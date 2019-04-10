@@ -14,6 +14,18 @@ tsmono adding foo it.
 
 Caution: Tested on linux only for now.
 
+How to use:
+===========
+
+```
+npm install tsmono # or similar tools from fyn to ..
+```
+
+Then see tsmono.json example below, run tsmono update and be done.
+
+Add your package.json contents to the tsmono.json file ..
+
+
 Example:
 ========
 
@@ -138,6 +150,11 @@ command line options
   tsmono update [--symlink-node-modules] 
   # rewrite package.json and tsconfig.json files then run npm-install-cmd
   # --symlink-node-modules-hack link node_modules to all dirs so that dependencies
+  # an alternativet would be to implement --recuse to run update on all
+  # dependencies installing npm based dependencies - but then you run the risk
+  # getting multiple verisons which will be harder to test
+
+
   # are found. The problem if if you use "paths" in tsconfig.json it doesn't matter whether
   # you symlink the .ts files to local ./tsmono/links directory or point to ../other-dir/srcr/*
   # node -r ts-node/register/trasnpile-only will look for the dependencies
