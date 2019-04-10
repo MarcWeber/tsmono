@@ -1,4 +1,4 @@
-tsmono typescript monorepositories
+tsmono: typescript monorepositories
 ===================================
 
 1) TS -> JS (transpile) -> babel -> just a lot of overhead
@@ -6,6 +6,13 @@ tsmono typescript monorepositories
 
 1) is annoying if you change files developing
 2) is what this repository is about
+
+"references" in tsconfig.json -> comes close, but you still need multiple
+actions to use a library: adding it to "references" and linking it.
+While it gets the job done, I think adding dependecies should be as easy as
+tsmono adding foo it.
+
+Caution: Tested on linux only for now.
 
 Example:
 ========
@@ -24,19 +31,26 @@ Example:
 
   {
    tsmono: {
-    directories: ["../"]
+    "directories": ["../"]
     "dependencies": ["lib", "tool"] // lib and tool will be made available if found in directories
    },
   }
 ```
 
-Running ```tsmono``` then will create package.json adding all the dependencies
-and dependencies of depnedencies looking in mono repository first.
+Running ```tsmono update``` then will create package.json adding all the dependencies
+and dependencies of dependencies looking in mono repository first.
 
 All the mono repository data will be linked to src/* so that tools pick the
 files up.
 
-```./bin/*``` will be populated for executables
+Progress
+========
+See test/test.ts
+
+libraries with package.json and tsmono.json get linked and run with the
+../node_modules symlinks hack, see below.
+
+More work is required to put executables in path
 
 Why extra file
 ==============
@@ -121,7 +135,14 @@ On windows: untested, help me.
 command line options
 ====================
 ```
-  tsmono update  # rewrite package.json and tsconfig.json files then run npm-install-cmd
+  tsmono update [--symlink-node-modules] 
+  # rewrite package.json and tsconfig.json files then run npm-install-cmd
+  # --symlink-node-modules-hack link node_modules to all dirs so that dependencies
+  # are found. The problem if if you use "paths" in tsconfig.json it doesn't matter whether
+  # you symlink the .ts files to local ./tsmono/links directory or point to ../other-dir/srcr/*
+  # node -r ts-node/register/trasnpile-only will look for the dependencies
+  # relative to the link target, not the symlink location.
+
   # TODO add --lock-time option as in fyn
   to be implemented (eg looking up the code to query node from fyn, eg https://registry.npmjs.org/@types%2fobjecthash
   tsmono watch  # run tsc or so in node_modules depenendency directories (TODO)

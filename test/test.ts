@@ -59,7 +59,7 @@ const prepare_tmp = () => {
     }
     `, 'utf-8')
     fs.writeFileSync(`${p}/src/lib.ts`,`
-    import {hash} from "object-hash"
+    import hash from "object-hash"
     export const libwithpackagejson:string = hash("lib")
     `, 'utf-8')
 
@@ -78,7 +78,7 @@ const prepare_tmp = () => {
     }
     `, 'utf-8')
     fs.writeFileSync(`${p}/src/lib.ts`,`
-    import {hash} from "object-hash"
+    import hash from "object-hash"
     import deepequal from "deep-equal"
     export const libwithtsmonojson:string = JSON.stringify([hash("lib"), deepequal([], [])])
     `, 'utf-8')
@@ -92,7 +92,7 @@ const prepare_tmp = () => {
         "package": {
           "name":"lib-using-libs",
         },
-        "dependencies":["lib-with-package-json", "lib-with-tsmono-json"],
+        "dependencies":["lib-with-package-json", "lib-with-tsmono-json"]
     }
     `, 'utf-8')
     fs.writeFileSync(`${p}/src/lib-using-libs.ts`,`
@@ -110,7 +110,7 @@ const prepare_tmp = () => {
       "package": {
         "name":"tool"
       },
-      "dependencies":["lib-with-package-json", "lib-with-tsmono-json"],
+      "dependencies":["lib-with-package-json", "lib-with-tsmono-json"]
     }
     `, 'utf-8')
     fs.writeFileSync(`${p}/tool/tool.ts`,`
@@ -157,7 +157,7 @@ const assert_eql = (a:string, b:string) => {
     assert(a.trim() === b.trim(), `assertion ${JSON.stringify(a)} === ${JSON.stringify(b)} failed`)
 }
 
-const hash = "xxxx"
+const hash = "libwithpackagejson 78376af8db2edfecc2e8f6e3abddb2c0e34021ea\nlibwithtsmonojson [\"78376af8db2edfecc2e8f6e3abddb2c0e34021ea\",true]"
 
 const main = async () => {
   await prepare_tmp()
@@ -169,17 +169,20 @@ const main = async () => {
   // tool can use lib
   console.log("IN TOOL");
   process.chdir("test-tmp/tool")
-  await tsmono("add", "lib")
-  await tsmono("add", "update")
+  // await tsmono("add", "lib")
+  await tsmono("update", "--symlink-node-modules-hack")
 
   // should be hash result ..
   assert_eql(hash, await run_stdout("node", '-r', 'ts-node/register/transpile-only', '-r', 'tsconfig-paths/register', 'tool/tool.ts'))
 
+  // will take care of this later:
   // project can use tool and lib-using-libs (level 2 deps)
   console.log("IN PROJECT");
   process.chdir("../project")
   await tsmono("add", "lib-using-libs", '-d', 'tool') // should also pull lib
-  await tsmono("update")
+  await tsmono("update", "--symlink-node-modules-hack")
+
+  // TODO: test that add works
 
   // tool should be running
   assert_eql(hash, await run_stdout("tsmono/tools-bin/tool"))
