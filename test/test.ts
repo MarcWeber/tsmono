@@ -62,6 +62,26 @@ const prepare_tmp = (tmp_dir) => {
     `, 'utf-8')
 
 
+
+    // lib with package json
+    var p = `${tmp_dir}/lib-with-package-json-older`
+    fs.mkdirpSync(`${p}/src`)
+    fs.writeFileSync(`${p}/package.json`,`
+    {
+        "name":"lib-with-package-json-older",
+        "dependencies": {
+          "object-hash": "^1.2.0"
+        },
+        "devDependencies": {
+          "@types/object-hash": "^1.2.0"
+        }
+    }
+    `, 'utf-8')
+    fs.writeFileSync(`${p}/src/lib.ts`,`
+    import hash from "object-hash"
+    export const libwithpackagejsonolder:string = hash("lib")
+    `, 'utf-8')
+
     var p = `${tmp_dir}/lib-with-tsmono-json`
     fs.mkdirpSync(`${p}/src`)
     fs.writeFileSync(`${p}/tsmono.json`,`
@@ -108,11 +128,12 @@ const prepare_tmp = (tmp_dir) => {
       "package": {
         "name":"tool"
       },
-      "dependencies":["lib-with-package-json", "lib-with-tsmono-json"]
+      "dependencies":["lib-with-package-json", "lib-with-package-json-older", "lib-with-tsmono-json"]
     }
     `, 'utf-8')
     fs.writeFileSync(`${p}/tool/tool.ts`,`
     import {libwithpackagejson} from "lib-with-package-json/lib"
+    import {libwithpackagejsonolder} from "lib-with-package-json-older/lib"
     import {libwithtsmonojson} from "lib-with-tsmono-json/lib"
     console.log("libwithpackagejson", libwithpackagejson)
     console.log("libwithtsmonojson", libwithtsmonojson)
@@ -144,7 +165,7 @@ const prepare_tmp = (tmp_dir) => {
 const cwd = process.cwd()
 
 const tsmono = async (...args:string[]) => {
-    await run("node", "-r", "ts-node/register/transpile-only", `${cwd}/tool/tsmono.ts`, ...args)
+    await run("node", "-r", "ts-node/register/transpile-only", `${cwd}/src/tsmono.ts`, ...args)
 }
 
 const assert = (a:boolean, msg:string = "") => {
@@ -177,8 +198,9 @@ const run_test = async (tmp_dir:string, dep_of_dep_style:"recurse"|"hack") => {
   // project can use tool and lib-using-libs (level 2 deps)
   console.log(`=== IN ${tmp_dir}/project`);
   process.chdir("../project")
-  await tsmono("add", "lib-using-libs", '-d', 'tool') // should also pull lib
-  await tsmono("update", hack_argument)
+
+  // await tsmono("add", "lib-using-libs", '-d', 'tool') // should also pull lib
+  // await tsmono("update", hack_argument)
 
   // // TODO: test that add works
   // // tool should be running

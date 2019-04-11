@@ -64,6 +64,7 @@ libraries with package.json and tsmono.json get linked and run with the
 different versions of the same library)..
 
 More work is required to put executables in path, too.
+Eg finish symlinking them all to tsmono/bin or so.
 
 Warnings about differing versions should be implemented.
 
