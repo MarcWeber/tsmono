@@ -2,7 +2,7 @@ import { ArgumentParser } from "argparse";
 import * as JSON5 from "json5";
 import * as fs from "fs-extra";
 import * as path from "path";
-import { spawn } from "child_process";
+import { spawn, SpawnOptions } from "child_process";
 import { basename, dirname, normalize } from "path";
 // import deepequal from "deep-equal"
 const deepequal = require("deep-equal") // allowSynteticImports doesn't exist for node -r ..
@@ -11,9 +11,12 @@ import deepmerge from "deepmerge"
 import {fetch} from "cross-fetch"
 import {homedir} from "os"
 
+const info = (s:string) => {
+  console.log(s)
+}
+
 /// LIBRARY SUPPORT CODE
 const clone = (x:any) => {
-  console.log("cloning", x);
   return x === undefined ? undefined : JSON.parse(JSON.stringify(x))
 }
 
@@ -29,16 +32,16 @@ const assert = (a:boolean, msg:string = "") => {
 const assert_eql = (a:string, b:string) => {
     assert(a.trim() === b.trim(), `assertion ${JSON.stringify(a)} === ${JSON.stringify(b)} failed`)
 }
-const run = async (cmd: string, args:string[]) => {
+const run = async (cmd: string, args:string[], opts:SpawnOptions = {}) => {
   // duplicate code
   await new Promise((a, b) => {
-    const child = spawn(cmd, args, {
+    const child = spawn(cmd, args, Object.assign({
       stdio: [
-        0, // use parents stdin for child
-        'pipe', // pipe child's stdout to parent
-        fs.openSync("err.out", "w") // direct child's stderr to a file
+        'ignore', // use parents stdin for child
+        'inherit', // pipe child's stdout to parent
+        'inherit' // direct child's stderr to a file
       ]
-    });
+    }, opts));
     child.on('close', (code, signal) => {
       if (code === 0) a()
       b(`${cmd.toString()} failed with code ${code}`)
@@ -158,7 +161,7 @@ const parse_dependency = (s:string, origin?: string):Dependency =>{
       r.version = v.slice(8); continue;
     }
     if (v === 'node_modules') r[v] = true;
-    if (v === 'types') r[v] = true;
+    if (v === 'types') { r[v] = true; r["npm"] = true; }
     if (v === 'npm') r[v] = true;
   }
   if (origin !== undefined) r.origin = origin;
@@ -266,12 +269,12 @@ class JSONFile {
     }
   }
 
-  flush_protect_user_changes(){
+  flush_protect_user_changes(force:boolean = false){
     const protect_path = `${this.path}.tsmonoguard`
     if (fs.existsSync(protect_path)){
-      if (fs.readFileSync(protect_path, 'utf8') !== fs.readFileSync(this.path, 'utf8'))
+      if (!force && fs.readFileSync(protect_path, 'utf8') !== fs.readFileSync(this.path, 'utf8'))
         // TODO nicer diff or allow applying changes to tsmono.json
-        throw new Error(`Move ${protect_path} ${this.path} to continue. Not overwriting your changes`)
+        throw new Error(`mv ${protect_path} ${this.path} to continue. Not overwriting your changes. Use --force to force`)
     }
     console.log("flushing", this.json);
     this.flush()
@@ -429,14 +432,26 @@ class Repository {
     return fs.existsSync(src) ? src : this.path
   }
 
-  async update(cfg: Config, opts:{link_to_links?:boolean, run_update?:boolean, symlink_node_modules_hack?:boolean} = {}){
-
+  async update(cfg: Config, opts: {link_to_links?:boolean, install_npm_packages?:boolean, symlink_node_modules_hack?:boolean, recurse?: boolean, force?:boolean} = {}){
+    console.log("opts", opts);
+    /*
+    * symlink_node_modules_hack -> see README. This will break other repos - thus you can only work on one repository
+    * recurse -> run update on each dependency folder, too. This will result in duplicate installations (TODO: test on non tsmono on those just run fyn)
+    */
     assert(!!opts.link_to_links, 'link_to_links should be true') 
     // otherwise node_modules relative to the .ts files location will be used arnd chaos will hapen
     // So we must link to local directory
 
+    if (!fs.existsSync(`${this.path}/tsmono.json`)){
+      // only run fyn if package.json exists
+      if (opts.install_npm_packages && fs.existsSync(`${this.path}/package.json`)){
+        info(`running fyn in dependency ${this.path}`)
+        await run('fyn', [], {'cwd': this.path})
+      }
+      return
+    }
 
-    const link_dir:string = "tsmono/links";
+    const link_dir:string = `${this.path}/tsmono/links`;
 
     (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach((x:string) => {
       fs.unlinkSync(`${link_dir}/${x}`)
@@ -459,7 +474,7 @@ class Repository {
     console.log("dep_collection", dep_collection);
 
     const expected_symlinks: {[key:string]: string} = {}
-    const expected_tools: {[key:string]: string} = {}
+    const expected_tools:    {[key:string]: string} = {}
 
     const path_for_tsconfig = (tsconfig_path:string) => {
       const r:any = {}
@@ -471,7 +486,7 @@ class Repository {
             const rhs = path.relative(dirname(tsconfig_path), path.resolve(cwd,
               (!!opts.link_to_links)
               ? `${link_dir}/${v[0].name}/*`
-              : `v[0].repository.src()))}/*`
+              : `${v[0].repository.src()}/*`
               ))
 
             ensure_path(r, 'compilerOptions', 'paths', lhs, [])
@@ -505,6 +520,8 @@ class Repository {
     }
 
     const fix_ts_config = (x:any) => {
+      console.log("fixing", x);
+      ensure_path(x, 'compilerOptions', {})
       if (x.compilerOptions.paths && !('baseUrl' in x.compilerOptions))
       x.compilerOptions.baseUrl = "."
 
@@ -539,7 +556,7 @@ class Repository {
       ['tsmono/tools','tsmono/tools-bin','tsmono/tools-bin-check' ].forEach((x) => { if (!fs.existsSync(x)) fs.mkdirSync(x) })
 
       // this is going to break if you have realtive symlinks ?
-      expected_symlinks[`tsmono/tools/${k}`] = v
+      expected_symlinks[`${this.path}/}tsmono/tools/${k}`] = v
 
       // TODO windows
       // boldly create in node_modules/.bin instead to make things just work ?
@@ -553,6 +570,7 @@ class Repository {
     for (let [k, v] of Object.entries(expected_symlinks)){
       del_if_exists(k)
       fs.mkdirpSync(dirname(k))
+      console.log("linking", v, k);
       fs.symlinkSync(v, k)
     }
 
@@ -571,7 +589,7 @@ class Repository {
           const type_version = await cfg.npm_version_for_name(type_name)
           console.log("got type version", type_version);
           if (type_version !== undefined)
-            ensure_path(package_json, dep, type_name, await cfg.npm_version_for_name(dep_name))
+            ensure_path(package_json, 'devDependencies', type_name, await cfg.npm_version_for_name(type_name))
         }
         console.log("package_json", package_json);
       }
@@ -587,12 +605,12 @@ class Repository {
     console.log("package_json2", package_json);
     this.packagejson.json = package_json;
     console.log("package_json2", this.packagejson.json);
-    this.packagejson.flush_protect_user_changes()
+    this.packagejson.flush_protect_user_changes(opts.force)
 
-    if (opts.run_update){
-      console.log("run_update");
+    if (opts.install_npm_packages){
+      console.log("install_npm_packages");
       const npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"])
-      await run(npm_install_cmd[0], npm_install_cmd.slice(1))
+      await run(npm_install_cmd[0], npm_install_cmd.slice(1), {'cwd': this.path})
     }
 
     console.log("opts", opts);
@@ -607,6 +625,17 @@ class Repository {
         fs.symlinkSync(path.relative(dir, `${this.path}/node_modules`), n)
       }
     }
+    if (opts.recurse){
+      const opts2 = clone(opts)
+      opts2.symlink_node_modules_hack = false; // mutually exclusive. when using it ony one repository can be active
+      const repositories = Object.values(dep_collection.dependency_locactions).filter((x) => x[0].repository ).map((x) => x[0].repository)
+
+      // TODO run in parallel ?
+      for (const r of repositories) {
+          info(`recursing into dependency ${r.path}`);
+          await r.update(cfg, opts2)
+      }
+    }
   }
 
   async add(cfg:Config, dependencies:string[], devDependencies:string[]){
@@ -615,7 +644,7 @@ class Repository {
     const j = this.tsmonojson.json;
     j["dependencies"] = [...j["dependencies"], ...dependencies.filter((x) => !(j["dependencies"] || []).includes(x))]
     j["devDependencies"] = [...j["devDependencies"], ...devDependencies.filter((x) => !(j["devDependencies"] || []).includes(x))]
-    await this.update(cfg, {link_to_links : true, run_update : true})
+    await this.update(cfg, {link_to_links : true, install_npm_packages : true})
   }
 
 }
@@ -635,11 +664,11 @@ var add    = sp.addParser("add", {'addHelp':true})
 add.addArgument("args", {'nargs':'*'})
 var update = sp.addParser("update", {'addHelp':true})
 update.addArgument("--symlink-node-modules-hack", {'action': 'storeTrue'})
+update.addArgument("--recurse", {'action': 'storeTrue'})
+update.addArgument("--force", {'action': 'storeTrue'})
 var watch = sp.addParser("watch", {'addHelp':true})
 
-console.log(process.argv)
 const args = parser.parseArgs();
-console.log("args", args);
 
 const main = async () => {
   const cache = new DirectoryCache(`${homedir()}/.tsmono/cache`)
@@ -670,7 +699,7 @@ const main = async () => {
     return;
   }
   if (args.main_action == "update"){
-    await p.update(cfg, {link_to_links: true, run_update : true, symlink_node_modules_hack: args.symlink_node_modules_hack})
+    await p.update(cfg, {link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force})
     return;
   }
   if (args.main_action == "add"){

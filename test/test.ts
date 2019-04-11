@@ -36,16 +36,14 @@ const run_stdout = async (cmd: string, ...args:string[]) => {
     return stdout
 }
 
-const test_tmp = "test-tmp";
+const prepare_tmp = (tmp_dir) => {
 
-const prepare_tmp = () => {
-
-    if (!fs.existsSync('test-tmp'))
-      fs.mkdirSync('test-tmp')
-    fs.emptyDirSync("test-tmp")
+    if (!fs.existsSync(tmp_dir))
+      fs.mkdirSync(tmp_dir)
+    fs.emptyDirSync(tmp_dir)
 
     // lib with package json
-    var p = `${test_tmp}/lib-with-package-json`
+    var p = `${tmp_dir}/lib-with-package-json`
     fs.mkdirpSync(`${p}/src`)
     fs.writeFileSync(`${p}/package.json`,`
     {
@@ -54,7 +52,7 @@ const prepare_tmp = () => {
           "object-hash": "^1.3.1"
         },
         "devDependencies": {
-          "@types/object-hash": "^1.2.0",
+          "@types/object-hash": "^1.2.0"
         }
     }
     `, 'utf-8')
@@ -64,7 +62,7 @@ const prepare_tmp = () => {
     `, 'utf-8')
 
 
-    var p = `${test_tmp}/lib-with-tsmono-json`
+    var p = `${tmp_dir}/lib-with-tsmono-json`
     fs.mkdirpSync(`${p}/src`)
     fs.writeFileSync(`${p}/tsmono.json`,`
     {
@@ -85,7 +83,7 @@ const prepare_tmp = () => {
 
 
     // lib-using-libs
-    p = `${test_tmp}/lib-using-libs`
+    p = `${tmp_dir}/lib-using-libs`
     fs.mkdirpSync(`${p}/src`)
     fs.writeFileSync(`${p}/tsmono.json`,`
     {
@@ -103,7 +101,7 @@ const prepare_tmp = () => {
     `, 'utf-8')
 
     // tool
-    p = `${test_tmp}/tool`
+    p = `${tmp_dir}/tool`
     fs.mkdirpSync(`${p}/tool`)
     fs.writeFileSync(`${p}/tsmono.json`,`
     { 
@@ -122,7 +120,7 @@ const prepare_tmp = () => {
 
 
     // project
-    p = `${test_tmp}/project`
+    p = `${tmp_dir}/project`
     fs.mkdirpSync(`${p}/tool`)
     fs.mkdirpSync(`${p}/src`)
     fs.writeFileSync(`${p}/tsmono.json`,`
@@ -159,37 +157,43 @@ const assert_eql = (a:string, b:string) => {
 
 const hash = "libwithpackagejson 78376af8db2edfecc2e8f6e3abddb2c0e34021ea\nlibwithtsmonojson [\"78376af8db2edfecc2e8f6e3abddb2c0e34021ea\",true]"
 
-const main = async () => {
-  await prepare_tmp()
+const run_test = async (tmp_dir:string, dep_of_dep_style:"recurse"|"hack") => {
 
-  process.env['TS_NODE_COMPILER_OPTIONS'] = '{ "esModuleInterop": true  }'
+  const hack_argument = dep_of_dep_style == "recurse" ? "--recurse" : "--symlink-node-modules-hack"
 
-  assert_eql('a', await run_stdout('echo', "a"))
+  await prepare_tmp(tmp_dir)
 
   // tool can use lib
-  console.log("IN TOOL");
-  process.chdir("test-tmp/tool")
+  console.log(`=== IN ${tmp_dir}/tool`, dep_of_dep_style);
+  process.chdir(`${tmp_dir}/tool`)
+
   // await tsmono("add", "lib")
-  await tsmono("update", "--symlink-node-modules-hack")
+  await tsmono("update", hack_argument)
 
   // should be hash result ..
   assert_eql(hash, await run_stdout("node", '-r', 'ts-node/register/transpile-only', '-r', 'tsconfig-paths/register', 'tool/tool.ts'))
 
   // will take care of this later:
   // project can use tool and lib-using-libs (level 2 deps)
-  console.log("IN PROJECT");
+  console.log(`=== IN ${tmp_dir}/project`);
   process.chdir("../project")
   await tsmono("add", "lib-using-libs", '-d', 'tool') // should also pull lib
-  await tsmono("update", "--symlink-node-modules-hack")
+  await tsmono("update", hack_argument)
 
-  // TODO: test that add works
+  // // TODO: test that add works
+  // // tool should be running
+  // assert_eql(hash, await run_stdout("tsmono/tools-bin/tool"))
+  // // project-tool should be running
+  // assert_eql(hash, await run_stdout("node", '-r', 'ts-node/register/transpile-only', 'tool/project-tool.ts'))
+}
 
-  // tool should be running
-  assert_eql(hash, await run_stdout("tsmono/tools-bin/tool"))
 
-  // project-tool should be running
-  assert_eql(hash, await run_stdout("node", '-r', 'ts-node/register/transpile-only', 'tool/project-tool.ts'))
-  
+const main = async () => {
+  process.env['TS_NODE_COMPILER_OPTIONS'] = '{ "esModuleInterop": true  }'
+  assert_eql('a', await run_stdout('echo', "a"))
+
+  await run_test("test-tmp-recurse", "recurse")
+  await run_test("test-tmp-hack", "hack")
 }
 
 main().then(

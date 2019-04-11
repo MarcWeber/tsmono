@@ -4,6 +4,10 @@
   "scripts": {
     "build": "rimraf dist && tsc"
   },
+  "keywords": [
+    "monorepo",
+    "typescript"
+  ],
   "files": [
     "dist/",
     "LICENSE"

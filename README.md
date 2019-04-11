@@ -60,9 +60,12 @@ Progress
 See test/test.ts
 
 libraries with package.json and tsmono.json get linked and run with the
-../node_modules symlinks hack, see below.
+../node_modules symlinks hack, or --recurse (running the risk that you use
+different versions of the same library)..
 
-More work is required to put executables in path
+More work is required to put executables in path, too.
+
+Warnings about differing versions should be implemented.
 
 Why extra file
 ==============
