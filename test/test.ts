@@ -36,7 +36,7 @@ const run_stdout = async (cmd: string, ...args:string[]) => {
     return stdout
 }
 
-const prepare_tmp = (tmp_dir) => {
+const prepare_tmp = (tmp_dir:string) => {
 
     if (!fs.existsSync(tmp_dir))
       fs.mkdirSync(tmp_dir)
@@ -211,7 +211,7 @@ const run_test = async (tmp_dir:string, dep_of_dep_style:"recurse"|"hack") => {
 
 
 const main = async () => {
-  process.env['TS_NODE_COMPILER_OPTIONS'] = '{ "esModuleInterop": true  }'
+  // process.env['TS_NODE_COMPILER_OPTIONS'] = '{ "esModuleInterop": true  }'
   assert_eql('a', await run_stdout('echo', "a"))
 
   await run_test("test-tmp-recurse", "recurse")

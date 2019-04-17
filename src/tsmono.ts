@@ -7,11 +7,13 @@ const debug = debug_("tsmono")
 import { spawn, SpawnOptions } from "child_process";
 import { basename, dirname, normalize } from "path";
 // import deepequal from "deep-equal"
-const deepequal = require("deep-equal") // allowSynteticImports doesn't exist for node -r ..
+import deepequal from "deep-equal"
 import btoa from "btoa"
 import deepmerge from "deepmerge"
 import {fetch} from "cross-fetch"
 import {homedir} from "os"
+
+// TODO: use path.join everywhere
 
 const info = (s:string) => {
   console.log(s)
@@ -150,7 +152,8 @@ type Dependency = {
   node_modules?:boolean, // requires TS -> .js .d.ts steps
   types?:boolean,
   reference_by_references?:boolean,
-  origin?:string // where this dependency was declared
+  origin?:string, // where this dependency was declared
+  ignore_src?:boolean
 }
 
 const parse_dependency = (s:string, origin?: string):Dependency =>{
@@ -163,6 +166,7 @@ const parse_dependency = (s:string, origin?: string):Dependency =>{
     if (v === 'node_modules') r[v] = true;
     if (v === 'types') { r[v] = true; r["npm"] = true; }
     if (v === 'npm') r[v] = true;
+    if (v === 'ignore_src') r[v] = true;
   }
   if (origin !== undefined) r.origin = origin;
   return r;
@@ -235,6 +239,17 @@ const ensure_path = (obj:any, ...args:any[]):any => {
     obj = obj[k]
   }
 }
+
+const protect = (path:string, flush: () => void, force:boolean=false, protect_path:string = `${path}.protect`) => {
+    if (fs.existsSync(protect_path) && fs.existsSync(path)){
+      if (!force && fs.readFileSync(protect_path, 'utf8') !== fs.readFileSync(path, 'utf8'))
+        // TODO nicer diff or allow applying changes to tsmono.json
+        throw new Error(`mv ${protect_path} ${path} to continue. Not overwriting your changes. Use --force to force`)
+    }
+    flush()
+    fs.copyFileSync(path, protect_path)
+}
+
 class JSONFile {
 
   private json_on_disc:object|undefined = undefined;
@@ -267,14 +282,7 @@ class JSONFile {
   }
 
   flush_protect_user_changes(force:boolean = false){
-    const protect_path = `${this.path}.tsmonoguard`
-    if (fs.existsSync(protect_path)){
-      if (!force && fs.readFileSync(protect_path, 'utf8') !== fs.readFileSync(this.path, 'utf8'))
-        // TODO nicer diff or allow applying changes to tsmono.json
-        throw new Error(`mv ${protect_path} ${this.path} to continue. Not overwriting your changes. Use --force to force`)
-    }
-    this.flush()
-    fs.copyFileSync(this.path, protect_path)
+    protect(this.path, () => { this.flush(); }, force)
   }
 }
 
@@ -458,18 +466,13 @@ class Repository {
 
   }
 
-  public src():string{
-    // the src file of this repository which should be linked to depending repository
-    const src = `${this.path}/src`
-    return fs.existsSync(src) ? src : this.path
-  }
 
   async update(cfg: Config, opts: {link_to_links?:boolean, install_npm_packages?:boolean, symlink_node_modules_hack?:boolean, recurse?: boolean, force?:boolean} = {}){
     /*
     * symlink_node_modules_hack -> see README. This will break other repos - thus you can only work on one repository
     * recurse -> run update on each dependency folder, too. This will result in duplicate installations (TODO: test on non tsmono on those just run fyn)
     */
-    assert(!!opts.link_to_links, 'link_to_links should be true') 
+    // assert(!!opts.link_to_links, 'link_to_links should be true') 
     // otherwise node_modules relative to the .ts files location will be used arnd chaos will hapen
     // So we must link to local directory
 
@@ -512,16 +515,26 @@ class Repository {
         for (let [k, v] of Object.entries(dep_collection.dependency_locactions)) {
           if ( v[0].repository) {
             // path.absolute path.relative(from,to) ?
-            const lhs = `${k}/*`
+
+            const src = 
+              !v[0].ignore_src && fs.existsSync(`${v[0].repository.path}/src`)
+              ? '/src'
+              : ''
+
             const rhs = path.relative(dirname(tsconfig_path), path.resolve(cwd,
               (!!opts.link_to_links)
-              ? `${link_dir}/${v[0].name}/*`
-              : `${v[0].repository.src()}/*`
-              ))
+              ? `${link_dir}/${v[0].name}${src}`
+              : `${v[0].repository.path}${src}`
+            ))
 
-            ensure_path(r, 'compilerOptions', 'paths', lhs, [])
-            if (!r.compilerOptions.paths[lhs].includes(rhs))
-              r.compilerOptions.paths[lhs].push(rhs)
+            const a = (lhs:string, rhs:string) => {
+              ensure_path(r, 'compilerOptions', 'paths', lhs, [])
+              if (!r.compilerOptions.paths[lhs].includes(rhs)){
+                r.compilerOptions.paths[lhs].push(rhs)
+              }
+            }
+            a(k, rhs) // without * for index.ts
+            a(`${k}/*`, `${rhs}/*`) // for pkg/foo.ts or pkg/foo/sth.ts
           }
         }
       }
@@ -530,10 +543,8 @@ class Repository {
 
     for (let [k, v] of Object.entries(dep_collection.dependency_locactions)) {
       if (v[0].repository) {
-        const src = `${v[0].repository.path}/src`
-        var src_dir = fs.existsSync(src) ? src : v[0].repository.path
         if (opts.link_to_links) {
-          expected_symlinks[`${link_dir}/${k}`] = `../../${src_dir}`
+          expected_symlinks[`${link_dir}/${k}`] = `../../${v[0].repository.path}`
         }
 
         const src_tool = `${v[0].repository.path}/src/tool`;
@@ -555,6 +566,11 @@ class Repository {
       x.compilerOptions.allowSyntheticDefaultImports = true
       x.compilerOptions.esModuleInterop = true
 
+      // if we have an dist/outDir add to exclude
+      for (const key of ['outDir', 'outFile']) {
+        if (x.compilerOptions[key])
+          ensure_path(x, 'exclude', []).push(x.compilerOptions[key])
+      }
       return x;
     }
 
@@ -565,7 +581,7 @@ class Repository {
     } else if ('tsconfig' in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0){
       const tsconfig_path = `${this.path}/tsconfig.json`
       const json:string = JSON.stringify(fix_ts_config(deepmerge( tsmonojson.tsconfig || {}, path_for_tsconfig(tsconfig_path), tsconfig )), undefined, 2)
-      fs.writeFileSync(tsconfig_path, json, 'utf8')
+      protect(tsconfig_path, () => { fs.writeFileSync(tsconfig_path, json, 'utf8'); }, opts.force);
     }
 
 
@@ -675,13 +691,14 @@ const parser = new ArgumentParser({
 });
 const sp = parser.addSubparsers({
   'title':'sub commands',
-  'dest':'main_action'
+  'dest':'main_action',
 })
 var init   = sp.addParser("init", {'addHelp':true})
 var add    = sp.addParser("add", {'addHelp':true})
 add.addArgument("args", {'nargs':'*'})
-var update = sp.addParser("update", {'addHelp':true})
+var update = sp.addParser("update", {'addHelp':true, 'description': 'This also is default action'})
 update.addArgument("--symlink-node-modules-hack", {'action': 'storeTrue'})
+update.addArgument("--link-to-links", {'action': 'storeTrue', 'help': 'link ts dependencies to tsmono/links/* using symlinks'})
 update.addArgument("--recurse", {'action': 'storeTrue'})
 update.addArgument("--force", {'action': 'storeTrue'})
 var watch = sp.addParser("watch", {'addHelp':true})
@@ -689,7 +706,7 @@ var watch = sp.addParser("watch", {'addHelp':true})
 const args = parser.parseArgs();
 
 const main = async () => {
-  const cache = new DirectoryCache(`${homedir()}/.tsmono/cache`)
+  const cache = new DirectoryCache(`${homedir()}/.smono/cache`)
 
   const config = {
     cache,
@@ -699,6 +716,11 @@ const main = async () => {
   const cfg = Object.assign({}, config, cfg_api(config))
 
   const p = new Repository(process.cwd())
+
+  const update = async () => {
+    await p.update(cfg, {link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force})
+  }
+
   if (args.main_action == "init"){
     await p.init()
     return;
@@ -717,17 +739,20 @@ const main = async () => {
     return;
   }
   if (args.main_action == "update"){
-    await p.update(cfg, {link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force})
-    return;
+    await update(); return
   }
   if (args.main_action == "add"){
     throw new Error("TODO")
   }
-  const package_json = fs.readFileSync("package.json")
+  // default action is update - does not work due to argparse (TOOD, there is no reqired: false for addSubparsers)
+  // await update()
 }
 
-process.on("unhandledRejection", (error) => {
+process.on("unhandledRejection", (error:any) => {
   console.error(error); // This prints error with stack included (as for normal errors)
+  if (error.message)
+    console.error(error.message); // the error above does not print the message for whatever reason, so do so
+
   throw error; // Following best practices re-throw error and let the process exit with error code
 });
 

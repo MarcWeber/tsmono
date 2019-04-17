@@ -25,6 +25,20 @@ Then see tsmono.json example below, run tsmono update and be done.
 
 Add your package.json contents to the tsmono.json file ..
 
+Problems:
+=========
+Well if the depending packages have conflicting tsconfig settings then you
+might run into trouble, see node_modules flag (untested / to be developed)
+
+tsconfig options which might cause problems if set differently (incomplete list)
+suppressImplicitAnyIndexErrors
+
+TODO: take care of it and tell user
+
+convenient fixes for tsconfig files
+===================================
+See fix_tsconfig
+* if outDir or outFile is set automatically add to excludes to prevent multiple files would write to same distination file errors
 
 Example:
 ========
