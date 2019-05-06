@@ -1,11 +1,17 @@
 tsmono: typescript monorepositories
 ===================================
 
-1) TS -> JS (transpile) -> babel -> just a lot of overhead
-2) TS -> target (transpile maybe with type checking) -> works, but requires all .ts files sharing same tsconfig settings.
+WHY?
+====
+* edit libraries and target lib/application in the same vscode session and
+  refactor or edit without intermediary transpiling
+* allow multiple versions of dependencies in the same project (does not work
+  with different versions of transient dependencies managed by node, becaues
+  they end up in package.json dependecies fields)
 
-1) is annoying if you change files developing
-2) is what this repository is about
+
+Without tsmono, what is next best option?
+========================================
 
 "references" in tsconfig.json -> comes close, but you still need multiple
 actions to use a library: adding it to "references" and linking it.
@@ -56,10 +62,9 @@ Example:
   monorepo/project/tsmono.json (package.json / tsconfig.json will be derived from it)
 
   {
-   tsmono: {
+    // more examples see below
     "directories": ["../"]
     "dependencies": ["lib", "tool"] // lib and tool will be made available if found in directories
-   },
   }
 ```
 
@@ -104,6 +109,8 @@ tsmono.json example file:
     "name": "..",
 
   }
+
+  "directories": ["../"],
 
   // command to install npm packages from package.json 
   "npm-install-cmd": ["npm", "i"], # or ["fyn"]
@@ -153,6 +160,10 @@ dep:
                    I think we can handle this with "references" or by running own command depending on config
                    "references" should be the default way I think ?
                    TODO: think about 
+
+                   I think the best fix is to allow different compilerOptions
+                   to be applied for parst of the sources, thus to extend tsconfig files. 
+                   https://github.com/Microsoft/TypeScript/issues/31035
 
 ```
 
@@ -266,3 +277,12 @@ EOF
 
 tsc --build .
 )
+
+
+# TODO
+If a local dependency is a version controlled package each time tsmono update is run record that hash
+This way you have some control over updates. Thus if s.th breakes you know where to start looking for changes
+
+.gitignore and .node ignore like file
+
+# G

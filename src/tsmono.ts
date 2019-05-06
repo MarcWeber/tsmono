@@ -392,7 +392,7 @@ class DependencyCollection {
       this[key] = [...this[key], ...deps[key].map((x) => x.name).filter(filter)]
     }
     add("dependencies")
-    if (dev === true || dev === 'dev-types') add("devDependencies", (x:string) => /@types/.test(x))
+    if (dev === true || dev === 'dev-types') add("devDependencies", (x:string) => /^@types/.test(x))
   }
 
   do(){
@@ -478,6 +478,7 @@ class Repository {
 
     if (!fs.existsSync(`${this.path}/tsmono.json`)){
       // only run fyn if package.json exists
+      info("!! NO tsmono.json found, only trying to run fyn")
       if (opts.install_npm_packages && fs.existsSync(`${this.path}/package.json`)){
         info(`running fyn in dependency ${this.path}`)
         await run('fyn', [], {'cwd': this.path})
