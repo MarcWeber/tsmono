@@ -194,6 +194,10 @@ command line options
   tsmono watch  # run tsc or so in node_modules depenendency directories (TODO)
   tsmono add [--no-types] foo -d bar # add foo and devDependencies bar, then run update
   tsmono remove foo -bar # remove libraries again
+
+  tsmono push-with-dependencies --shell-on-change --git-push-remote-location-name origin --run-remote-command 'user@host:typescript:git pull; tsmono --update --link-to-links'
+  # pushes multiple repositories to a remote location optionally pulilng them, too.
+  # great for keeping a test or server inv up to date with your local changes
 ```
 
 Think about this:

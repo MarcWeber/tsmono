@@ -41,16 +41,26 @@ const assert = (a:boolean, msg:string = "") => {
 const assert_eql = (a:string, b:string) => {
     assert(a.trim() === b.trim(), `assertion ${JSON.stringify(a)} === ${JSON.stringify(b)} failed`)
 }
-const run = async (cmd: string, args:string[], opts:SpawnOptions = {}) => {
+const run = async (cmd: string, opts: {args?:string[], stdin?:string} & SpawnOptions) => {
+  const args = opts.args || []
+  console.log("running", cmd, args, 'in', opts.cwd);
+
   // duplicate code
   await new Promise((a, b) => {
     const child = spawn(cmd, args, Object.assign({
       stdio: [
-        'ignore', // use parents stdin for child
+        'pipe', // use parents stdin for child
         'inherit', // pipe child's stdout to parent
         'inherit' // direct child's stderr to a file
       ]
     }, opts));
+    if ('stdin' in opts && child.stdin){
+      // @ts-ignore
+      child.stdin.setEncoding('utf8');
+      child.stdin.write(opts.stdin)
+    }
+    // @ts-ignore
+    child.stdin.end()
     child.on('close', (code, signal) => {
       if (code === 0) a()
       b(`${cmd.toString()} failed with code ${code}`)
@@ -58,14 +68,15 @@ const run = async (cmd: string, args:string[], opts:SpawnOptions = {}) => {
   })
 }
 
-const run_stdout = async (cmd: string, ...args:string[]) => {
-  debug("running", cmd, args);
+const run_stdout = async (cmd: string, opts: {args?: string[]} & SpawnOptions) => {
+  const args = opts.args || [];
+  console.log("running", cmd, args, 'in', opts.cwd);
     var stdout = ""
     // duplicate code
     await new Promise((a, b) => {
-        const child = spawn(cmd, args, {
+        const child = spawn(cmd, args, Object.assign( opts, {
             stdio: [ 0, 'pipe', 2 ]
-        });
+        }));
         if (!child.stdout)
             throw new Error("child.stdout is null")
 
@@ -426,8 +437,8 @@ class DependencyCollection {
 
 class Repository {
 
-  private tsmonojson: TSMONOJSONFile;
-  private packagejson: JSONFile;
+  public tsmonojson: TSMONOJSONFile;
+  public packagejson: JSONFile;
 
   constructor(public path:string) {
     this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
@@ -440,7 +451,7 @@ class Repository {
   }
 
   init(){
-    const tsconfig = `${this.path}/tsconfig.json`
+    const tsconfig = path.join(this.path, 'tsconfig.json')
     this.tsmonojson.init(fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, 'utf8')) : {})
   }
 
@@ -481,7 +492,7 @@ class Repository {
       info("!! NO tsmono.json found, only trying to run fyn")
       if (opts.install_npm_packages && fs.existsSync(`${this.path}/package.json`)){
         info(`running fyn in dependency ${this.path}`)
-        await run('fyn', [], {'cwd': this.path})
+        await run('fyn', {'cwd': this.path})
       }
       return
     }
@@ -576,11 +587,11 @@ class Repository {
     }
 
     if ('tsconfigs' in tsmonojson){
-      for (let [path, merge] of Object.entries(tsmonojson.tsconfigs)) {
-        fs.writeFileSync(path, JSON.stringify(fix_ts_config(deepmerge.all([ tsmonojson.tsconfig || {}, path_for_tsconfig(path), tsconfig, merge ])), undefined, 2), 'utf8')
+      for (let [path_, merge] of Object.entries(tsmonojson.tsconfigs)) {
+        fs.writeFileSync(path.join(path_, `tsconfig.json`), JSON.stringify(fix_ts_config(deepmerge.all([ tsmonojson.tsconfig || {}, path_for_tsconfig(path_), tsconfig, merge ])), undefined, 2), 'utf8')
       }
     } else if ('tsconfig' in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0){
-      const tsconfig_path = `${this.path}/tsconfig.json`
+      const tsconfig_path = path.join(this.path, 'tsconfig.json')
       const json:string = JSON.stringify(fix_ts_config(deepmerge( tsmonojson.tsconfig || {}, path_for_tsconfig(tsconfig_path), tsconfig )), undefined, 2)
       protect(tsconfig_path, () => { fs.writeFileSync(tsconfig_path, json, 'utf8'); }, opts.force);
     }
@@ -646,7 +657,7 @@ class Repository {
     if (opts.install_npm_packages){
       debug("install_npm_packages");
       const npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"])
-      await run(npm_install_cmd[0], npm_install_cmd.slice(1), {'cwd': this.path})
+      await run(npm_install_cmd[0], {'args': npm_install_cmd.slice(1), 'cwd': this.path})
     }
 
     if (opts.symlink_node_modules_hack){
@@ -694,15 +705,21 @@ const sp = parser.addSubparsers({
   'title':'sub commands',
   'dest':'main_action',
 })
-var init   = sp.addParser("init", {'addHelp':true})
-var add    = sp.addParser("add", {'addHelp':true})
+const init   = sp.addParser("init", {'addHelp':true})
+const add    = sp.addParser("add", {'addHelp':true})
 add.addArgument("args", {'nargs':'*'})
 var update = sp.addParser("update", {'addHelp':true, 'description': 'This also is default action'})
 update.addArgument("--symlink-node-modules-hack", {'action': 'storeTrue'})
 update.addArgument("--link-to-links", {'action': 'storeTrue', 'help': 'link ts dependencies to tsmono/links/* using symlinks'})
 update.addArgument("--recurse", {'action': 'storeTrue'})
 update.addArgument("--force", {'action': 'storeTrue'})
-var watch = sp.addParser("watch", {'addHelp':true})
+
+const push = sp.addParser("push-with-dependencies", {'addHelp':true, 'description': 'upload to git repository'})
+push.addArgument("--shell-on-changes", {'action': 'storeTrue', 'help': 'open shell so that you can commit changes'})
+push.addArgument("--git-push-remote-location-name", { 'help': 'eg origin'})
+push.addArgument("--run-remote-command", {'help': 'remote ssh location to run git pull in user@host:path:cmd'})
+
+var watch  = sp.addParser("watch", {'addHelp':true})
 
 const args = parser.parseArgs();
 
@@ -745,6 +762,47 @@ const main = async () => {
   if (args.main_action == "add"){
     throw new Error("TODO")
   }
+
+  if (args.main_action == "push-with-dependencies"){
+    const p = new Repository(process.cwd())
+    const dep_collection = new DependencyCollection(p.path, p.tsmonojson.dirs())
+    dep_collection.dependencies_of_repository(p, true)
+    dep_collection.do()
+    dep_collection.print_warnings()
+
+    const basenames_to_pull:string[] = []
+    const seen:string[] = [] // TODO: why aret there duplicates ?
+    for (let [k, v] of Object.entries(dep_collection.dependency_locactions)) {
+      const r = v[0].repository
+      if (r) {
+        if (seen.includes(r.path)) continue;
+        seen.push(r.path)
+
+        // 1 updates / commit
+        if (args.shell_on_changes && "" != await run_stdout('git', {args: ['diff'], cwd: r.path})){
+          console.log(`${r.path} is dirty, please commit changes starting shell`)
+          await run('/bin/sh', {'cwd': r.path})
+        }
+        // 2 push
+        if (args.git_push_remote_location_name){
+          console.log(`... pushing in ${r.path} ...`)
+          await run('git', {'args': ['push', args.git_push_remote_location_name], 'cwd': r.path})
+        }
+        // 3 checkout
+        if (args.run_remote_command){
+          basenames_to_pull.push(path.basename(r.path))
+        }
+      }
+
+      for (const v of basenames_to_pull){
+          const user_host  = args.run_remote_command.split(':')
+          const target_path = `${user_host[1]}/${v}`
+          console.log(`... pulling ${args.ssh_remote_location_git_pull}${v} ...`)
+          await run('ssh', {args: [user_host[0]], stdin: `cd ${target_path}; ${user_host[2]}`})
+      }
+    }
+  }
+
   // default action is update - does not work due to argparse (TOOD, there is no reqired: false for addSubparsers)
   // await update()
 }
