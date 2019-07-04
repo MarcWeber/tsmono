@@ -403,7 +403,7 @@ class DependencyCollection {
       this[key] = [...this[key], ...deps[key].map((x) => x.name).filter(filter)]
     }
     add("dependencies")
-    if (dev === true || dev === 'dev-types') add("devDependencies", (x:string) => /^@types/.test(x))
+    if (dev === true || dev === 'dev-types') add("devDependencies", (x:string) => dev !== "dev-types" || /^@types/.test(x))
   }
 
   do(){
@@ -419,9 +419,12 @@ class DependencyCollection {
       if (this.recursed.includes(dep.name)) return;
       this.recursed.push(dep.name)
 
-      if (dep.npm) return // nothing to do
+      if (dep.npm) return; // nothing to do
 
-      const d = this.dirs.map((x) => `${x}/${dep.name}` ).find((dir) => fs.existsSync(dir) )
+      const dirs_lookup = this.dirs.map((x) => path.join(x, dep.name))
+      console.log("dirs_lookup", dirs_lookup);
+
+      const d = dirs_lookup.find((dir) => fs.existsSync(dir) )
       if (!d){
         info(`dependency ${dependency_to_str(dep)} not found, forcing npm`);
         dep.npm = true; return
@@ -441,6 +444,7 @@ class Repository {
   public packagejson: JSONFile;
 
   constructor(public path:string) {
+    if (/\/\//.test(path)) throw `bad path ${path}`
     this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
     this.packagejson = new JSONFile(`${path}/package.json`)
   }
@@ -644,6 +648,7 @@ class Repository {
       }
     }
 
+
     // manually forcing ts-node dependency for now
     ensure_path(package_json, 'devDependencies', 'ts-node', await cfg.npm_version_for_name('ts-node'))
 
@@ -723,6 +728,37 @@ var watch  = sp.addParser("watch", {'addHelp':true})
 
 const args = parser.parseArgs();
 
+const tslint_hack = async () => {
+  // this is biased  but its going to save your ass
+  if (!fs.existsSync('tslint.json')){
+    fs.writeFileSync('tslint.json', `
+    {
+        "extends": [
+            "tslint:recommended"
+        ],
+        "rules": {
+            "no-floating-promises": true,
+            "no-return-await": true,
+            "await-promise": [true, "PromiseLike"],
+        }
+    }
+    `, 'utf8')
+
+  } else {
+    var j = JSON5.parse(fs.readFileSync('tslint.json', 'utf8'))
+    if (!j.rules['no-floating-promises'] && !j.rules['await-promise'])
+      throw `please add
+
+            "no-floating-promises": true,
+            "no-return-await": true,
+            "await-promise": [true, "PromiseLike"],
+
+            to your tslint.json 's rules section because it might save your ass
+      `
+  }
+
+}
+
 const main = async () => {
   const cache = new DirectoryCache(`${homedir()}/.smono/cache`)
 
@@ -757,7 +793,9 @@ const main = async () => {
     return;
   }
   if (args.main_action == "update"){
-    await update(); return
+    await update();
+    await tslint_hack();
+    return
   }
   if (args.main_action == "add"){
     throw new Error("TODO")
