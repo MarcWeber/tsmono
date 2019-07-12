@@ -158,6 +158,7 @@ const config = {
 
 type Dependency = {
   name:string,
+  url?:string,
   npm?:boolean,    // force installing from npm
   version?:string, // check or verify version constraints
   node_modules?:boolean, // requires TS -> .js .d.ts steps
@@ -168,11 +169,19 @@ type Dependency = {
 }
 
 const parse_dependency = (s:string, origin?: string):Dependency =>{
-  const l = s.split(':')
+  const l = s.split(';')
   const r:Dependency = {name: l[0]}
+  if (/git\+https/.test(r.name)){
+    r.url = r.name
+    r.name = path.basename(r.name).replace(/\.git$/, '')
+  }
+
   for (const v of l.slice(1)) {
-    if (/version=(.*)/.test(v)){
-      r.version = v.slice(8); continue;
+    const x = v.split('=',1)
+    if (x.length === 2){
+      if (x[0] === 'version') r.version = x[1]
+      if (x[0] === 'name') r.version = x[1]
+      throw `bad key=name pair: ${v}`
     }
     if (v === 'node_modules') r[v] = true;
     if (v === 'types') { r[v] = true; r["npm"] = true; }
@@ -323,7 +332,7 @@ class TSMONOJSONFile extends JSONFile {
 const map_package_dependencies_to_tsmono_dependencies = (versions:{[key:string]: string}) => {
   const r = []
   for (let [k, v] of Object.entries(versions)) {
-    r.push(`${k}:version=${v}`)
+    r.push(`${k};version=${v}`)
   }
   return r;
 }
@@ -631,13 +640,24 @@ class Repository {
     ensure_path(package_json, 'dependencies', {})
     ensure_path(package_json, 'devDependencies', {})
 
+    const add_dep = async (dep:string, first:Dependency, dep_name:string) => {
+      if (first.url){
+        if (/git\+https/.test(first.url)){
+          ensure_path(package_json, dep, first.name, first.url)
+        } else {
+          throw `cannot cope with url ${first.url} yet, no git+https, fix code`
+        }
+
+      } else ensure_path(package_json, dep, dep_name, await cfg.npm_version_for_name(dep_name))
+    }
+
     const add_npm_packages = async (dep: "dependencies" | "devDependencies") => {
       for (const dep_name of dep_collection[dep]) {
         const first = dep_collection.dependency_locactions[dep_name][0]
         if (!first.npm) continue;
         debug("adding npm", dep_name, first);
         // TODO: care about version
-        ensure_path(package_json, dep, dep_name, await cfg.npm_version_for_name(dep_name))
+        await add_dep(dep, first, dep_name)
         if (first.types){
           const type_name = `@types/${dep_name}`
           const type_version = await cfg.npm_version_for_name(type_name)

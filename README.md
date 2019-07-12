@@ -51,11 +51,11 @@ Example:
 
 ```
   monorepo/lib
-  monorepo/lib/tsmono.json {"devDependencies", "depnedencies": h}
+  monorepo/lib/tsmono.json {"devDependencies", "dependencies": h}
   monorepo/lib/src/lib.ts
 
   monorepo/tool
-  monorepo/tool/tsmono.json {"devDependencies", "depnedencies": h}
+  monorepo/tool/tsmono.json {"devDependencies", "dependencies": h}
   monorepo/tool/tool/tool.ts
 
   monorepo/project
@@ -64,7 +64,7 @@ Example:
   {
     // more examples see below
     "directories": ["../"]
-    "dependencies": ["lib", "tool"] // lib and tool will be made available if found in directories
+    "dependencies": ["lib", "tool", "git+https://github.com/bar/baz.git:name=baz", "bar:types"] // lib and tool will be made available if found in directories
   }
 ```
 
@@ -148,6 +148,8 @@ dep:
   "name:npm:version=^1.3:types"  -> force installing from npm optionally give version and fetch types
 
   "name:node_modules" -> 
+
+  "git+https//.....:name=bar" -> name is optional, fetch from github
 
   flags:
   :types -> when installing from npm try to fetch types also
