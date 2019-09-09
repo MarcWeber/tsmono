@@ -1,10 +1,12 @@
-tsmono: typescript monorepositories
-===================================
+tsmono: work with modular repositories as if they were a monorepository
+=======================================================================
 
 WHY?
 ====
+
 * edit libraries and target lib/application in the same vscode session and
   refactor or edit without intermediary transpiling
+
 * allow multiple versions of dependencies in the same project (does not work
   with different versions of transient dependencies managed by node, becaues
   they end up in package.json dependecies fields)
@@ -200,6 +202,11 @@ command line options
   tsmono push-with-dependencies --shell-on-change --git-push-remote-location-name origin --run-remote-command 'user@host:typescript:git pull; tsmono --update --link-to-links'
   # pushes multiple repositories to a remote location optionally pulilng them, too.
   # great for keeping a test or server inv up to date with your local changes
+
+
+  tsmono list-dependencies
+  # just lists all dependencies so that you can pack them manually
+
 ```
 
 Think about this:
