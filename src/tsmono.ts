@@ -175,13 +175,17 @@ const parse_dependency = (s: string, origin?: string): Dependency => {
     r.url = r.name
     r.name = path.basename(r.name).replace(/\.git$/, "")
   }
+    console.log("l", l);
 
   for (const v of l.slice(1)) {
-    const x = v.split("=", 1)
-    if (x.length === 2) {
+    let x = v.split("=")
+    if (x.length >= 2) {
+      x = [ x[0], x.slice(1).join("=") ];
+      console.log("x", x);
       if (x[0] === "version") r.version = x[1]
-      if (x[0] === "name") r.version = x[1]
-      throw new Error(`bad key=name pair: ${v}`)
+      else if (x[0] === "name") r.name = x[1]
+      else throw new Error(`bad key=name pair: ${v}`)
+        console.log("r", r);
     }
     if (v === "node_modules") r[v] = true;
     if (v === "types") { r[v] = true; r.npm = true; }
@@ -449,11 +453,13 @@ class Repository {
 
   public tsmonojson: TSMONOJSONFile;
   public packagejson: JSONFile;
+  public packagejson_path: string;
 
   constructor(public path: string) {
     if (/\/\//.test(path)) throw new Error(`bad path ${path}`)
     this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
-    this.packagejson = new JSONFile(`${path}/package.json`)
+    this.packagejson_path = `${path}/package.json`
+    this.packagejson = new JSONFile(this.packagejson_path)
   }
 
   public flush() {
@@ -546,11 +552,15 @@ class Repository {
               ? "/src"
               : ""
 
-            const rhs = path.relative(dirname(tsconfig_path), path.resolve(cwd,
+            const resolved = path.resolve(cwd,
               (!!opts.link_to_links)
               ? `${link_dir}/${v[0].name}${src}`
               : `${v[0].repository.path}${src}`,
-            ))
+            )
+
+
+            const rhs = path.relative(tsconfig_path, resolved)
+            console.log("tsconfig path", dirname(tsconfig_path), "resolved", resolved, "result", rhs);
 
             const a = (lhs: string, rhs: string) => {
               ensure_path(r, "compilerOptions", "paths", lhs, [])
@@ -601,6 +611,8 @@ class Repository {
 
     if ("tsconfigs" in tsmonojson) {
       for (const [path_, merge] of Object.entries(tsmonojson.tsconfigs)) {
+        console.log("tsconfig.json path", path_)
+          // use protect
         fs.writeFileSync(path.join(path_, `tsconfig.json`), JSON.stringify(fix_ts_config(deepmerge.all([ tsmonojson.tsconfig || {}, path_for_tsconfig(path_), tsconfig, merge ])), undefined, 2), "utf8")
       }
     } else if ("tsconfig" in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0) {
@@ -647,7 +659,7 @@ class Repository {
           throw new Error(`cannot cope with url ${first.url} yet, no git+https, fix code`)
         }
 
-      } else ensure_path(package_json, dep, dep_name, await cfg.npm_version_for_name(dep_name))
+      } else ensure_path(package_json, dep, dep_name, 'version' in first ? first.version : await cfg.npm_version_for_name(dep_name))
     }
 
     const add_npm_packages = async (dep: "dependencies" | "devDependencies") => {
@@ -680,7 +692,17 @@ class Repository {
     if (opts.install_npm_packages) {
       debug("install_npm_packages");
       const npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"])
-      await run(npm_install_cmd[0], {args: npm_install_cmd.slice(1), cwd: this.path})
+
+      // 2²
+
+
+      const to_be_installed = fs.readFileSync(this.packagejson_path, 'utf-8')
+      const p_installed = `${this.packagejson_path}.installed`
+      const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, 'utf-8') : undefined
+      console.log("deciding to run fyn in", this.path, installed, to_be_installed);
+      if (installed !== to_be_installed)
+        await run(npm_install_cmd[0], {args: npm_install_cmd.slice(1), cwd: this.path})
+      fs.writeFileSync(p_installed, to_be_installed)
     }
 
     if (opts.symlink_node_modules_hack) {
@@ -852,6 +874,7 @@ const main = async () => {
 
     const basenames_to_pull: string[] = []
     const seen: string[] = [] // TODO: why aret there duplicates ?
+
     for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
       const r = v[0].repository
       if (r) {
@@ -874,12 +897,13 @@ const main = async () => {
         }
       }
 
-      for (const v of basenames_to_pull) {
-          const user_host  = args.run_remote_command.split(":")
-          const target_path = `${user_host[1]}/${v}`
-          console.log(`... pulling ${args.ssh_remote_location_git_pull}${v} ...`)
-          await run("ssh", {args: [user_host[0]], stdin: `cd ${target_path}; ${user_host[2]}`})
-      }
+    }
+
+    for (const v of basenames_to_pull) {
+        const user_host  = args.run_remote_command.split(":")
+        const target_path = `${user_host[1]}/${v}`
+        console.log(`... pulling ${args.ssh_remote_location_git_pull}${v} ...`)
+        await run("ssh", {args: [user_host[0]], stdin: `cd ${target_path}; ${user_host[2]}`})
     }
   }
 
@@ -896,6 +920,9 @@ const main = async () => {
         if (seen.includes(r.path)) continue;
         seen.push(r.path)
         fs.remove(path.join(r.path, "node_modules"))
+        const package_json_installed = path.join(r.path, "package.json.installed");
+        if (fs.existsSync(package_json_installed))
+          fs.remove(package_json_installed)
       }
     }
     await p.update(cfg, {link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true

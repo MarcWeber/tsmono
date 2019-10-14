@@ -43,6 +43,11 @@ suppressImplicitAnyIndexErrors
 
 TODO: take care of it and tell user
 
+FILES ON DISK
+=============
+package.json.installed: If package.json{,.installed} are same don't run npm i/fyn
+*.protect: used to detect user changes. Don't overwrite files changed by users unless --force is used
+
 convenient fixes for tsconfig files
 ===================================
 See fix_tsconfig
@@ -144,23 +149,23 @@ tsmono.json example file:
 
 
 dep:
-  "<name>[:flag ...]"
+  "<name>[;flag ...]"
 
   "name" -> reference ts project from local directory if not found get from npm
-  "name:npm:version=^1.3:types"  -> force installing from npm optionally give version and fetch types
+  "name;npm;version=^1.3;types"  -> force installing from npm optionally give version and fetch types
 
-  "name:node_modules" -> 
+  "name;node_modules" -> 
 
   "git+https//.....:name=bar" -> name is optional, fetch from github
 
   flags:
-  :types -> when installing from npm try to fetch types also
-  :version=^1.3 - npm version
+  ;types -> when installing from npm try to fetch types also
+  ;version=^1.3 - npm version
 
 
   TODO:
-  :reference_by_references -> add to "references" section so that it gets recomplied by TS
-  :node_modules -> requires own ts -> js compilation, dependencies are hidden in node_modules/* the usual way
+  ;reference_by_references -> add to "references" section so that it gets recomplied by TS
+  ;node_modules -> requires own ts -> js compilation, dependencies are hidden in node_modules/* the usual way
                    I think we can handle this with "references" or by running own command depending on config
                    "references" should be the default way I think ?
                    TODO: think about 
