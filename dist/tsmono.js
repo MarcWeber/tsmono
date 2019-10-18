@@ -605,7 +605,7 @@ var Repository = /** @class */ (function () {
                         dep_collection.print_warnings();
                         expected_symlinks = {};
                         expected_tools = {};
-                        path_for_tsconfig = function (tsconfig_path) {
+                        path_for_tsconfig = function (tsconfig_dir) {
                             var r = {};
                             { // always set path
                                 for (var _i = 0, _a = Object.entries(dep_collection.dependency_locactions); _i < _a.length; _i++) {
@@ -618,8 +618,8 @@ var Repository = /** @class */ (function () {
                                         var resolved = path.resolve(cwd, (!!opts.link_to_links)
                                             ? link_dir + "/" + v[0].name + src
                                             : "" + v[0].repository.path + src);
-                                        var rhs = path.relative(tsconfig_path, resolved);
-                                        console.log("tsconfig path", path_1.dirname(tsconfig_path), "resolved", resolved, "result", rhs);
+                                        var rhs = path.relative(tsconfig_dir, resolved);
+                                        console.log("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
                                         var a = function (lhs, rhs) {
                                             ensure_path(r, "compilerOptions", "paths", lhs, []);
                                             if (!r.compilerOptions.paths[lhs].includes(rhs)) {
@@ -673,7 +673,7 @@ var Repository = /** @class */ (function () {
                         }
                         else if ("tsconfig" in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0) {
                             tsconfig_path_1 = path.join(this.path, "tsconfig.json");
-                            json_1 = JSON.stringify(fix_ts_config(deepmerge_1.default(tsmonojson.tsconfig || {}, path_for_tsconfig(tsconfig_path_1), tsconfig)), undefined, 2);
+                            json_1 = JSON.stringify(fix_ts_config(deepmerge_1.default(tsmonojson.tsconfig || {}, path_for_tsconfig(this.path), tsconfig)), undefined, 2);
                             protect(tsconfig_path_1, function () { fs.writeFileSync(tsconfig_path_1, json_1, "utf8"); }, opts.force);
                         }
                         clone(tsmonojson.tsconfig) || {};

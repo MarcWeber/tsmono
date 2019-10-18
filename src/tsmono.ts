@@ -540,7 +540,7 @@ class Repository {
     const expected_symlinks: {[key: string]: string} = {}
     const expected_tools: {[key: string]: string} = {}
 
-    const path_for_tsconfig = (tsconfig_path: string) => {
+    const path_for_tsconfig = (tsconfig_dir: string) => {
       const r: any = {}
       { // always set path
         for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
@@ -559,8 +559,8 @@ class Repository {
             )
 
 
-            const rhs = path.relative(tsconfig_path, resolved)
-            console.log("tsconfig path", dirname(tsconfig_path), "resolved", resolved, "result", rhs);
+            const rhs = path.relative(tsconfig_dir, resolved)
+            console.log("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
 
             const a = (lhs: string, rhs: string) => {
               ensure_path(r, "compilerOptions", "paths", lhs, [])
@@ -617,7 +617,7 @@ class Repository {
       }
     } else if ("tsconfig" in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0) {
       const tsconfig_path = path.join(this.path, "tsconfig.json")
-      const json: string = JSON.stringify(fix_ts_config(deepmerge( tsmonojson.tsconfig || {}, path_for_tsconfig(tsconfig_path), tsconfig )), undefined, 2)
+      const json: string = JSON.stringify(fix_ts_config(deepmerge( tsmonojson.tsconfig || {}, path_for_tsconfig(this.path), tsconfig )), undefined, 2)
       protect(tsconfig_path, () => { fs.writeFileSync(tsconfig_path, json, "utf8"); }, opts.force);
     }
 
