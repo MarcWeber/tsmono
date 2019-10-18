@@ -699,9 +699,10 @@ class Repository {
       const to_be_installed = fs.readFileSync(this.packagejson_path, 'utf-8')
       const p_installed = `${this.packagejson_path}.installed`
       const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, 'utf-8') : undefined
-      console.log("deciding to run fyn in", this.path, installed, to_be_installed);
-      if (installed !== to_be_installed)
+      console.log("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
+      if (installed !== to_be_installed){
         await run(npm_install_cmd[0], {args: npm_install_cmd.slice(1), cwd: this.path})
+      }
       fs.writeFileSync(p_installed, to_be_installed)
     }
 

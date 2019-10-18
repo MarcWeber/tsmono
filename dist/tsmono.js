@@ -13,10 +13,11 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
@@ -47,24 +48,49 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var _this = this;
+var __spreadArrays = (this && this.__spreadArrays) || function () {
+    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+    for (var r = Array(s), k = 0, i = 0; i < il; i++)
+        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
+            r[k] = a[j];
+    return r;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 var argparse_1 = require("argparse");
-var JSON5 = require("json5");
-var fs = require("fs-extra");
-var path = require("path");
+var debug_1 = __importDefault(require("debug"));
+var fs = __importStar(require("fs-extra"));
+var JSON5 = __importStar(require("json5"));
+var path = __importStar(require("path"));
+var debug = debug_1.default("tsmono");
+var btoa_1 = __importDefault(require("btoa"));
 var child_process_1 = require("child_process");
-var path_1 = require("path");
-// import deepequal from "deep-equal"
-var deepequal = require("deep-equal"); // allowSynteticImports doesn't exist for node -r ..
-var btoa_1 = require("btoa");
-var deepmerge_1 = require("deepmerge");
 var cross_fetch_1 = require("cross-fetch");
+// import deepequal from "deep-equal"
+var deep_equal_1 = __importDefault(require("deep-equal"));
+var deepmerge_1 = __importDefault(require("deepmerge"));
 var os_1 = require("os");
+var path_1 = require("path");
+// TODO: use path.join everywhere
+var info = function (s) {
+    console.log(s);
+};
+var warning = info;
 /// LIBRARY SUPPORT CODE
 var clone = function (x) {
-    console.log("cloning", x);
     return x === undefined ? undefined : JSON.parse(JSON.stringify(x));
+};
+var unique = function (x) {
+    return x.filter(function (v, i) { return x.indexOf(v) === i; });
 };
 var del_if_exists = function (path) {
     // fs.existsSync doesn't work on symlinks
@@ -81,25 +107,35 @@ var assert = function (a, msg) {
 var assert_eql = function (a, b) {
     assert(a.trim() === b.trim(), "assertion " + JSON.stringify(a) + " === " + JSON.stringify(b) + " failed");
 };
-var run = function (cmd, args) { return __awaiter(_this, void 0, void 0, function () {
+var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, function () {
+    var args;
     return __generator(this, function (_a) {
         switch (_a.label) {
-            case 0: 
-            // duplicate code
-            return [4 /*yield*/, new Promise(function (a, b) {
-                    var child = child_process_1.spawn(cmd, args, {
-                        stdio: [
-                            0,
-                            'pipe',
-                            fs.openSync("err.out", "w") // direct child's stderr to a file
-                        ]
-                    });
-                    child.on('close', function (code, signal) {
-                        if (code === 0)
-                            a();
-                        b(cmd.toString() + " failed with code " + code);
-                    });
-                })];
+            case 0:
+                args = opts.args || [];
+                console.log("running", cmd, args, "in", opts.cwd);
+                // duplicate code
+                return [4 /*yield*/, new Promise(function (a, b) {
+                        var child = child_process_1.spawn(cmd, args, Object.assign({
+                            stdio: [
+                                "pipe",
+                                "inherit",
+                                "inherit",
+                            ],
+                        }, opts));
+                        if ("stdin" in opts && child.stdin) {
+                            // @ts-ignore
+                            child.stdin.setEncoding("utf8");
+                            child.stdin.write(opts.stdin);
+                        }
+                        // @ts-ignore
+                        child.stdin.end();
+                        child.on("close", function (code, signal) {
+                            if (code === 0)
+                                a();
+                            b(cmd.toString() + " failed with code " + code);
+                        });
+                    })];
             case 1:
                 // duplicate code
                 _a.sent();
@@ -107,71 +143,40 @@ var run = function (cmd, args) { return __awaiter(_this, void 0, void 0, functio
         }
     });
 }); };
-var read_and_show = function (l, path) {
-    if (fs.existsSync(path))
-        console.log("file " + l + " " + path + " has contents " + fs.readFileSync(path, 'utf8'));
-    else
-        console.log("file " + l + " doesn't exist");
-};
-var run_stdout = function (cmd) {
-    var args = [];
-    for (var _i = 1; _i < arguments.length; _i++) {
-        args[_i - 1] = arguments[_i];
-    }
-    return __awaiter(_this, void 0, void 0, function () {
-        var stdout;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    console.log("running", cmd, args);
-                    stdout = "";
-                    // duplicate code
-                    return [4 /*yield*/, new Promise(function (a, b) {
-                            var child = child_process_1.spawn(cmd, args, {
-                                stdio: [0, 'pipe', 2]
-                            });
-                            if (!child.stdout)
-                                throw new Error("child.stdout is null");
-                            child.stdout.on('data', function (s) { return stdout += s; });
-                            child.on('close', function (code, signal) {
-                                if (code === 0)
-                                    a();
-                                b(cmd.toString() + " " + args.join(' ').toString() + " failed with code " + code);
-                            });
-                        })];
-                case 1:
-                    // duplicate code
-                    _a.sent();
-                    return [2 /*return*/, stdout];
-            }
-        });
+var run_stdout = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, function () {
+    var args, stdout;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0:
+                args = opts.args || [];
+                console.log("running", cmd, args, "in", opts.cwd);
+                stdout = "";
+                // duplicate code
+                return [4 /*yield*/, new Promise(function (a, b) {
+                        var child = child_process_1.spawn(cmd, args, Object.assign(opts, {
+                            stdio: [0, "pipe", 2],
+                        }));
+                        if (!child.stdout)
+                            throw new Error("child.stdout is null");
+                        child.stdout.on("data", function (s) { return stdout += s; });
+                        child.on("close", function (code, signal) {
+                            if (code === 0)
+                                a();
+                            b(cmd.toString() + " " + args.join(" ").toString() + " failed with code " + code);
+                        });
+                    })];
+            case 1:
+                // duplicate code
+                _a.sent();
+                return [2 /*return*/, stdout];
+        }
     });
-};
+}); };
 var DirectoryCache = /** @class */ (function () {
     // sry for reimplementing it - need a *simple* fast solution
     function DirectoryCache(path) {
         this.path = path;
     }
-    DirectoryCache.prototype.tc_ = function () {
-        return new Date().getTime();
-    };
-    DirectoryCache.prototype.path_ = function (key) {
-        return this.path + "/" + btoa_1.default(key);
-    };
-    DirectoryCache.prototype.get_ = function (key, ttl) {
-        var p = this.path_(key);
-        if (fs.existsSync(p)) {
-            var json = JSON.parse(fs.readFileSync(p, 'utf8'));
-            if (ttl === undefined || !(this.tc_() - json.tc > ttl))
-                return json.thing;
-        }
-        return undefined;
-    };
-    DirectoryCache.prototype.put_ = function (key, thing) {
-        if (!fs.existsSync(this.path))
-            fs.mkdirpSync(this.path);
-        fs.writeFileSync(this.path_(key), JSON.stringify({ 'thing': thing, 'tc': this.tc_() }));
-    };
     DirectoryCache.prototype.get = function (key, f, ttl_seconds) {
         var cached = this.get_(key, ttl_seconds);
         if (cached === undefined) {
@@ -199,25 +204,62 @@ var DirectoryCache = /** @class */ (function () {
             });
         });
     };
+    DirectoryCache.prototype.tc_ = function () {
+        return new Date().getTime();
+    };
+    DirectoryCache.prototype.path_ = function (key) {
+        return this.path + "/" + btoa_1.default(key);
+    };
+    DirectoryCache.prototype.get_ = function (key, ttl) {
+        var p = this.path_(key);
+        if (fs.existsSync(p)) {
+            var json = JSON.parse(fs.readFileSync(p, "utf8"));
+            if (ttl === undefined || !(this.tc_() - json.tc > ttl))
+                return json.thing;
+        }
+        return undefined;
+    };
+    DirectoryCache.prototype.put_ = function (key, thing) {
+        if (!fs.existsSync(this.path))
+            fs.mkdirpSync(this.path);
+        fs.writeFileSync(this.path_(key), JSON.stringify({ thing: thing, tc: this.tc_() }));
+    };
     return DirectoryCache;
 }());
 var config = {
-    cacheDir: "~/.tsmono/cache"
+    cacheDir: "~/.tsmono/cache",
 };
 var parse_dependency = function (s, origin) {
-    var l = s.split(':');
+    var l = s.split(";");
     var r = { name: l[0] };
+    if (/git\+https/.test(r.name)) {
+        r.url = r.name;
+        r.name = path.basename(r.name).replace(/\.git$/, "");
+    }
+    console.log("l", l);
     for (var _i = 0, _a = l.slice(1); _i < _a.length; _i++) {
         var v = _a[_i];
-        if (/version=(.*)/.test(v)) {
-            r.version = v.slice(8);
-            continue;
+        var x = v.split("=");
+        if (x.length >= 2) {
+            x = [x[0], x.slice(1).join("=")];
+            console.log("x", x);
+            if (x[0] === "version")
+                r.version = x[1];
+            else if (x[0] === "name")
+                r.name = x[1];
+            else
+                throw new Error("bad key=name pair: " + v);
+            console.log("r", r);
         }
-        if (v === 'node_modules')
+        if (v === "node_modules")
             r[v] = true;
-        if (v === 'types')
+        if (v === "types") {
             r[v] = true;
-        if (v === 'npm')
+            r.npm = true;
+        }
+        if (v === "npm")
+            r[v] = true;
+        if (v === "ignore_src")
             r[v] = true;
     }
     if (origin !== undefined)
@@ -226,7 +268,7 @@ var parse_dependency = function (s, origin) {
 };
 var cfg_api = function (cfg) {
     var fetch_from_registry = function (name) {
-        return cfg.cache.get_async("fetch-" + name + "-registry.npmjs.org", function () { return __awaiter(_this, void 0, void 0, function () {
+        return cfg.cache.get_async("fetch-" + name + "-registry.npmjs.org", function () { return __awaiter(void 0, void 0, void 0, function () {
             var url, res;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -243,19 +285,19 @@ var cfg_api = function (cfg) {
             });
         }); }, cfg.fetch_ttl_seconds);
     };
-    var npm_version_for_name = function (name) { return __awaiter(_this, void 0, void 0, function () {
+    var npm_version_for_name = function (name) { return __awaiter(void 0, void 0, void 0, function () {
         var lock, r;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    lock = new JSONFile('.tsmonolock');
+                    lock = new JSONFile(".tsmonolock");
                     if (!!(name in lock.json)) return [3 /*break*/, 2];
                     return [4 /*yield*/, fetch_from_registry(name)];
                 case 1:
                     r = _a.sent();
                     if (r.error)
                         return [2 /*return*/, undefined];
-                    lock.json[name] = "^" + r['dist-tags'].latest;
+                    lock.json[name] = "^" + r["dist-tags"].latest;
                     lock.flush();
                     _a.label = 2;
                 case 2: return [2 /*return*/, lock.json[name]];
@@ -264,7 +306,7 @@ var cfg_api = function (cfg) {
     }); };
     return {
         fetch_from_registry: fetch_from_registry,
-        npm_version_for_name: npm_version_for_name
+        npm_version_for_name: npm_version_for_name,
     };
 };
 var backup_file = function (path) {
@@ -279,7 +321,6 @@ var get_path = function () {
     for (var _i = 0; _i < arguments.length; _i++) {
         args[_i] = arguments[_i];
     }
-    console.log("get_path", JSON.stringify(args));
     // get_path(obj, path)
     var r = args[0];
     for (var _a = 0, _b = args.slice(1, -1); _a < _b.length; _a++) {
@@ -312,14 +353,25 @@ var ensure_path = function (obj) {
         obj = obj[k];
     }
 };
+var protect = function (path, flush, force, protect_path) {
+    if (force === void 0) { force = false; }
+    if (protect_path === void 0) { protect_path = path + ".protect"; }
+    if (fs.existsSync(protect_path) && fs.existsSync(path)) {
+        if (!force && fs.readFileSync(protect_path, "utf8") !== fs.readFileSync(path, "utf8"))
+            // TODO nicer diff or allow applying changes to tsmono.json
+            throw new Error("mv " + protect_path + " " + path + " to continue. Not overwriting your changes. Use --force to force");
+    }
+    flush();
+    fs.copyFileSync(path, protect_path);
+};
 var JSONFile = /** @class */ (function () {
     function JSONFile(path, default_) {
-        if (default_ === void 0) { default_ = function () { return {}; }; }
+        if (default_ === void 0) { default_ = function () { return ({}); }; }
         this.path = path;
-        this.json_on_disc = undefined;
         this.json = {};
+        this.json_on_disc = undefined;
         if (fs.existsSync(this.path)) {
-            var s = fs.readFileSync(this.path, 'utf8');
+            var s = fs.readFileSync(this.path, "utf8");
             try {
                 this.json_on_disc = JSON5.parse(s);
             }
@@ -337,23 +389,15 @@ var JSONFile = /** @class */ (function () {
         return fs.existsSync(this.path);
     };
     JSONFile.prototype.flush = function () {
-        var s = JSON.stringify(this.json);
-        console.log('flushing ?', this.path);
-        if (!deepequal(this.json_on_disc, this.json)) {
-            console.log('flushing', this.path);
-            fs.writeFileSync(this.path, s, 'utf8');
+        var s = JSON.stringify(this.json, undefined, 2);
+        if (!deep_equal_1.default(this.json_on_disc, this.json)) {
+            fs.writeFileSync(this.path, s, "utf8");
         }
     };
-    JSONFile.prototype.flush_protect_user_changes = function () {
-        var protect_path = this.path + ".tsmonoguard";
-        if (fs.existsSync(protect_path)) {
-            if (fs.readFileSync(protect_path, 'utf8') !== fs.readFileSync(this.path, 'utf8'))
-                // TODO nicer diff or allow applying changes to tsmono.json
-                throw new Error("Move " + protect_path + " " + this.path + " to continue. Not overwriting your changes");
-        }
-        console.log("flushing", this.json);
-        this.flush();
-        fs.copyFileSync(this.path, protect_path);
+    JSONFile.prototype.flush_protect_user_changes = function (force) {
+        var _this = this;
+        if (force === void 0) { force = false; }
+        protect(this.path, function () { _this.flush(); }, force);
     };
     return JSONFile;
 }());
@@ -379,16 +423,16 @@ var map_package_dependencies_to_tsmono_dependencies = function (versions) {
     var r = [];
     for (var _i = 0, _a = Object.entries(versions); _i < _a.length; _i++) {
         var _b = _a[_i], k = _b[0], v = _b[1];
-        r.push(k + ":version=" + v);
+        r.push(k + ";version=" + v);
     }
-    console.log("ABCC", r, versions);
     return r;
 };
 var dependency_to_str = function (d) {
-    return d.name + " " + (d.npm && d.repository ? 'npm and repository?' : (d.repository ? "from " + d.repository.path : "from npm " + (d.version ? d.version : ''))) + " requested from " + d.origin;
+    return d.name + " " + (d.npm && d.repository ? "npm and repository?" : (d.repository ? "from " + d.repository.path : "from npm " + (d.version ? d.version : ""))) + " requested from " + d.origin;
 };
 var DependencyCollection = /** @class */ (function () {
-    function DependencyCollection(dirs) {
+    function DependencyCollection(origin, dirs) {
+        this.origin = origin;
         this.dirs = dirs;
         this.dependency_locactions = {};
         this.dependencies = [];
@@ -397,28 +441,66 @@ var DependencyCollection = /** @class */ (function () {
         this.recursed = [];
     }
     DependencyCollection.prototype.print_warnings = function () {
-        for (var _i = 0, _a = Object.entries(this.dependency_locactions); _i < _a.length; _i++) {
-            var _b = _a[_i], k = _b[0], v = _b[1];
+        var _loop_1 = function (k, v) {
             // TODO: check that all v's are same constraints ..
             var npms = v.filter(function (x) { return x.npm; });
             var no_npms = v.filter(function (x) { return !x.npm; });
             if (npms.length > 0 && no_npms.length > 0)
-                console.log("WARNING: dependency " + k + " requested as npm and from disk, choosing first", v.map(dependency_to_str).join("\n"));
+                warning("WARNING: " + this_1.origin + " dependency " + k + " requested as npm and from disk, choosing first " + v.map(dependency_to_str).join("\n"));
             // check version match etc
+            var package_json_cache = {};
+            var all_versions = [];
+            var with_version = v.map(function (dep) {
+                // hack just removing leading ^ - should look at lock files (fyn, node, ..) instead - but this probably is good enough
+                var f = function (x) { return x.replace("^", ""); };
+                var versions = [];
+                if (dep.version)
+                    versions.push(f(dep.version));
+                if (dep.origin) {
+                    var p = dep.origin + "/package.json";
+                    if (!(dep.origin in package_json_cache) && fs.existsSync(p)) {
+                        package_json_cache[dep.origin] = JSON5.parse(fs.readFileSync(p, "utf8"));
+                        ["dependencies", "devDependencies"].forEach(function (d) {
+                            var x = (dep.origin === undefined)
+                                ? undefined
+                                : get_path(package_json_cache[dep.origin], d, k, undefined);
+                            if (x !== undefined)
+                                versions.push(f(x));
+                        });
+                    }
+                    else if (dep.version) {
+                        versions.push(f(dep.version));
+                    }
+                }
+                all_versions = __spreadArrays(all_versions, versions);
+                return { dep: dep, versions: versions };
+            }).filter(function (x) { return x.versions.length > 0; });
+            if (unique(all_versions).length > 1) {
+                warning("WARNING: " + this_1.origin + " transient dependencies " + k + " with competing versions found:");
+                for (var _i = 0, with_version_1 = with_version; _i < with_version_1.length; _i++) {
+                    var v_1 = with_version_1[_i];
+                    console.log(v_1.dep.origin, v_1.versions);
+                }
+            }
+        };
+        var this_1 = this;
+        for (var _i = 0, _a = Object.entries(this.dependency_locactions); _i < _a.length; _i++) {
+            var _b = _a[_i], k = _b[0], v = _b[1];
+            _loop_1(k, v);
         }
     };
     DependencyCollection.prototype.dependencies_of_repository = function (r, dev) {
         var _this = this;
         // add dependencies r to todo list to be looked at
         var deps = r.dependencies();
-        console.log("DEPS OF", r.path, deps);
-        var add = function (key) {
-            _this.todo = _this.todo.concat(deps[key]);
-            _this[key] = _this[key].concat(deps[key].map(function (x) { return x.name; }));
+        var add = function (key, filter) {
+            if (filter === void 0) { filter = function (x) { return true; }; }
+            _this.todo = __spreadArrays(_this.todo, deps[key]);
+            _this[key] = __spreadArrays(_this[key], deps[key].map(function (x) { return x.name; }).filter(filter));
         };
         add("dependencies");
-        if (dev)
-            add("devDependencies");
+        if (dev === true || dev === "dev-types")
+            add("devDependencies", function (x) { return dev !== "dev-types" || /^@types/.test(x); });
     };
     DependencyCollection.prototype.do = function () {
         var next;
@@ -434,9 +516,11 @@ var DependencyCollection = /** @class */ (function () {
         this.recursed.push(dep.name);
         if (dep.npm)
             return; // nothing to do
-        var d = this.dirs.map(function (x) { return x + "/" + dep.name; }).find(function (dir) { return fs.existsSync(dir); });
+        var dirs_lookup = this.dirs.map(function (x) { return path.join(x, dep.name); });
+        console.log("dirs_lookup", dirs_lookup);
+        var d = dirs_lookup.find(function (dir) { return fs.existsSync(dir); });
         if (!d) {
-            console.log("WARNING, dependency " + dependency_to_str(dep) + " not found, forcing npm");
+            info("dependency " + dependency_to_str(dep) + " not found, forcing npm");
             dep.npm = true;
             return;
         }
@@ -444,23 +528,26 @@ var DependencyCollection = /** @class */ (function () {
         dep.repository = r;
         // devDependencies are likely to contain @types thus pull them, too ?
         // TODO: only pull @types/*?
-        this.dependencies_of_repository(r, true);
+        this.dependencies_of_repository(r, "dev-types");
     };
     return DependencyCollection;
 }());
 var Repository = /** @class */ (function () {
     function Repository(path) {
         this.path = path;
+        if (/\/\//.test(path))
+            throw new Error("bad path " + path);
         this.tsmonojson = new TSMONOJSONFile(path + "/tsmono.json");
-        this.packagejson = new JSONFile(path + "/package.json");
+        this.packagejson_path = path + "/package.json";
+        this.packagejson = new JSONFile(this.packagejson_path);
     }
     Repository.prototype.flush = function () {
         this.tsmonojson.flush();
         this.packagejson.flush();
     };
     Repository.prototype.init = function () {
-        var tsconfig = this.path + "/tsconfig.json";
-        this.tsmonojson.init(fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, 'utf8')) : {});
+        var tsconfig = path.join(this.path, "tsconfig.json");
+        this.tsmonojson.init(fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, "utf8")) : {});
     };
     Repository.prototype.dependencies = function () {
         var _this = this;
@@ -470,36 +557,41 @@ var Repository = /** @class */ (function () {
         // package.json otherwise
         if (fs.existsSync(this.path + "/tsmono.json")) {
             return {
-                dependencies: clone(get_path(this.tsmonojson.json, 'dependencies', [])).map(to_dependency),
-                devDependencies: clone(get_path(this.tsmonojson.json, 'devDependencies', [])).map(to_dependency)
+                dependencies: clone(get_path(this.tsmonojson.json, "dependencies", [])).map(to_dependency),
+                devDependencies: clone(get_path(this.tsmonojson.json, "devDependencies", [])).map(to_dependency),
             };
         }
         return {
-            dependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, 'dependencies', {})).map(to_dependency),
-            devDependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, 'devDependencies', {})).map(to_dependency)
+            dependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "dependencies", {})).map(to_dependency),
+            devDependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
         };
-    };
-    Repository.prototype.src = function () {
-        // the src file of this repository which should be linked to depending repository
-        var src = this.path + "/src";
-        return fs.existsSync(src) ? src : this.path;
     };
     Repository.prototype.update = function (cfg, opts) {
         if (opts === void 0) { opts = {}; }
         return __awaiter(this, void 0, void 0, function () {
-            var link_dir, cwd, tsmonojson, package_json, tsconfig, dep_collection, expected_symlinks, expected_tools, path_for_tsconfig, _i, _a, _b, k, v, src, src_dir, src_tool, fix_ts_config, _c, _d, _e, path_2, merge, tsconfig_path, json, _f, _g, _h, k, v, t, _j, _k, _l, k, v, add_npm_packages, _m, _o, npm_install_cmd, _p, _q, dir, n;
+            var link_dir, cwd, tsmonojson, package_json, tsconfig, dep_collection, expected_symlinks, expected_tools, path_for_tsconfig, _i, _a, _b, k, v, src_tool, fix_ts_config, _c, _d, _e, path_, merge, tsconfig_path_1, json_1, _f, _g, _h, k, v, t, _j, _k, _l, k, v, add_dep, add_npm_packages, _m, _o, npm_install_cmd, to_be_installed, p_installed, installed, _p, _q, dir, n, opts2, repositories, _r, repositories_1, r;
             var _this = this;
-            return __generator(this, function (_r) {
-                switch (_r.label) {
+            return __generator(this, function (_s) {
+                switch (_s.label) {
                     case 0:
-                        assert(!!opts.link_to_links, 'link_to_links should be true');
-                        link_dir = "tsmono/links";
+                        if (!!fs.existsSync(this.path + "/tsmono.json")) return [3 /*break*/, 3];
+                        // only run fyn if package.json exists
+                        info("!! NO tsmono.json found, only trying to run fyn");
+                        if (!(opts.install_npm_packages && fs.existsSync(this.path + "/package.json"))) return [3 /*break*/, 2];
+                        info("running fyn in dependency " + this.path);
+                        return [4 /*yield*/, run(opts.update_cmd && opts.update_cmd.executable || "fyn", { args: opts.update_cmd && opts.update_cmd.args, cwd: this.path })];
+                    case 1:
+                        _s.sent();
+                        _s.label = 2;
+                    case 2: return [2 /*return*/];
+                    case 3:
+                        link_dir = this.path + "/tsmono/links";
                         (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach(function (x) {
                             fs.unlinkSync(link_dir + "/" + x);
                         });
                         cwd = process.cwd();
                         tsmonojson = this.tsmonojson.json || {};
-                        package_json = clone(get_path(tsmonojson, 'package', {}));
+                        package_json = clone(get_path(tsmonojson, "package", {}));
                         if (package_json === undefined) {
                             package_json = {};
                         }
@@ -507,11 +599,10 @@ var Repository = /** @class */ (function () {
                         package_json.devDependencies = {};
                         delete package_json.tsconfig;
                         tsconfig = {};
-                        dep_collection = new DependencyCollection(this.tsmonojson.dirs());
+                        dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs());
                         dep_collection.dependencies_of_repository(this, true);
                         dep_collection.do();
                         dep_collection.print_warnings();
-                        console.log("dep_collection", dep_collection);
                         expected_symlinks = {};
                         expected_tools = {};
                         path_for_tsconfig = function (tsconfig_path) {
@@ -521,13 +612,22 @@ var Repository = /** @class */ (function () {
                                     var _b = _a[_i], k = _b[0], v = _b[1];
                                     if (v[0].repository) {
                                         // path.absolute path.relative(from,to) ?
-                                        var lhs = k + "/*";
-                                        var rhs = path.relative(path_1.dirname(tsconfig_path), path.resolve(cwd, (!!opts.link_to_links)
-                                            ? link_dir + "/" + v[0].name + "/*"
-                                            : "v[0].repository.src()))}/*"));
-                                        ensure_path(r, 'compilerOptions', 'paths', lhs, []);
-                                        if (!r.compilerOptions.paths[lhs].includes(rhs))
-                                            r.compilerOptions.paths[lhs].push(rhs);
+                                        var src = !v[0].ignore_src && fs.existsSync(v[0].repository.path + "/src")
+                                            ? "/src"
+                                            : "";
+                                        var resolved = path.resolve(cwd, (!!opts.link_to_links)
+                                            ? link_dir + "/" + v[0].name + src
+                                            : "" + v[0].repository.path + src);
+                                        var rhs = path.relative(tsconfig_path, resolved);
+                                        console.log("tsconfig path", path_1.dirname(tsconfig_path), "resolved", resolved, "result", rhs);
+                                        var a = function (lhs, rhs) {
+                                            ensure_path(r, "compilerOptions", "paths", lhs, []);
+                                            if (!r.compilerOptions.paths[lhs].includes(rhs)) {
+                                                r.compilerOptions.paths[lhs].push(rhs);
+                                            }
+                                        };
+                                        a(k, rhs); // without * for index.ts
+                                        a(k + "/*", rhs + "/*"); // for pkg/foo.ts or pkg/foo/sth.ts
                                     }
                                 }
                             }
@@ -536,13 +636,9 @@ var Repository = /** @class */ (function () {
                         for (_i = 0, _a = Object.entries(dep_collection.dependency_locactions); _i < _a.length; _i++) {
                             _b = _a[_i], k = _b[0], v = _b[1];
                             if (v[0].repository) {
-                                src = v[0].repository.path + "/src";
-                                src_dir = fs.existsSync(src) ? src : v[0].repository.path;
                                 if (opts.link_to_links) {
-                                    console.log("add", k);
-                                    expected_symlinks[link_dir + "/" + k] = "../../" + src_dir;
+                                    expected_symlinks[link_dir + "/" + k] = "../../" + v[0].repository.path;
                                 }
-                                console.log("tsconfig2", tsconfig);
                                 src_tool = v[0].repository.path + "/src/tool";
                                 (fs.existsSync(src_tool) ? fs.readdirSync(src_tool) : []).forEach(function (x) {
                                     var match = /([^/\\]*)(\.ts)/.exec(x);
@@ -553,136 +649,190 @@ var Repository = /** @class */ (function () {
                             }
                         }
                         fix_ts_config = function (x) {
-                            if (x.compilerOptions.paths && !('baseUrl' in x.compilerOptions))
+                            ensure_path(x, "compilerOptions", {});
+                            if ("paths" in x.compilerOptions && !("baseUrl" in x.compilerOptions))
                                 x.compilerOptions.baseUrl = ".";
                             // otherwise a lot of imports will not work
                             x.compilerOptions.allowSyntheticDefaultImports = true;
                             x.compilerOptions.esModuleInterop = true;
+                            // if we have an dist/outDir add to exclude
+                            for (var _i = 0, _a = ["outDir", "outFile"]; _i < _a.length; _i++) {
+                                var key = _a[_i];
+                                if (x.compilerOptions[key])
+                                    ensure_path(x, "exclude", []).push(x.compilerOptions[key]);
+                            }
                             return x;
                         };
-                        if ('tsconfigs' in tsmonojson) {
+                        if ("tsconfigs" in tsmonojson) {
                             for (_c = 0, _d = Object.entries(tsmonojson.tsconfigs); _c < _d.length; _c++) {
-                                _e = _d[_c], path_2 = _e[0], merge = _e[1];
-                                fs.writeFileSync(path_2, JSON.stringify(fix_ts_config(deepmerge_1.default.all([tsmonojson.tsconfig || {}, path_for_tsconfig(path_2), tsconfig, merge]))), 'utf8');
+                                _e = _d[_c], path_ = _e[0], merge = _e[1];
+                                console.log("tsconfig.json path", path_);
+                                // use protect
+                                fs.writeFileSync(path.join(path_, "tsconfig.json"), JSON.stringify(fix_ts_config(deepmerge_1.default.all([tsmonojson.tsconfig || {}, path_for_tsconfig(path_), tsconfig, merge])), undefined, 2), "utf8");
                             }
                         }
-                        else if ('tsconfig' in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0) {
-                            tsconfig_path = this.path + "/tsconfig.json";
-                            json = JSON.stringify(fix_ts_config(deepmerge_1.default(tsmonojson.tsconfig || {}, path_for_tsconfig(tsconfig_path), tsconfig)));
-                            console.log('pwd', this.path);
-                            console.log("writing tsconfig.json", json);
-                            fs.writeFileSync(tsconfig_path, json, 'utf8');
-                            console.log("read", fs.readFileSync(this.path + "/tsconfig.json", 'utf8'));
+                        else if ("tsconfig" in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0) {
+                            tsconfig_path_1 = path.join(this.path, "tsconfig.json");
+                            json_1 = JSON.stringify(fix_ts_config(deepmerge_1.default(tsmonojson.tsconfig || {}, path_for_tsconfig(tsconfig_path_1), tsconfig)), undefined, 2);
+                            protect(tsconfig_path_1, function () { fs.writeFileSync(tsconfig_path_1, json_1, "utf8"); }, opts.force);
                         }
                         clone(tsmonojson.tsconfig) || {};
                         for (_f = 0, _g = Object.entries(expected_tools); _f < _g.length; _f++) {
                             _h = _g[_f], k = _h[0], v = _h[1];
-                            // todo should be self contained but 
-                            // node -r ts-node/register/transpile-only -r tsconfig-paths/register 
+                            // todo should be self contained but
+                            // node -r ts-node/register/transpile-only -r tsconfig-paths/register
                             // works so well that you sohuld have a shourtcut in your .bashrc anywaya
                             // so just making symlinks for now which should be good enough
-                            ['tsmono/tools', 'tsmono/tools-bin', 'tsmono/tools-bin-check'].forEach(function (x) { if (!fs.existsSync(x))
+                            ["tsmono/tools", "tsmono/tools-bin", "tsmono/tools-bin-check"].forEach(function (x) { if (!fs.existsSync(x))
                                 fs.mkdirSync(x); });
                             // this is going to break if you have realtive symlinks ?
-                            expected_symlinks["tsmono/tools/" + k] = v;
+                            expected_symlinks[this.path + "/}tsmono/tools/" + k] = v;
                             t = "tsmono/tools-bin/" + k;
                             del_if_exists(t);
-                            fs.writeFileSync(t, "#!/bin/sh\nnode -r ts-node/register/transpile-only -r tsconfig-paths/register " + v + " \"$@\" ", 'utf8');
-                            fs.writeFileSync("tsmono/tools-bin-check/" + k, "#!/bin/sh\nnode -r ts-node/register-only -r tsconfig-paths/register " + v + " \"$@\"", 'utf8');
+                            fs.writeFileSync(t, "#!/bin/sh\nnode -r ts-node/register/transpile-only -r tsconfig-paths/register " + v + " \"$@\" ", "utf8");
+                            fs.writeFileSync("tsmono/tools-bin-check/" + k, "#!/bin/sh\nnode -r ts-node/register-only -r tsconfig-paths/register " + v + " \"$@\"", "utf8");
                         }
-                        console.log("expected_symlinks", expected_symlinks);
                         for (_j = 0, _k = Object.entries(expected_symlinks); _j < _k.length; _j++) {
                             _l = _k[_j], k = _l[0], v = _l[1];
                             del_if_exists(k);
                             fs.mkdirpSync(path_1.dirname(k));
+                            info("symlinking " + k + " -> " + v);
                             fs.symlinkSync(v, k);
                         }
-                        ensure_path(package_json, 'dependencies', {});
-                        ensure_path(package_json, 'devDependencies', {});
+                        ensure_path(package_json, "dependencies", {});
+                        ensure_path(package_json, "devDependencies", {});
+                        add_dep = function (dep, first, dep_name) { return __awaiter(_this, void 0, void 0, function () {
+                            var _a, _b, _c;
+                            return __generator(this, function (_d) {
+                                switch (_d.label) {
+                                    case 0:
+                                        if (!first.url) return [3 /*break*/, 1];
+                                        if (/git\+https/.test(first.url)) {
+                                            ensure_path(package_json, dep, first.name, first.url);
+                                        }
+                                        else {
+                                            throw new Error("cannot cope with url " + first.url + " yet, no git+https, fix code");
+                                        }
+                                        return [3 /*break*/, 5];
+                                    case 1:
+                                        _a = ensure_path;
+                                        _b = [package_json, dep, dep_name];
+                                        if (!('version' in first)) return [3 /*break*/, 2];
+                                        _c = first.version;
+                                        return [3 /*break*/, 4];
+                                    case 2: return [4 /*yield*/, cfg.npm_version_for_name(dep_name)];
+                                    case 3:
+                                        _c = _d.sent();
+                                        _d.label = 4;
+                                    case 4:
+                                        _a.apply(void 0, _b.concat([_c]));
+                                        _d.label = 5;
+                                    case 5: return [2 /*return*/];
+                                }
+                            });
+                        }); };
                         add_npm_packages = function (dep) { return __awaiter(_this, void 0, void 0, function () {
-                            var _i, _a, dep_name, first, _b, _c, type_name, type_version, _d, _e;
-                            return __generator(this, function (_f) {
-                                switch (_f.label) {
+                            var _i, _a, dep_name, first, type_name, type_version, _b, _c;
+                            return __generator(this, function (_d) {
+                                switch (_d.label) {
                                     case 0:
                                         _i = 0, _a = dep_collection[dep];
-                                        _f.label = 1;
+                                        _d.label = 1;
                                     case 1:
-                                        if (!(_i < _a.length)) return [3 /*break*/, 7];
+                                        if (!(_i < _a.length)) return [3 /*break*/, 6];
                                         dep_name = _a[_i];
                                         first = dep_collection.dependency_locactions[dep_name][0];
                                         if (!first.npm)
-                                            return [3 /*break*/, 6];
-                                        console.log("adding npm", dep_name, first);
+                                            return [3 /*break*/, 5];
+                                        debug("adding npm", dep_name, first);
                                         // TODO: care about version
-                                        _b = ensure_path;
-                                        _c = [package_json, dep, dep_name];
-                                        return [4 /*yield*/, cfg.npm_version_for_name(dep_name)];
+                                        return [4 /*yield*/, add_dep(dep, first, dep_name)];
                                     case 2:
                                         // TODO: care about version
-                                        _b.apply(void 0, _c.concat([_f.sent()]));
+                                        _d.sent();
                                         if (!first.types) return [3 /*break*/, 5];
                                         type_name = "@types/" + dep_name;
                                         return [4 /*yield*/, cfg.npm_version_for_name(type_name)];
                                     case 3:
-                                        type_version = _f.sent();
-                                        console.log("got type version", type_version);
+                                        type_version = _d.sent();
+                                        debug("got type version " + type_name + " " + type_version);
                                         if (!(type_version !== undefined)) return [3 /*break*/, 5];
-                                        _d = ensure_path;
-                                        _e = [package_json, dep, type_name];
-                                        return [4 /*yield*/, cfg.npm_version_for_name(dep_name)];
+                                        _b = ensure_path;
+                                        _c = [package_json, "devDependencies", type_name];
+                                        return [4 /*yield*/, cfg.npm_version_for_name(type_name)];
                                     case 4:
-                                        _d.apply(void 0, _e.concat([_f.sent()]));
-                                        _f.label = 5;
+                                        _b.apply(void 0, _c.concat([_d.sent()]));
+                                        _d.label = 5;
                                     case 5:
-                                        console.log("package_json", package_json);
-                                        _f.label = 6;
-                                    case 6:
                                         _i++;
                                         return [3 /*break*/, 1];
-                                    case 7: return [2 /*return*/];
+                                    case 6: return [2 /*return*/];
                                 }
                             });
                         }); };
                         // manually forcing ts-node dependency for now
                         _m = ensure_path;
-                        _o = [package_json, 'devDependencies', 'ts-node'];
-                        return [4 /*yield*/, cfg.npm_version_for_name('ts-node')];
-                    case 1:
-                        // manually forcing ts-node dependency for now
-                        _m.apply(void 0, _o.concat([_r.sent()]));
-                        return [4 /*yield*/, add_npm_packages("dependencies")];
-                    case 2:
-                        _r.sent();
-                        return [4 /*yield*/, add_npm_packages("devDependencies")];
-                    case 3:
-                        _r.sent();
-                        backup_file(package_json.path);
-                        console.log("package_json2", package_json);
-                        this.packagejson.json = package_json;
-                        console.log("package_json2", this.packagejson.json);
-                        this.packagejson.flush_protect_user_changes();
-                        if (!opts.run_update) return [3 /*break*/, 5];
-                        console.log("run_update");
-                        npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"]);
-                        return [4 /*yield*/, run(npm_install_cmd[0], npm_install_cmd.slice(1))];
+                        _o = [package_json, "devDependencies", "ts-node"];
+                        return [4 /*yield*/, cfg.npm_version_for_name("ts-node")];
                     case 4:
-                        _r.sent();
-                        _r.label = 5;
+                        // manually forcing ts-node dependency for now
+                        _m.apply(void 0, _o.concat([_s.sent()]));
+                        return [4 /*yield*/, add_npm_packages("dependencies")];
                     case 5:
-                        console.log("opts", opts);
+                        _s.sent();
+                        return [4 /*yield*/, add_npm_packages("devDependencies")];
+                    case 6:
+                        _s.sent();
+                        backup_file(package_json.path);
+                        this.packagejson.json = package_json;
+                        this.packagejson.flush_protect_user_changes(opts.force);
+                        if (!opts.install_npm_packages) return [3 /*break*/, 9];
+                        debug("install_npm_packages");
+                        npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"]);
+                        to_be_installed = fs.readFileSync(this.packagejson_path, 'utf-8');
+                        p_installed = this.packagejson_path + ".installed";
+                        installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, 'utf-8') : undefined;
+                        console.log("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
+                        if (!(installed !== to_be_installed)) return [3 /*break*/, 8];
+                        return [4 /*yield*/, run(npm_install_cmd[0], { args: npm_install_cmd.slice(1), cwd: this.path })];
+                    case 7:
+                        _s.sent();
+                        _s.label = 8;
+                    case 8:
+                        fs.writeFileSync(p_installed, to_be_installed);
+                        _s.label = 9;
+                    case 9:
                         if (opts.symlink_node_modules_hack) {
-                            console.log("hack", this.tsmonojson.dirs());
                             for (_p = 0, _q = this.tsmonojson.dirs(); _p < _q.length; _p++) {
                                 dir = _q[_p];
                                 n = dir + "/node_modules";
                                 if (fs.existsSync(n)) {
                                     fs.unlinkSync(n);
                                 }
-                                console.log("hack: symlinking node modules to ", n, path.relative(dir, this.path + "/node_modules"));
+                                info("hack: symlinking node modules to " + n + " " + path.relative(dir, this.path + "/node_modules"));
                                 fs.symlinkSync(path.relative(dir, this.path + "/node_modules"), n);
                             }
                         }
-                        return [2 /*return*/];
+                        if (!opts.recurse) return [3 /*break*/, 13];
+                        opts2 = clone(opts);
+                        opts2.symlink_node_modules_hack = false; // mutually exclusive. when using it ony one repository can be active
+                        repositories = Object.values(dep_collection.dependency_locactions).map(function (x) { return x[0].repository; });
+                        _r = 0, repositories_1 = repositories;
+                        _s.label = 10;
+                    case 10:
+                        if (!(_r < repositories_1.length)) return [3 /*break*/, 13];
+                        r = repositories_1[_r];
+                        if (r === undefined)
+                            return [3 /*break*/, 12];
+                        info("recursing into dependency " + r.path);
+                        return [4 /*yield*/, r.update(cfg, opts2)];
+                    case 11:
+                        _s.sent();
+                        _s.label = 12;
+                    case 12:
+                        _r++;
+                        return [3 /*break*/, 10];
+                    case 13: return [2 /*return*/];
                 }
             });
         });
@@ -699,9 +849,9 @@ var Repository = /** @class */ (function () {
                         // TODO: check prefix "auto" etc to keep unique or overwrite
                         _a.sent();
                         j = this.tsmonojson.json;
-                        j["dependencies"] = j["dependencies"].concat(dependencies.filter(function (x) { return !(j["dependencies"] || []).includes(x); }));
-                        j["devDependencies"] = j["devDependencies"].concat(devDependencies.filter(function (x) { return !(j["devDependencies"] || []).includes(x); }));
-                        return [4 /*yield*/, this.update(cfg, { link_to_links: true, run_update: true })];
+                        j.dependencies = __spreadArrays(j.dependencies, dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
+                        j.devDependencies = __spreadArrays(j.devDependencies, devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
+                        return [4 /*yield*/, this.update(cfg, { link_to_links: true, install_npm_packages: true })];
                     case 2:
                         _a.sent();
                         return [2 /*return*/];
@@ -714,72 +864,221 @@ var Repository = /** @class */ (function () {
 // COMMAND LINE ARGUMENTS
 var parser = new argparse_1.ArgumentParser({
     addHelp: true,
-    description: "tsmono (typescirpt monorepository), see github ",
+    description: "tsmono (typescript monorepository), see github's README file",
     version: "0.0.1",
 });
 var sp = parser.addSubparsers({
-    'title': 'sub commands',
-    'dest': 'main_action'
+    title: "sub commands",
+    dest: "main_action",
 });
-var init = sp.addParser("init", { 'addHelp': true });
-var add = sp.addParser("add", { 'addHelp': true });
-add.addArgument("args", { 'nargs': '*' });
-var update = sp.addParser("update", { 'addHelp': true });
-update.addArgument("--symlink-node-modules-hack", { 'action': 'storeTrue' });
-var watch = sp.addParser("watch", { 'addHelp': true });
-console.log(process.argv);
+var init = sp.addParser("init", { addHelp: true });
+var add = sp.addParser("add", { addHelp: true });
+add.addArgument("args", { nargs: "*" });
+var update = sp.addParser("update", { addHelp: true, description: "This also is default action" });
+update.addArgument("--symlink-node-modules-hack", { action: "storeTrue" });
+update.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks" });
+update.addArgument("--recurse", { action: "storeTrue" });
+update.addArgument("--force", { action: "storeTrue" });
+var push = sp.addParser("push-with-dependencies", { addHelp: true, description: "upload to git repository" });
+push.addArgument("--shell-on-changes", { action: "storeTrue", help: "open shell so that you can commit changes" });
+push.addArgument("--git-push-remote-location-name", { help: "eg origin" });
+push.addArgument("--run-remote-command", { help: "remote ssh location to run git pull in user@host:path:cmd" });
+var list_dependencies = sp.addParser("list-dependencies", { addHelp: true, description: "list dependencies" });
+var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, description: "removes node_modules and reinstalls to match current node version" });
+var watch = sp.addParser("watch", { addHelp: true });
 var args = parser.parseArgs();
-console.log("args", args);
-var main = function () { return __awaiter(_this, void 0, void 0, function () {
-    var cache, config, cfg, p, d, dd, add, _i, _a, v, package_json;
-    return __generator(this, function (_b) {
-        switch (_b.label) {
+var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
+    var j;
+    return __generator(this, function (_a) {
+        // this is biased  but its going to save your ass
+        if (!fs.existsSync("tslint.json")) {
+            fs.writeFileSync("tslint.json", "\n    {\n        \"extends\": [\n            \"tslint:recommended\"\n        ],\n        \"rules\": {\n            \"no-floating-promises\": true,\n            \"no-return-await\": true,\n            \"await-promise\": [true, \"PromiseLike\"],\n        }\n    }\n    ", "utf8");
+        }
+        else {
+            j = JSON5.parse(fs.readFileSync("tslint.json", "utf8"));
+            if (!j.rules["no-floating-promises"] && !j.rules["await-promise"])
+                throw new Error("please add\n\n            \"no-floating-promises\": true,\n            \"no-return-await\": true,\n            \"await-promise\": [true, \"PromiseLike\"],\n\n            to your tslint.json 's rules section because it might save your ass\n      ");
+        }
+        return [2 /*return*/];
+    });
+}); };
+var main = function () { return __awaiter(void 0, void 0, void 0, function () {
+    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, p_2, dep_collection, basenames_to_pull, seen, _e, _f, _g, k, v, r, _h, _j, _k, basenames_to_pull_1, v, user_host, target_path, p_3, dep_collection, seen, _l, _m, _o, k, v, r, package_json_installed;
+    return __generator(this, function (_p) {
+        switch (_p.label) {
             case 0:
-                cache = new DirectoryCache(os_1.homedir() + "/.tsmono/cache");
+                cache = new DirectoryCache(os_1.homedir() + "/.smono/cache");
                 config = {
                     cache: cache,
-                    fetch_ttl_seconds: 60 * 24
+                    fetch_ttl_seconds: 60 * 24,
                 };
                 cfg = Object.assign({}, config, cfg_api(config));
                 p = new Repository(process.cwd());
+                update = function () { return __awaiter(void 0, void 0, void 0, function () {
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0: return [4 /*yield*/, p.update(cfg, { link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force })];
+                            case 1:
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); };
                 if (!(args.main_action == "init")) return [3 /*break*/, 2];
                 return [4 /*yield*/, p.init()];
             case 1:
-                _b.sent();
+                _p.sent();
                 return [2 /*return*/];
             case 2:
                 if (!(args.main_action == "add")) return [3 /*break*/, 4];
                 d = [];
                 dd = [];
-                add = d;
+                add_1 = d;
                 for (_i = 0, _a = args.args; _i < _a.length; _i++) {
                     v = _a[_i];
                     if (v == "-d") {
-                        add = dd;
+                        add_1 = dd;
                     }
                     dd.push(v);
                 }
                 return [4 /*yield*/, p.add(cfg, d, dd)];
             case 3:
-                _b.sent();
+                _p.sent();
                 return [2 /*return*/];
             case 4:
-                if (!(args.main_action == "update")) return [3 /*break*/, 6];
-                return [4 /*yield*/, p.update(cfg, { link_to_links: true, run_update: true, symlink_node_modules_hack: args.symlink_node_modules_hack })];
+                if (!(args.main_action == "update")) return [3 /*break*/, 7];
+                return [4 /*yield*/, update()];
             case 5:
-                _b.sent();
-                return [2 /*return*/];
+                _p.sent();
+                return [4 /*yield*/, tslint_hack()];
             case 6:
+                _p.sent();
+                return [2 /*return*/];
+            case 7:
                 if (args.main_action == "add") {
                     throw new Error("TODO");
                 }
-                package_json = fs.readFileSync("package.json");
-                return [2 /*return*/];
+                if (args.main_action == "list-dependencies") {
+                    p_1 = new Repository(process.cwd());
+                    dep_collection = new DependencyCollection(p_1.path, p_1.tsmonojson.dirs());
+                    dep_collection.dependencies_of_repository(p_1, true);
+                    dep_collection.do();
+                    dep_collection.print_warnings();
+                    basenames_to_pull = [];
+                    seen = [] // TODO: why aret there duplicates ?
+                    ;
+                    for (_b = 0, _c = Object.entries(dep_collection.dependency_locactions); _b < _c.length; _b++) {
+                        _d = _c[_b], k = _d[0], v = _d[1];
+                        r = v[0].repository;
+                        if (r) {
+                            if (seen.includes(r.path))
+                                continue;
+                            console.log('dependency-path:', r.path);
+                            seen.push(r.path);
+                        }
+                    }
+                }
+                if (!(args.main_action == "push-with-dependencies")) return [3 /*break*/, 20];
+                p_2 = new Repository(process.cwd());
+                dep_collection = new DependencyCollection(p_2.path, p_2.tsmonojson.dirs());
+                dep_collection.dependencies_of_repository(p_2, true);
+                dep_collection.do();
+                dep_collection.print_warnings();
+                basenames_to_pull = [];
+                seen = [] // TODO: why aret there duplicates ?
+                ;
+                _e = 0, _f = Object.entries(dep_collection.dependency_locactions);
+                _p.label = 8;
+            case 8:
+                if (!(_e < _f.length)) return [3 /*break*/, 16];
+                _g = _f[_e], k = _g[0], v = _g[1];
+                r = v[0].repository;
+                if (!r) return [3 /*break*/, 15];
+                if (seen.includes(r.path))
+                    return [3 /*break*/, 15];
+                seen.push(r.path);
+                _h = args.shell_on_changes;
+                if (!_h) return [3 /*break*/, 10];
+                _j = "";
+                return [4 /*yield*/, run_stdout("git", { args: ["diff"], cwd: r.path })];
+            case 9:
+                _h = _j != (_p.sent());
+                _p.label = 10;
+            case 10:
+                if (!_h) return [3 /*break*/, 12];
+                console.log(r.path + " is dirty, please commit changes starting shell");
+                return [4 /*yield*/, run("/bin/sh", { cwd: r.path })];
+            case 11:
+                _p.sent();
+                _p.label = 12;
+            case 12:
+                if (!args.git_push_remote_location_name) return [3 /*break*/, 14];
+                console.log("... pushing in " + r.path + " ...");
+                return [4 /*yield*/, run("git", { args: ["push", args.git_push_remote_location_name], cwd: r.path })];
+            case 13:
+                _p.sent();
+                _p.label = 14;
+            case 14:
+                // 3 checkout
+                if (args.run_remote_command) {
+                    basenames_to_pull.push(path.basename(r.path));
+                }
+                _p.label = 15;
+            case 15:
+                _e++;
+                return [3 /*break*/, 8];
+            case 16:
+                _k = 0, basenames_to_pull_1 = basenames_to_pull;
+                _p.label = 17;
+            case 17:
+                if (!(_k < basenames_to_pull_1.length)) return [3 /*break*/, 20];
+                v = basenames_to_pull_1[_k];
+                user_host = args.run_remote_command.split(":");
+                target_path = user_host[1] + "/" + v;
+                console.log("... pulling " + args.ssh_remote_location_git_pull + v + " ...");
+                return [4 /*yield*/, run("ssh", { args: [user_host[0]], stdin: "cd " + target_path + "; " + user_host[2] })];
+            case 18:
+                _p.sent();
+                _p.label = 19;
+            case 19:
+                _k++;
+                return [3 /*break*/, 17];
+            case 20:
+                if (!(args.main_action == "reinstall-with-dependencies")) return [3 /*break*/, 22];
+                p_3 = new Repository(process.cwd());
+                dep_collection = new DependencyCollection(p_3.path, p_3.tsmonojson.dirs());
+                dep_collection.dependencies_of_repository(p_3, true);
+                dep_collection.do();
+                dep_collection.print_warnings();
+                seen = [] // TODO: why aret there duplicates ?
+                ;
+                for (_l = 0, _m = Object.entries(dep_collection.dependency_locactions); _l < _m.length; _l++) {
+                    _o = _m[_l], k = _o[0], v = _o[1];
+                    r = v[0].repository;
+                    if (r) {
+                        if (seen.includes(r.path))
+                            continue;
+                        seen.push(r.path);
+                        fs.remove(path.join(r.path, "node_modules"));
+                        package_json_installed = path.join(r.path, "package.json.installed");
+                        if (fs.existsSync(package_json_installed))
+                            fs.remove(package_json_installed);
+                    }
+                }
+                return [4 /*yield*/, p_3.update(cfg, { link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true
+                        // , update_cmd: {executable: "npm", args: ["i"]}
+                    })];
+            case 21:
+                _p.sent();
+                _p.label = 22;
+            case 22: return [2 /*return*/];
         }
     });
 }); };
 process.on("unhandledRejection", function (error) {
     console.error(error); // This prints error with stack included (as for normal errors)
+    if (error.message)
+        console.error(error.message); // the error above does not print the message for whatever reason, so do so
     throw error; // Following best practices re-throw error and let the process exit with error code
 });
 main();

@@ -25,9 +25,10 @@ Caution: Tested on linux only for now.
 How to use:
 ===========
 
-```
-npm install tsmono # or similar tools from fyn to ..
-```
+git clone the repo
+tsc -p .
+then create bash function like this:
+tsmono(){ node $TSMONO/dist/tsmono.js "$@"; }
 
 Then see tsmono.json example below, run tsmono update and be done.
 
