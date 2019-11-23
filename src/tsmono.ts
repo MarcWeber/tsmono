@@ -15,10 +15,13 @@ import { basename, dirname, normalize } from "path";
 
 // TODO: use path.join everywhere
 
-const info = (s: string) => {
-  console.log(s)
+let silent: boolean = false;
+const info = (...args: any[]) => {
+  if (!silent) console.log(...args);
 }
 const warning = info
+
+const verbose = info
 
 /// LIBRARY SUPPORT CODE
 const clone = (x: any) => {
@@ -44,7 +47,7 @@ const assert_eql = (a: string, b: string) => {
 
 const run = async (cmd: string, opts: {args?: string[], stdin?: string, exitcodes?: number[]} & SpawnOptions) => {
   const args = opts.args || [];
-  console.log("running", cmd, args, "in", opts.cwd);
+  info("running", cmd, args, "in", opts.cwd);
   let stdout = ""
     // duplicate code
   await new Promise((a, b) => {
@@ -159,17 +162,13 @@ const parse_dependency = (s: string, origin?: string): Dependency => {
     r.url = r.name
     r.name = path.basename(r.name).replace(/\.git$/, "")
   }
-  console.log("l", l);
-
   for (const v of l.slice(1)) {
     let x = v.split("=")
     if (x.length >= 2) {
       x = [ x[0], x.slice(1).join("=") ];
-      console.log("x", x);
       if (x[0] === "version") r.version = x[1]
       else if (x[0] === "name") r.name = x[1]
       else throw new Error(`bad key=name pair: ${v}`)
-      console.log("r", r);
     }
     if (v === "node_modules") r[v] = true;
     if (v === "types") { r[v] = true; r.npm = true; }
@@ -384,7 +383,7 @@ class DependencyCollection {
       if (unique(all_versions).length > 1) {
         warning(`WARNING: ${this.origin} transient dependencies ${k} with competing versions found:`)
         for (const v of with_version) {
-          console.log(v.dep.origin, v.versions);
+          warning(v.dep.origin, v.versions);
         }
       }
     }
@@ -418,7 +417,7 @@ class DependencyCollection {
       if (dep.npm) return; // nothing to do
 
       const dirs_lookup = this.dirs.map((x) => path.join(x, dep.name))
-      console.log("dirs_lookup", dirs_lookup);
+      verbose("dirs_lookup", dirs_lookup);
 
       const d = dirs_lookup.find((dir) => fs.existsSync(dir) )
       if (!d) {
@@ -544,7 +543,7 @@ class Repository {
             )
 
             const rhs = path.relative(tsconfig_dir, resolved)
-            console.log("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
+            info("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
 
             const a = (lhs: string, rhs: string) => {
               ensure_path(r, "compilerOptions", "paths", lhs, [])
@@ -595,7 +594,7 @@ class Repository {
 
     if ("tsconfigs" in tsmonojson) {
       for (const [path_, merge] of Object.entries(tsmonojson.tsconfigs)) {
-        console.log("tsconfig.json path", path_)
+        info("tsconfig.json path", path_)
           // use protect
         fs.writeFileSync(path.join(path_, `tsconfig.json`), JSON.stringify(fix_ts_config(deepmerge.all([ tsmonojson.tsconfig || {}, path_for_tsconfig(path_), tsconfig, merge ])), undefined, 2), "utf8")
       }
@@ -682,7 +681,7 @@ class Repository {
       const to_be_installed = fs.readFileSync(this.packagejson_path, "utf-8")
       const p_installed = `${this.packagejson_path}.installed`
       const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf-8") : undefined
-      console.log("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
+      info("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
       if (installed !== to_be_installed) {
         await run(npm_install_cmd[0], {args: npm_install_cmd.slice(1), cwd: this.path})
       }
@@ -764,7 +763,10 @@ interface RemoteLocation {
 push.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
 push.addArgument("--run-remote-command", {help: "remote ssh location to run git pull in user@host:path:cmd"})
 
-const list_dependencies = sp.addParser("list-dependencies", {addHelp: true, description: "list dependencies"})
+const pull = sp.addParser("pull-with-dependencies", {addHelp: true, description: "pull current directory from remote location with dependencies"})
+pull.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
+
+const list_dependencies = sp.addParser("list-local-dependencies", {addHelp: true, description: "list dependencies"})
 
 const from_json_files = sp.addParser("from-json-files", {addHelp: true, description: "try to create tsmono.json fom package.json and tsconfig.json file"})
 push.addArgument("--force", {action: "storeTrue", help: "overwrites existing tsconfig.json file"})
@@ -850,10 +852,10 @@ const main = async () => {
     return
   }
   if (args.main_action === "add") {
-    throw new Error("TODO")
-  }
+    throw new Error("TODO")  }
 
-  if (args.main_action === "list-dependencies") {
+  if (args.main_action === "list-local-dependencies") {
+    silent = true;
     const p = new Repository(process.cwd())
     const dep_collection = new DependencyCollection(p.path, p.tsmonojson.dirs())
     dep_collection.dependencies_of_repository(p, true)
@@ -866,7 +868,7 @@ const main = async () => {
       const r = v[0].repository
       if (r) {
         if (seen.includes(r.path)) continue;
-        console.log("dependency-path:", r.path);
+        console.log("rel-path: ", r.path);
         seen.push(r.path)
       }
     }
@@ -911,13 +913,36 @@ const main = async () => {
       fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "uft8")
   }
 
+  if (args.main_action === "pull-with-dependencies") {
+    const cwd = process.cwd()
+    const reponame: string = path.basename(cwd)
+    const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
+
+    const items = await run("ssh", {args: [config.server], stdin: `
+          cd ${config.repositoriesPath}/${reponame} && tsmono list-local-dependencies
+    `})
+    info("pulling " + JSON.stringify(items))
+
+    for (const line of ([] as string[]).concat([`../${reponame}`]).concat(items)) {
+      if (/rel-path: /.test( line)) {
+        const p = path.relative(cwd, line.slice(10))
+        if (!fs.existsSync( p)) {
+          info(`creating ${p}`)
+          fs.mkdirpSync(p)
+        }
+        if (!fs.existsSync(path.join(p, ".git/config"))) {
+          await run("git", {args: ["clone", `${config.server}:${config.repositoriesPath}/${reponame}`, p]})
+        }
+      }
+    }
+
+  }
+
   if (args.main_action === "push-with-dependencies") {
     const p = new Repository(process.cwd())
     const dep_collection = new DependencyCollection(p.path, p.tsmonojson.dirs())
 
     const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
-
-    console.log(config)
 
     dep_collection.dependencies_of_repository(p, true)
     dep_collection.do()
@@ -927,16 +952,16 @@ const main = async () => {
     const seen: string[] = [] // TODO: why aret there duplicates ?
 
     const ensure_repo_committed_and_clean = async (r: Repository) => {
-      console.log(r.path, "checking for cleanness")
+      info(r.path, "checking for cleanness")
       // 1 updates / commit
-      if (args.shell_on_changes && "" != await run("git", {args: ["diff"], cwd: r.path})) {
-          console.log(`${r.path} is dirty, please commit changes starting shell`)
+      if (args.shell_on_changes && "" !== await run("git", {args: ["diff"], cwd: r.path})) {
+          info(`${r.path} is dirty, please commit changes starting shell`)
           await run("/bin/sh", {cwd: r.path})
        }
     }
 
     const ensure_remote_location_setup = async (r: Repository) => {
-      console.log(r.path, "ensuring remote setup")
+      info(r.path, "ensuring remote setup")
         // ensure remote location is there
       const reponame = path.basename(r.path)
       if ("" === await run(`git`, {exitcodes: [0, 1], args: `config --get remote.${config.gitRemoteLocationName}.url`.split(" "), cwd: r.path})) {
@@ -973,7 +998,7 @@ const main = async () => {
 
         // 2 push
         if (config.gitRemoteLocationName) {
-          console.log(`... pushing in ${r.path} ...`)
+          info(`... pushing in ${r.path} ...`)
           await run("git", {args: ["push", config.gitRemoteLocationName], cwd: r.path})
         }
         // 3 checkout
@@ -1034,6 +1059,6 @@ process.on("unhandledRejection", (error: any) => {
 });
 
 main().then(
-  console.log,
+  () => {},
   console.log,
 )

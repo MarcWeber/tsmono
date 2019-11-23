@@ -244,12 +244,17 @@ command line options
   tsmono add [--no-types] foo -d bar # add foo and devDependencies bar, then run update
   tsmono remove foo -bar # remove libraries again
 
-  tsmono push-with-dependencies --shell-on-change --git-push-remote-location-name origin --run-remote-command 'user@host:typescript:git pull; tsmono --update --link-to-links'
+  tsmono push-with-dependencies --shell-on-change --git-remote-config-json='{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'
   # pushes multiple repositories to a remote location optionally pulilng them, too.
   # great for keeping a test or server inv up to date with your local changes
 
+  mkdir repo-to-pull; cd repo-to-pull
+  tsmono pull-with-dependencies --shell-on-change --git-remote-config-json='{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'
+  # pulls repository with dependencies
+  # tsmono must be runnable by ssh on the remote site (eg add to .bashrc or .zprofile or such)
+  # because tsmono list-local-dependencies is used to determine what repositories to fetch
 
-  tsmono list-dependencies
+  tsmono list-local-dependencies
   # just lists all dependencies so that you can pack them manually
 
   tsmono from-json-files
