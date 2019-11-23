@@ -108,42 +108,6 @@ var assert_eql = function (a, b) {
     assert(a.trim() === b.trim(), "assertion " + JSON.stringify(a) + " === " + JSON.stringify(b) + " failed");
 };
 var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, function () {
-    var args;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
-            case 0:
-                args = opts.args || [];
-                console.log("running", cmd, args, "in", opts.cwd);
-                // duplicate code
-                return [4 /*yield*/, new Promise(function (a, b) {
-                        var child = child_process_1.spawn(cmd, args, Object.assign({
-                            stdio: [
-                                "pipe",
-                                "inherit",
-                                "inherit",
-                            ],
-                        }, opts));
-                        if ("stdin" in opts && child.stdin) {
-                            // @ts-ignore
-                            child.stdin.setEncoding("utf8");
-                            child.stdin.write(opts.stdin);
-                        }
-                        // @ts-ignore
-                        child.stdin.end();
-                        child.on("close", function (code, signal) {
-                            if (code === 0)
-                                a();
-                            b(cmd.toString() + " failed with code " + code);
-                        });
-                    })];
-            case 1:
-                // duplicate code
-                _a.sent();
-                return [2 /*return*/];
-        }
-    });
-}); };
-var run_stdout = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, function () {
     var args, stdout;
     return __generator(this, function (_a) {
         switch (_a.label) {
@@ -154,13 +118,21 @@ var run_stdout = function (cmd, opts) { return __awaiter(void 0, void 0, void 0,
                 // duplicate code
                 return [4 /*yield*/, new Promise(function (a, b) {
                         var child = child_process_1.spawn(cmd, args, Object.assign(opts, {
-                            stdio: [0, "pipe", 2],
+                            stdio: ["pipe", "pipe", 2],
                         }));
+                        if ("stdin" in opts && child.stdin) {
+                            // @ts-ignore
+                            child.stdin.setEncoding("utf8");
+                            child.stdin.write(opts.stdin);
+                        }
+                        // @ts-ignore
+                        child.stdin.end();
                         if (!child.stdout)
                             throw new Error("child.stdout is null");
                         child.stdout.on("data", function (s) { return stdout += s; });
                         child.on("close", function (code, signal) {
-                            if (code === 0)
+                            var exitcodes = opts.exitcodes || [0];
+                            if (exitcodes.includes(code))
                                 a();
                             b(cmd.toString() + " " + args.join(" ").toString() + " failed with code " + code);
                         });
@@ -345,7 +317,7 @@ var ensure_path = function (obj) {
     var e = args.length - 2;
     for (var i = 0, len = e; i <= e; i++) {
         var k = args[i];
-        if (i == e) {
+        if (i === e) {
             obj[k] = obj[k] || args[e + 1];
             return obj[k];
         }
@@ -504,6 +476,7 @@ var DependencyCollection = /** @class */ (function () {
     };
     DependencyCollection.prototype.do = function () {
         var next;
+        // tslint:disable-next-line: no-conditional-assignment
         while (next = this.todo.shift()) {
             this.find_and_recurse_dependency(next);
         }
@@ -676,7 +649,7 @@ var Repository = /** @class */ (function () {
                             json_1 = JSON.stringify(fix_ts_config(deepmerge_1.default(tsmonojson.tsconfig || {}, path_for_tsconfig(this.path), tsconfig)), undefined, 2);
                             protect(tsconfig_path_1, function () { fs.writeFileSync(tsconfig_path_1, json_1, "utf8"); }, opts.force);
                         }
-                        clone(tsmonojson.tsconfig) || {};
+                        // clone(tsmonojson.tsconfig) || {}
                         for (_f = 0, _g = Object.entries(expected_tools); _f < _g.length; _f++) {
                             _h = _g[_f], k = _h[0], v = _h[1];
                             // todo should be self contained but
@@ -717,7 +690,7 @@ var Repository = /** @class */ (function () {
                                     case 1:
                                         _a = ensure_path;
                                         _b = [package_json, dep, dep_name];
-                                        if (!('version' in first)) return [3 /*break*/, 2];
+                                        if (!("version" in first)) return [3 /*break*/, 2];
                                         _c = first.version;
                                         return [3 /*break*/, 4];
                                     case 2: return [4 /*yield*/, cfg.npm_version_for_name(dep_name)];
@@ -789,9 +762,9 @@ var Repository = /** @class */ (function () {
                         if (!opts.install_npm_packages) return [3 /*break*/, 9];
                         debug("install_npm_packages");
                         npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"]);
-                        to_be_installed = fs.readFileSync(this.packagejson_path, 'utf-8');
+                        to_be_installed = fs.readFileSync(this.packagejson_path, "utf-8");
                         p_installed = this.packagejson_path + ".installed";
-                        installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, 'utf-8') : undefined;
+                        installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf-8") : undefined;
                         console.log("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
                         if (!(installed !== to_be_installed)) return [3 /*break*/, 8];
                         return [4 /*yield*/, run(npm_install_cmd[0], { args: npm_install_cmd.slice(1), cwd: this.path })];
@@ -842,17 +815,14 @@ var Repository = /** @class */ (function () {
             var j;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: 
-                    // TODO: check prefix "auto" etc to keep unique or overwrite
-                    return [4 /*yield*/, this.init()];
-                    case 1:
+                    case 0:
                         // TODO: check prefix "auto" etc to keep unique or overwrite
-                        _a.sent();
+                        this.init();
                         j = this.tsmonojson.json;
                         j.dependencies = __spreadArrays(j.dependencies, dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
                         j.devDependencies = __spreadArrays(j.devDependencies, devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
                         return [4 /*yield*/, this.update(cfg, { link_to_links: true, install_npm_packages: true })];
-                    case 2:
+                    case 1:
                         _a.sent();
                         return [2 /*return*/];
                 }
@@ -876,14 +846,24 @@ var add = sp.addParser("add", { addHelp: true });
 add.addArgument("args", { nargs: "*" });
 var update = sp.addParser("update", { addHelp: true, description: "This also is default action" });
 update.addArgument("--symlink-node-modules-hack", { action: "storeTrue" });
+update.addArgument("--link-via-root-dirs", { action: "storeTrue", help: "add dependencies by populating root-dirs. See README " });
 update.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks" });
 update.addArgument("--recurse", { action: "storeTrue" });
 update.addArgument("--force", { action: "storeTrue" });
+var update_using_rootDirs = sp.addParser("update-using-rootDirs", { addHelp: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way" });
+// update_using_rootDirs.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
+// update_using_rootDirs.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
+// update_using_rootDirs.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
+update_using_rootDirs.addArgument("--recurse", { action: "storeTrue" });
+update_using_rootDirs.addArgument("--force", { action: "storeTrue" });
 var push = sp.addParser("push-with-dependencies", { addHelp: true, description: "upload to git repository" });
 push.addArgument("--shell-on-changes", { action: "storeTrue", help: "open shell so that you can commit changes" });
 push.addArgument("--git-push-remote-location-name", { help: "eg origin" });
+push.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}' });
 push.addArgument("--run-remote-command", { help: "remote ssh location to run git pull in user@host:path:cmd" });
 var list_dependencies = sp.addParser("list-dependencies", { addHelp: true, description: "list dependencies" });
+var from_json_files = sp.addParser("from-json-files", { addHelp: true, description: "try to create tsmono.json fom package.json and tsconfig.json file" });
+push.addArgument("--force", { action: "storeTrue", help: "overwrites existing tsconfig.json file" });
 var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, description: "removes node_modules and reinstalls to match current node version" });
 var watch = sp.addParser("watch", { addHelp: true });
 var args = parser.parseArgs();
@@ -892,7 +872,7 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
     return __generator(this, function (_a) {
         // this is biased  but its going to save your ass
         if (!fs.existsSync("tslint.json")) {
-            fs.writeFileSync("tslint.json", "\n    {\n        \"extends\": [\n            \"tslint:recommended\"\n        ],\n        \"rules\": {\n            \"no-floating-promises\": true,\n            \"no-return-await\": true,\n            \"await-promise\": [true, \"PromiseLike\"],\n        }\n    }\n    ", "utf8");
+            fs.writeFileSync("tslint.json", "\n    {\n        \"extends\": [\n            \"tslint:recommended\"\n        ],\n        \"rules\": {\n            \"no-floating-promises\": true,\n            \"no-return-await\": true,\n            \"await-promise\": [true, \"PromiseLike\"]\n        }\n    }\n    ", "utf8");
         }
         else {
             j = JSON5.parse(fs.readFileSync("tslint.json", "utf8"));
@@ -903,11 +883,11 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
     });
 }); };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, p_2, dep_collection, basenames_to_pull, seen, _e, _f, _g, k, v, r, _h, _j, _k, basenames_to_pull_1, v, user_host, target_path, p_3, dep_collection, seen, _l, _m, _o, k, v, r, package_json_installed;
-    return __generator(this, function (_p) {
-        switch (_p.label) {
+    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, package_contents, tsconfig_contents, tsmono_contents, _e, _f, _g, k, v, _h, _j, _k, pack, version, p_2, dep_collection, config_1, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _l, _m, _o, k, v, r, p_3, dep_collection, seen, _p, _q, _r, k, v, r, package_json_installed;
+    return __generator(this, function (_s) {
+        switch (_s.label) {
             case 0:
-                cache = new DirectoryCache(os_1.homedir() + "/.smono/cache");
+                cache = new DirectoryCache(os_1.homedir() + "/.tsmono/cache");
                 config = {
                     cache: cache,
                     fetch_ttl_seconds: 60 * 24,
@@ -924,41 +904,47 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         }
                     });
                 }); };
-                if (!(args.main_action == "init")) return [3 /*break*/, 2];
-                return [4 /*yield*/, p.init()];
-            case 1:
-                _p.sent();
-                return [2 /*return*/];
-            case 2:
-                if (!(args.main_action == "add")) return [3 /*break*/, 4];
+                if (args.main_action === "init") {
+                    p.init();
+                    return [2 /*return*/];
+                }
+                if (!(args.main_action === "add")) return [3 /*break*/, 2];
                 d = [];
                 dd = [];
                 add_1 = d;
                 for (_i = 0, _a = args.args; _i < _a.length; _i++) {
                     v = _a[_i];
-                    if (v == "-d") {
+                    if (v === "-d") {
                         add_1 = dd;
                     }
                     dd.push(v);
                 }
                 return [4 /*yield*/, p.add(cfg, d, dd)];
-            case 3:
-                _p.sent();
+            case 1:
+                _s.sent();
                 return [2 /*return*/];
-            case 4:
-                if (!(args.main_action == "update")) return [3 /*break*/, 7];
+            case 2:
+                if (!(args.main_action === "update")) return [3 /*break*/, 5];
                 return [4 /*yield*/, update()];
+            case 3:
+                _s.sent();
+                return [4 /*yield*/, tslint_hack()];
+            case 4:
+                _s.sent();
+                return [2 /*return*/];
             case 5:
-                _p.sent();
+                if (!(args.main_action === "update_using_rootDirs")) return [3 /*break*/, 7];
+                // await update_using_rootDirs();
                 return [4 /*yield*/, tslint_hack()];
             case 6:
-                _p.sent();
+                // await update_using_rootDirs();
+                _s.sent();
                 return [2 /*return*/];
             case 7:
-                if (args.main_action == "add") {
+                if (args.main_action === "add") {
                     throw new Error("TODO");
                 }
-                if (args.main_action == "list-dependencies") {
+                if (args.main_action === "list-dependencies") {
                     p_1 = new Repository(process.cwd());
                     dep_collection = new DependencyCollection(p_1.path, p_1.tsmonojson.dirs());
                     dep_collection.dependencies_of_repository(p_1, true);
@@ -973,78 +959,187 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         if (r) {
                             if (seen.includes(r.path))
                                 continue;
-                            console.log('dependency-path:', r.path);
+                            console.log("dependency-path:", r.path);
                             seen.push(r.path);
                         }
                     }
                 }
-                if (!(args.main_action == "push-with-dependencies")) return [3 /*break*/, 20];
+                if (args.main_action === "from-json-files") {
+                    // try creating tsmono from json files
+                    // TODO: test this
+                    if (fs.existsSync("tsmono.json") && !args.force) {
+                        console.log("not overwriting tsconfig.json, use --force");
+                        return [2 /*return*/];
+                    }
+                    package_contents = fs.existsSync("package.json") ? require("pcakage.json") : undefined;
+                    tsconfig_contents = fs.existsSync("tsconfig.json") ? require("tsconfig.json") : undefined;
+                    if (package_contents === undefined && tsconfig_contents === undefined) {
+                        console.log("Neither package.json nor tsconfig.json found");
+                        return [2 /*return*/];
+                    }
+                    tsconfig_contents = tsconfig_contents || {};
+                    tsmono_contents = {
+                        package: {},
+                        dependencies: [],
+                        devDependencies: [],
+                        tsconfig: tsconfig_contents || {},
+                    };
+                    // process package.json
+                    for (_e = 0, _f = Object.entries(package_contents || {}); _e < _f.length; _e++) {
+                        _g = _f[_e], k = _g[0], v = _g[1];
+                        if (k === "dependencies" || k === "devDependencies") {
+                            for (_h = 0, _j = Object.entries(v); _h < _j.length; _h++) {
+                                _k = _j[_h], pack = _k[0], version = _k[1];
+                                tsmono_contents[k].push(pack + ";version=" + version);
+                            }
+                        }
+                        else {
+                            tsmono_contents.package[k] = v;
+                        }
+                    }
+                    fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "uft8");
+                }
+                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 13];
                 p_2 = new Repository(process.cwd());
                 dep_collection = new DependencyCollection(p_2.path, p_2.tsmonojson.dirs());
+                config_1 = JSON.parse(args.git_remote_config_json);
+                console.log(config_1);
                 dep_collection.dependencies_of_repository(p_2, true);
                 dep_collection.do();
                 dep_collection.print_warnings();
                 basenames_to_pull = [];
                 seen = [] // TODO: why aret there duplicates ?
                 ;
-                _e = 0, _f = Object.entries(dep_collection.dependency_locactions);
-                _p.label = 8;
+                ensure_repo_committed_and_clean_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                    var _a, _b;
+                    return __generator(this, function (_c) {
+                        switch (_c.label) {
+                            case 0:
+                                console.log(r.path, "checking for cleanness");
+                                _a = args.shell_on_changes;
+                                if (!_a) return [3 /*break*/, 2];
+                                _b = "";
+                                return [4 /*yield*/, run("git", { args: ["diff"], cwd: r.path })];
+                            case 1:
+                                _a = _b != (_c.sent());
+                                _c.label = 2;
+                            case 2:
+                                if (!_a) return [3 /*break*/, 4];
+                                console.log(r.path + " is dirty, please commit changes starting shell");
+                                return [4 /*yield*/, run("/bin/sh", { cwd: r.path })];
+                            case 3:
+                                _c.sent();
+                                _c.label = 4;
+                            case 4: return [2 /*return*/];
+                        }
+                    });
+                }); };
+                ensure_remote_location_setup_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                    var reponame, _a;
+                    return __generator(this, function (_b) {
+                        switch (_b.label) {
+                            case 0:
+                                console.log(r.path, "ensuring remote setup");
+                                reponame = path.basename(r.path);
+                                _a = "";
+                                return [4 /*yield*/, run("git", { exitcodes: [0, 1], args: ("config --get remote." + config_1.gitRemoteLocationName + ".url").split(" "), cwd: r.path })];
+                            case 1:
+                                if (!(_a === (_b.sent()))) return [3 /*break*/, 5];
+                                // local side
+                                return [4 /*yield*/, run("git", { args: ("remote add " + config_1.gitRemoteLocationName + " " + config_1.server + ":" + config_1.bareRepositoriesPath + "/" + reponame).split(" "), cwd: r.path })
+                                    // remote side
+                                ];
+                            case 2:
+                                // local side
+                                _b.sent();
+                                // remote side
+                                return [4 /*yield*/, run("ssh", { args: [config_1.server], cwd: r.path, stdin: "\n          bare=" + config_1.bareRepositoriesPath + "/" + reponame + "\n          target=" + config_1.repositoriesPath + "/" + reponame + "\n          [ -d \"$bare\" ] || mkdir -p \"$bare\"; ( cd \"$bare\"; git init --bare; )\n          [ -d \"$target\" ] || git clone $bare $target\n          " })
+                                    // local side .git/config
+                                ];
+                            case 3:
+                                // remote side
+                                _b.sent();
+                                // local side .git/config
+                                return [4 /*yield*/, run("git", { args: ("push --set-upstream " + config_1.gitRemoteLocationName + " master").split(" "), cwd: r.path })];
+                            case 4:
+                                // local side .git/config
+                                _b.sent();
+                                _b.label = 5;
+                            case 5: return [2 /*return*/];
+                        }
+                    });
+                }); };
+                remote_update_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                    var reponame;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                reponame = path.basename(r.path);
+                                return [4 /*yield*/, run("ssh", { args: [config_1.server],
+                                        cwd: r.path, stdin: "\n          target=" + config_1.repositoriesPath + "/" + reponame + "\n          cd $target\n          git pull\n      " })];
+                            case 1:
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); };
+                push_to_remote_location = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0: return [4 /*yield*/, ensure_repo_committed_and_clean_1(r)];
+                            case 1:
+                                _a.sent();
+                                return [4 /*yield*/, ensure_remote_location_setup_1(r)
+                                    // 2 push
+                                ];
+                            case 2:
+                                _a.sent();
+                                if (!config_1.gitRemoteLocationName) return [3 /*break*/, 4];
+                                console.log("... pushing in " + r.path + " ...");
+                                return [4 /*yield*/, run("git", { args: ["push", config_1.gitRemoteLocationName], cwd: r.path })];
+                            case 3:
+                                _a.sent();
+                                _a.label = 4;
+                            case 4: 
+                            // 3 checkout
+                            return [4 /*yield*/, remote_update_1(r)];
+                            case 5:
+                                // 3 checkout
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); };
+                _l = 0, _m = Object.entries(dep_collection.dependency_locactions);
+                _s.label = 8;
             case 8:
-                if (!(_e < _f.length)) return [3 /*break*/, 16];
-                _g = _f[_e], k = _g[0], v = _g[1];
+                if (!(_l < _m.length)) return [3 /*break*/, 11];
+                _o = _m[_l], k = _o[0], v = _o[1];
                 r = v[0].repository;
-                if (!r) return [3 /*break*/, 15];
+                if (!r) return [3 /*break*/, 10];
                 if (seen.includes(r.path))
-                    return [3 /*break*/, 15];
+                    return [3 /*break*/, 10];
                 seen.push(r.path);
-                _h = args.shell_on_changes;
-                if (!_h) return [3 /*break*/, 10];
-                _j = "";
-                return [4 /*yield*/, run_stdout("git", { args: ["diff"], cwd: r.path })];
+                return [4 /*yield*/, push_to_remote_location(r)];
             case 9:
-                _h = _j != (_p.sent());
-                _p.label = 10;
+                _s.sent();
+                _s.label = 10;
             case 10:
-                if (!_h) return [3 /*break*/, 12];
-                console.log(r.path + " is dirty, please commit changes starting shell");
-                return [4 /*yield*/, run("/bin/sh", { cwd: r.path })];
-            case 11:
-                _p.sent();
-                _p.label = 12;
-            case 12:
-                if (!args.git_push_remote_location_name) return [3 /*break*/, 14];
-                console.log("... pushing in " + r.path + " ...");
-                return [4 /*yield*/, run("git", { args: ["push", args.git_push_remote_location_name], cwd: r.path })];
-            case 13:
-                _p.sent();
-                _p.label = 14;
-            case 14:
-                // 3 checkout
-                if (args.run_remote_command) {
-                    basenames_to_pull.push(path.basename(r.path));
-                }
-                _p.label = 15;
-            case 15:
-                _e++;
+                _l++;
                 return [3 /*break*/, 8];
-            case 16:
-                _k = 0, basenames_to_pull_1 = basenames_to_pull;
-                _p.label = 17;
-            case 17:
-                if (!(_k < basenames_to_pull_1.length)) return [3 /*break*/, 20];
-                v = basenames_to_pull_1[_k];
-                user_host = args.run_remote_command.split(":");
-                target_path = user_host[1] + "/" + v;
-                console.log("... pulling " + args.ssh_remote_location_git_pull + v + " ...");
-                return [4 /*yield*/, run("ssh", { args: [user_host[0]], stdin: "cd " + target_path + "; " + user_host[2] })];
-            case 18:
-                _p.sent();
-                _p.label = 19;
-            case 19:
-                _k++;
-                return [3 /*break*/, 17];
-            case 20:
-                if (!(args.main_action == "reinstall-with-dependencies")) return [3 /*break*/, 22];
+            case 11: return [4 /*yield*/, push_to_remote_location(p_2)
+                // for (const v of basenames_to_pull) {
+                //     const user_host  = args.run_remote_command.split(":")
+                //     const target_path = `${user_host[1]}/${v}`
+                //     console.log(`... pulling ${args.ssh_remote_location_git_pull}${v} ...`)
+                //     await run("ssh", {args: [user_host[0]], stdin: `cd ${target_path}; ${user_host[2]}`}  )
+                // }
+            ];
+            case 12:
+                _s.sent();
+                _s.label = 13;
+            case 13:
+                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 15];
                 p_3 = new Repository(process.cwd());
                 dep_collection = new DependencyCollection(p_3.path, p_3.tsmonojson.dirs());
                 dep_collection.dependencies_of_repository(p_3, true);
@@ -1052,26 +1147,25 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 dep_collection.print_warnings();
                 seen = [] // TODO: why aret there duplicates ?
                 ;
-                for (_l = 0, _m = Object.entries(dep_collection.dependency_locactions); _l < _m.length; _l++) {
-                    _o = _m[_l], k = _o[0], v = _o[1];
+                for (_p = 0, _q = Object.entries(dep_collection.dependency_locactions); _p < _q.length; _p++) {
+                    _r = _q[_p], k = _r[0], v = _r[1];
                     r = v[0].repository;
                     if (r) {
                         if (seen.includes(r.path))
                             continue;
                         seen.push(r.path);
-                        fs.remove(path.join(r.path, "node_modules"));
+                        fs.removeSync(path.join(r.path, "node_modules"));
                         package_json_installed = path.join(r.path, "package.json.installed");
                         if (fs.existsSync(package_json_installed))
-                            fs.remove(package_json_installed);
+                            fs.removeSync(package_json_installed);
                     }
                 }
-                return [4 /*yield*/, p_3.update(cfg, { link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true
-                        // , update_cmd: {executable: "npm", args: ["i"]}
+                return [4 /*yield*/, p_3.update(cfg, { link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                     })];
-            case 21:
-                _p.sent();
-                _p.label = 22;
-            case 22: return [2 /*return*/];
+            case 14:
+                _s.sent();
+                _s.label = 15;
+            case 15: return [2 /*return*/];
         }
     });
 }); };
@@ -1081,4 +1175,4 @@ process.on("unhandledRejection", function (error) {
         console.error(error.message); // the error above does not print the message for whatever reason, so do so
     throw error; // Following best practices re-throw error and let the process exit with error code
 });
-main();
+main().then(console.log, console.log);

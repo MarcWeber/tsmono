@@ -11,6 +11,7 @@ WHY?
   with different versions of transient dependencies managed by node, becaues
   they end up in package.json dependecies fields)
 
+* get code of target platform automatically
 
 Without tsmono, what is next best option?
 ========================================
@@ -28,11 +29,49 @@ How to use:
 git clone the repo
 tsc -p .
 then create bash function like this:
+
+
+```
+# first run tsc -p . in directory to create dist/tsomon.json
 tsmono(){ node $TSMONO/dist/tsmono.js "$@"; }
+```
+
+```
+# or use ts-node
+tsmono_solwer(){ node -r ts-node/register/trasnpile-only $TSMONO/src/tsmono.ts "$@"; }
+```
 
 Then see tsmono.json example below, run tsmono update and be done.
 
 Add your package.json contents to the tsmono.json file ..
+
+ROADMAP / TODO:
+===============
+
+[ ] add support turning into npm module
+
+[ ] turn this repository into npm module
+
+[ ] think about polyfills
+     * add typings to tsconfig
+     * conifgure webpack plugins
+
+peer dependecny support
+=======================
+
+support peer dependencies, how?
+
+* want to test / typecheck code in repo (thus need to be installed)
+* need to check its present in target repository (ts-node will fail)
+* despite having node_modules locally should not interfer with installation
+  in target ?
+
+Conclusion -> just adding to dependencies 'works' for now but is shit
+Getting all goal done -> some work
+
+or use devDepencdencies only like polythene ?0
+
+Thus is it a problem at all ?
 
 Problems:
 =========
@@ -213,6 +252,9 @@ command line options
   tsmono list-dependencies
   # just lists all dependencies so that you can pack them manually
 
+  tsmono from-json-files
+  # try to create tsmono.json fom package.json and tsconfig.json file
+
 ```
 
 Think about this:
@@ -305,3 +347,10 @@ This way you have some control over updates. Thus if s.th breakes you know where
 .gitignore and .node ignore like file
 
 # G
+
+
+NOTES FOR WINDOWS
+=================
+Symlinks seem to reqiure special privileges.
+Eg run as administrator or google how to change priviledges.
+Maybe there are more ways.
