@@ -128,6 +128,7 @@ var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, functi
                             stdio: ["pipe", "pipe", 2],
                         }));
                         if ("stdin" in opts && child.stdin) {
+                            verbose("stdin is", opts.stdin);
                             // @ts-ignore
                             child.stdin.setEncoding("utf8");
                             child.stdin.write(opts.stdin);
@@ -889,7 +890,7 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
     });
 }); };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, package_contents, tsconfig_contents, tsmono_contents, _e, _f, _g, k, v, _h, _j, _k, pack, version, cwd, reponame, config_1, items, _l, _m, line, p_2, p_3, dep_collection, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _o, _p, _q, k, v, r, p_4, dep_collection, seen, _r, _s, _t, k, v, r, package_json_installed;
+    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, package_contents, tsconfig_contents, tsmono_contents, _e, _f, _g, k, v, _h, _j, _k, pack, version, cwd, reponame, config_1, e_1, items, _l, _m, path_, p_2, p_3, dep_collection, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _o, _p, _q, k, v, r, p_4, dep_collection, seen, _r, _s, _t, k, v, r, package_json_installed;
     return __generator(this, function (_u) {
         switch (_u.label) {
             case 0:
@@ -1006,38 +1007,59 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     }
                     fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "uft8");
                 }
-                if (!(args.main_action === "pull-with-dependencies")) return [3 /*break*/, 12];
+                if (!(args.main_action === "pull-with-dependencies")) return [3 /*break*/, 19];
                 cwd = process.cwd();
                 reponame = path.basename(cwd);
                 config_1 = JSON.parse(args.git_remote_config_json);
-                return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n          cd " + config_1.repositoriesPath + "/" + reponame + " && tsmono list-local-dependencies\n    " })];
+                _u.label = 8;
             case 8:
-                items = _u.sent();
+                _u.trys.push([8, 10, , 11]);
+                return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n      [ -f " + config_1.repositoriesPath + "/" + reponame + "/.git/config ]\n      " })];
+            case 9:
+                _u.sent();
+                return [3 /*break*/, 11];
+            case 10:
+                e_1 = _u.sent();
+                info("remote directory " + config_1.repositoriesPath + "/" + reponame + "/.git/config does not exit, aborting");
+                return [2 /*return*/];
+            case 11: return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n          cd " + config_1.repositoriesPath + "/" + reponame + " && tsmono list-local-dependencies\n    " })];
+            case 12:
+                items = (_u.sent()).split("\n").filter(function (x) { return /rel-path: /.test(x); }).map(function (x) { return x.slice(11); });
                 info("pulling " + JSON.stringify(items));
                 _l = 0, _m = [].concat(["../" + reponame]).concat(items);
-                _u.label = 9;
-            case 9:
-                if (!(_l < _m.length)) return [3 /*break*/, 12];
-                line = _m[_l];
-                if (!/rel-path: /.test(line)) return [3 /*break*/, 11];
-                p_2 = path.relative(cwd, line.slice(10));
+                _u.label = 13;
+            case 13:
+                if (!(_l < _m.length)) return [3 /*break*/, 19];
+                path_ = _m[_l];
+                info("pulling " + path_);
+                p_2 = path.join(cwd, path_);
                 if (!fs.existsSync(p_2)) {
                     info("creating " + p_2);
                     fs.mkdirpSync(p_2);
                 }
-                if (!!fs.existsSync(path.join(p_2, ".git/config"))) return [3 /*break*/, 11];
-                return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.repositoriesPath + "/" + reponame, p_2] })];
-            case 10:
+                return [4 /*yield*/, run("ssh", { args: [config_1.server],
+                        stdin: "\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + reponame + "\n        repo=" + config_1.repositoriesPath + "/" + reponame + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, reponame), config_1.bareRepositoriesPath) + "/" + reponame + "\n            git push --set-upstream origin master\n          )\n        }\n        ( cd $repo; git push  )\n        " })];
+            case 14:
                 _u.sent();
-                _u.label = 11;
-            case 11:
+                if (!!fs.existsSync(path.join(p_2, ".git/config"))) return [3 /*break*/, 16];
+                return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.bareRepositoriesPath + "/" + reponame, p_2] })];
+            case 15:
+                _u.sent();
+                _u.label = 16;
+            case 16:
+                info("pulling " + p_2 + " ..");
+                return [4 /*yield*/, run("git", { args: ["pull"], cwd: p_2 })];
+            case 17:
+                _u.sent();
+                _u.label = 18;
+            case 18:
                 _l++;
-                return [3 /*break*/, 9];
-            case 12:
-                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 18];
+                return [3 /*break*/, 13];
+            case 19:
+                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 25];
                 p_3 = new Repository(process.cwd());
                 dep_collection = new DependencyCollection(p_3.path, p_3.tsmonojson.dirs());
-                config_2 = JSON.parse(args.git_remote_config_jon);
+                config_2 = JSON.parse(args.git_remote_config_json);
                 dep_collection.dependencies_of_repository(p_3, true);
                 dep_collection.do();
                 dep_collection.print_warnings();
@@ -1145,23 +1167,23 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     });
                 }); };
                 _o = 0, _p = Object.entries(dep_collection.dependency_locactions);
-                _u.label = 13;
-            case 13:
-                if (!(_o < _p.length)) return [3 /*break*/, 16];
+                _u.label = 20;
+            case 20:
+                if (!(_o < _p.length)) return [3 /*break*/, 23];
                 _q = _p[_o], k = _q[0], v = _q[1];
                 r = v[0].repository;
-                if (!r) return [3 /*break*/, 15];
+                if (!r) return [3 /*break*/, 22];
                 if (seen.includes(r.path))
-                    return [3 /*break*/, 15];
+                    return [3 /*break*/, 22];
                 seen.push(r.path);
                 return [4 /*yield*/, push_to_remote_location(r)];
-            case 14:
+            case 21:
                 _u.sent();
-                _u.label = 15;
-            case 15:
+                _u.label = 22;
+            case 22:
                 _o++;
-                return [3 /*break*/, 13];
-            case 16: return [4 /*yield*/, push_to_remote_location(p_3)
+                return [3 /*break*/, 20];
+            case 23: return [4 /*yield*/, push_to_remote_location(p_3)
                 // for (const v of basenames_to_pull) {
                 //     const user_host  = args.run_remote_command.split(":")
                 //     const target_path = `${user_host[1]}/${v}`
@@ -1169,11 +1191,11 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 //     await run("ssh", {args: [user_host[0]], stdin: `cd ${target_path}; ${user_host[2]}`}  )
                 // }
             ];
-            case 17:
+            case 24:
                 _u.sent();
-                _u.label = 18;
-            case 18:
-                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 20];
+                _u.label = 25;
+            case 25:
+                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 27];
                 p_4 = new Repository(process.cwd());
                 dep_collection = new DependencyCollection(p_4.path, p_4.tsmonojson.dirs());
                 dep_collection.dependencies_of_repository(p_4, true);
@@ -1196,10 +1218,10 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 }
                 return [4 /*yield*/, p_4.update(cfg, { link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                     })];
-            case 19:
+            case 26:
                 _u.sent();
-                _u.label = 20;
-            case 20: return [2 /*return*/];
+                _u.label = 27;
+            case 27: return [2 /*return*/];
         }
     });
 }); };

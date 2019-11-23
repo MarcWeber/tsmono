@@ -56,9 +56,10 @@ const run = async (cmd: string, opts: {args?: string[], stdin?: string, exitcode
       }));
 
       if ("stdin" in opts && child.stdin) {
+        verbose("stdin is", opts.stdin)
           // @ts-ignore
-          child.stdin.setEncoding("utf8");
-          child.stdin.write(opts.stdin)
+        child.stdin.setEncoding("utf8");
+        child.stdin.write(opts.stdin)
       }
       // @ts-ignore
       child.stdin.end()
@@ -914,26 +915,54 @@ const main = async () => {
   }
 
   if (args.main_action === "pull-with-dependencies") {
+    // TODO: think about relative directories ..
     const cwd = process.cwd()
     const reponame: string = path.basename(cwd)
     const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
 
-    const items = await run("ssh", {args: [config.server], stdin: `
+    // test remote is git repository
+    try {
+      await run("ssh", {args: [config.server], stdin: `
+      [ -f ${config.repositoriesPath}/${reponame}/.git/config ]
+      `})
+    } catch (e) {
+      info(`remote directory ${config.repositoriesPath}/${reponame}/.git/config does not exit, aborting`)
+      return;
+    }
+
+    const items = (await run("ssh", {args: [config.server], stdin: `
           cd ${config.repositoriesPath}/${reponame} && tsmono list-local-dependencies
-    `})
+    `})).split("\n").filter((x) => /rel-path: /.test( x) ).map((x) => x.slice(11) )
+
     info("pulling " + JSON.stringify(items))
 
-    for (const line of ([] as string[]).concat([`../${reponame}`]).concat(items)) {
-      if (/rel-path: /.test( line)) {
-        const p = path.relative(cwd, line.slice(10))
-        if (!fs.existsSync( p)) {
-          info(`creating ${p}`)
-          fs.mkdirpSync(p)
-        }
-        if (!fs.existsSync(path.join(p, ".git/config"))) {
-          await run("git", {args: ["clone", `${config.server}:${config.repositoriesPath}/${reponame}`, p]})
-        }
+    for (const path_ of ([] as string[]).concat([`../${reponame}`]).concat(items)) {
+      info(`pulling ${path_}`)
+      const p = path.join(cwd, path_)
+      if (!fs.existsSync(p)) {
+        info(`creating ${p}`)
+        fs.mkdirpSync(p)
       }
+      await run("ssh", { args: [config.server],
+        stdin: `
+        exec 2>&1
+        set -x
+        bare=${config.bareRepositoriesPath}/${reponame}
+        repo=${config.repositoriesPath}/${reponame}
+        [ -d $bare ] || {
+          mkdir -p $bare; ( cd $bare; git init --bare )
+          ( cd $repo;
+            git remote add origin ${path.relative(path.join(config.repositoriesPath, reponame), config.bareRepositoriesPath)}/${reponame}
+            git push --set-upstream origin master
+          )
+        }
+        ( cd $repo; git push  )
+        `})
+      if (!fs.existsSync(path.join(p, ".git/config"))) {
+        await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${reponame}`, p] })
+      }
+      info(`pulling ${p} ..`)
+      await run("git", { args: ["pull"], cwd: p })
     }
 
   }
