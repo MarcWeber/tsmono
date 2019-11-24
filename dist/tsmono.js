@@ -890,7 +890,7 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
     });
 }); };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, package_contents, tsconfig_contents, tsmono_contents, _e, _f, _g, k, v, _h, _j, _k, pack, version, cwd, reponame, config_1, e_1, items, _l, _m, path_, p_2, p_3, dep_collection, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _o, _p, _q, k, v, r, p_4, dep_collection, seen, _r, _s, _t, k, v, r, package_json_installed;
+    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, package_contents, tsconfig_contents, tsmono_contents, _e, _f, _g, k, v, _h, _j, _k, pack, version, cwd, reponame, config_1, e_1, items, _l, _m, path_, p_2, repo, p_3, dep_collection, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _o, _p, _q, k, v, r, p_4, dep_collection, seen, _r, _s, _t, k, v, r, package_json_installed;
     return __generator(this, function (_u) {
         switch (_u.label) {
             case 0:
@@ -1033,16 +1033,17 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 path_ = _m[_l];
                 info("pulling " + path_);
                 p_2 = path.join(cwd, path_);
+                repo = path.basename(p_2);
                 if (!fs.existsSync(p_2)) {
                     info("creating " + p_2);
                     fs.mkdirpSync(p_2);
                 }
                 return [4 /*yield*/, run("ssh", { args: [config_1.server],
-                        stdin: "\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + reponame + "\n        repo=" + config_1.repositoriesPath + "/" + reponame + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, reponame), config_1.bareRepositoriesPath) + "/" + reponame + "\n            git push --set-upstream origin master\n          )\n        }\n        ( cd $repo; git push  )\n        " })];
+                        stdin: "\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + repo + "\n        repo=" + config_1.repositoriesPath + "/" + repo + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, repo), config_1.bareRepositoriesPath) + "/" + repo + "\n            git push --set-upstream origin master\n          )\n        }\n        ( cd $repo; git push  )\n        " })];
             case 14:
                 _u.sent();
                 if (!!fs.existsSync(path.join(p_2, ".git/config"))) return [3 /*break*/, 16];
-                return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.bareRepositoriesPath + "/" + reponame, p_2] })];
+                return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.bareRepositoriesPath + "/" + repo, p_2] })];
             case 15:
                 _u.sent();
                 _u.label = 16;

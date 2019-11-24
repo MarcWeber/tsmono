@@ -939,6 +939,8 @@ const main = async () => {
     for (const path_ of ([] as string[]).concat([`../${reponame}`]).concat(items)) {
       info(`pulling ${path_}`)
       const p = path.join(cwd, path_)
+      const repo = path.basename(p)
+      
       if (!fs.existsSync(p)) {
         info(`creating ${p}`)
         fs.mkdirpSync(p)
@@ -947,19 +949,19 @@ const main = async () => {
         stdin: `
         exec 2>&1
         set -x
-        bare=${config.bareRepositoriesPath}/${reponame}
-        repo=${config.repositoriesPath}/${reponame}
+        bare=${config.bareRepositoriesPath}/${repo}
+        repo=${config.repositoriesPath}/${repo}
         [ -d $bare ] || {
           mkdir -p $bare; ( cd $bare; git init --bare )
           ( cd $repo;
-            git remote add origin ${path.relative(path.join(config.repositoriesPath, reponame), config.bareRepositoriesPath)}/${reponame}
+            git remote add origin ${path.relative(path.join(config.repositoriesPath, repo), config.bareRepositoriesPath)}/${repo}
             git push --set-upstream origin master
           )
         }
         ( cd $repo; git push  )
         `})
       if (!fs.existsSync(path.join(p, ".git/config"))) {
-        await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${reponame}`, p] })
+        await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${repo}`, p] })
       }
       info(`pulling ${p} ..`)
       await run("git", { args: ["pull"], cwd: p })
