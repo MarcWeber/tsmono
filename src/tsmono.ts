@@ -761,6 +761,7 @@ interface RemoteLocation {
     repositoriesPath: string,
     gitRemoteLocationName: string,
     ignoreWhenPulling?: string[]
+    ignoreWhenPushing?: string[]
 }
 push.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
 push.addArgument("--run-remote-command", {help: "remote ssh location to run git pull in user@host:path:cmd"})
@@ -1044,6 +1045,11 @@ const main = async () => {
       if (r) {
         if (seen.includes(r.path)) continue;
         seen.push(r.path)
+
+
+        const repo = path.basename(r.path)
+        if ((config.ignoreWhenPushing || []).includes(repo)) continue;
+
         await push_to_remote_location(r)
       }
     }
