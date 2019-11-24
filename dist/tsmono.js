@@ -1034,6 +1034,8 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 info("pulling " + path_);
                 p_2 = path.join(cwd, path_);
                 repo = path.basename(p_2);
+                if ((config_1.ignoreWhenPulling || []).includes(repo))
+                    return [3 /*break*/, 18];
                 if (!fs.existsSync(p_2)) {
                     info("creating " + p_2);
                     fs.mkdirpSync(p_2);
