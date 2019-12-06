@@ -490,7 +490,7 @@ class Repository {
     // package.json otherwise
     if (fs.existsSync(`${this.path}/tsmono.json`)) {
       return {
-        dependencies: clone(get_path(this.tsmonojson.json, "dependencies", [])).map(to_dependency),
+        dependencies: ["tslib", ...clone(get_path(this.tsmonojson.json, "dependencies", []))].map(to_dependency),
         devDependencies: clone(get_path(this.tsmonojson.json, "devDependencies", [])).map(to_dependency),
       }
     }
