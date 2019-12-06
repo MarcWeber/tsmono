@@ -13,11 +13,10 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
@@ -48,13 +47,6 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __spreadArrays = (this && this.__spreadArrays) || function () {
-    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-    for (var r = Array(s), k = 0, i = 0; i < il; i++)
-        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
-            r[k] = a[j];
-    return r;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -65,6 +57,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var _this = this;
 Object.defineProperty(exports, "__esModule", { value: true });
 var argparse_1 = require("argparse");
 var debug_1 = __importDefault(require("debug"));
@@ -114,7 +107,7 @@ var assert = function (a, msg) {
 var assert_eql = function (a, b) {
     assert(a.trim() === b.trim(), "assertion " + JSON.stringify(a) + " === " + JSON.stringify(b) + " failed");
 };
-var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, function () {
+var run = function (cmd, opts) { return __awaiter(_this, void 0, void 0, function () {
     var args, stdout;
     return __generator(this, function (_a) {
         switch (_a.label) {
@@ -125,19 +118,20 @@ var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, functi
                 // duplicate code
                 return [4 /*yield*/, new Promise(function (a, b) {
                         var child = child_process_1.spawn(cmd, args, Object.assign(opts, {
-                            stdio: ["pipe", "pipe", 2],
+                            stdio: ["stdin" in opts ? "pipe" : 0, opts.stdout1 ? 1 : "pipe", 2],
                         }));
-                        if ("stdin" in opts && child.stdin) {
-                            verbose("stdin is", opts.stdin);
+                        if (child.stdin) {
+                            if ("stdin" in opts && child.stdin) {
+                                verbose("stdin is", opts.stdin);
+                                // @ts-ignore
+                                child.stdin.setEncoding("utf8");
+                                child.stdin.write(opts.stdin);
+                            }
                             // @ts-ignore
-                            child.stdin.setEncoding("utf8");
-                            child.stdin.write(opts.stdin);
+                            child.stdin.end();
                         }
-                        // @ts-ignore
-                        child.stdin.end();
-                        if (!child.stdout)
-                            throw new Error("child.stdout is null");
-                        child.stdout.on("data", function (s) { return stdout += s; });
+                        if (child.stdout)
+                            child.stdout.on("data", function (s) { return stdout += s; });
                         child.on("close", function (code, signal) {
                             var exitcodes = opts.exitcodes || [0];
                             if (exitcodes.includes(code))
@@ -245,7 +239,7 @@ var parse_dependency = function (s, origin) {
 };
 var cfg_api = function (cfg) {
     var fetch_from_registry = function (name) {
-        return cfg.cache.get_async("fetch-" + name + "-registry.npmjs.org", function () { return __awaiter(void 0, void 0, void 0, function () {
+        return cfg.cache.get_async("fetch-" + name + "-registry.npmjs.org", function () { return __awaiter(_this, void 0, void 0, function () {
             var url, res;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -262,7 +256,7 @@ var cfg_api = function (cfg) {
             });
         }); }, cfg.fetch_ttl_seconds);
     };
-    var npm_version_for_name = function (name) { return __awaiter(void 0, void 0, void 0, function () {
+    var npm_version_for_name = function (name) { return __awaiter(_this, void 0, void 0, function () {
         var lock, r;
         return __generator(this, function (_a) {
             switch (_a.label) {
@@ -449,7 +443,7 @@ var DependencyCollection = /** @class */ (function () {
                         versions.push(f(dep.version));
                     }
                 }
-                all_versions = __spreadArrays(all_versions, versions);
+                all_versions = all_versions.concat(versions);
                 return { dep: dep, versions: versions };
             }).filter(function (x) { return x.versions.length > 0; });
             if (unique(all_versions).length > 1) {
@@ -472,8 +466,8 @@ var DependencyCollection = /** @class */ (function () {
         var deps = r.dependencies();
         var add = function (key, filter) {
             if (filter === void 0) { filter = function (x) { return true; }; }
-            _this.todo = __spreadArrays(_this.todo, deps[key]);
-            _this[key] = __spreadArrays(_this[key], deps[key].map(function (x) { return x.name; }).filter(filter));
+            _this.todo = _this.todo.concat(deps[key]);
+            _this[key] = _this[key].concat(deps[key].map(function (x) { return x.name; }).filter(filter));
         };
         add("dependencies");
         if (dev === true || dev === "dev-types")
@@ -519,6 +513,27 @@ var Repository = /** @class */ (function () {
         this.packagejson_path = path + "/package.json";
         this.packagejson = new JSONFile(this.packagejson_path);
     }
+    Repository.prototype.repositories = function (opts) {
+        var dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs());
+        dep_collection.dependencies_of_repository(this, true);
+        dep_collection.do();
+        dep_collection.print_warnings();
+        var result = [];
+        if (opts && opts.includeThis)
+            result.push(this);
+        var seen = [];
+        for (var _i = 0, _a = Object.entries(dep_collection.dependency_locactions); _i < _a.length; _i++) {
+            var _b = _a[_i], k = _b[0], v = _b[1];
+            var r = v[0].repository;
+            if (r) {
+                if (seen.includes(r.path))
+                    continue;
+                seen.push(r.path);
+                result.push(r);
+            }
+        }
+        return result;
+    };
     Repository.prototype.flush = function () {
         this.tsmonojson.flush();
         this.packagejson.flush();
@@ -824,8 +839,8 @@ var Repository = /** @class */ (function () {
                         // TODO: check prefix "auto" etc to keep unique or overwrite
                         this.init();
                         j = this.tsmonojson.json;
-                        j.dependencies = __spreadArrays(j.dependencies, dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
-                        j.devDependencies = __spreadArrays(j.devDependencies, devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
+                        j.dependencies = j.dependencies.concat(dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
+                        j.devDependencies = j.devDependencies.concat(devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
                         return [4 /*yield*/, this.update(cfg, { link_to_links: true, install_npm_packages: true })];
                     case 1:
                         _a.sent();
@@ -861,6 +876,9 @@ var update_using_rootDirs = sp.addParser("update-using-rootDirs", { addHelp: tru
 // update_using_rootDirs.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
 update_using_rootDirs.addArgument("--recurse", { action: "storeTrue" });
 update_using_rootDirs.addArgument("--force", { action: "storeTrue" });
+var commit_all = sp.addParser("commit-all", { addHelp: true, description: "commit all changes of this repository and dependencies" });
+commit_all.addArgument("--force", { action: "storeTrue" });
+commit_all.addArgument("-message", {});
 var push = sp.addParser("push-with-dependencies", { addHelp: true, description: "upload to git repository" });
 push.addArgument("--shell-on-changes", { action: "storeTrue", help: "open shell so that you can commit changes" });
 push.addArgument("--git-push-remote-location-name", { help: "eg origin" });
@@ -874,7 +892,7 @@ push.addArgument("--force", { action: "storeTrue", help: "overwrites existing ts
 var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, description: "removes node_modules and reinstalls to match current node version" });
 var watch = sp.addParser("watch", { addHelp: true });
 var args = parser.parseArgs();
-var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
+var tslint_hack = function () { return __awaiter(_this, void 0, void 0, function () {
     var j;
     return __generator(this, function (_a) {
         // this is biased  but its going to save your ass
@@ -889,10 +907,11 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
         return [2 /*return*/];
     });
 }); };
-var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, dep_collection, basenames_to_pull, seen, _b, _c, _d, k, v, r, package_contents, tsconfig_contents, tsmono_contents, _e, _f, _g, k, v, _h, _j, _k, pack, version, cwd, reponame, config_1, e_1, items, _l, _m, path_, p_2, repo, p_3, dep_collection, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _o, _p, _q, k, v, r, repo, p_4, dep_collection, seen, _r, _s, _t, k, v, r, package_json_installed;
-    return __generator(this, function (_u) {
-        switch (_u.label) {
+var main = function () { return __awaiter(_this, void 0, void 0, function () {
+    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, package_contents, tsconfig_contents, tsmono_contents, _d, _e, _f, k, v, _g, _h, _j, pack, version, cwd, reponame, config_1, e_1, items, _k, _l, path_, p_2, repo, p_3, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _m, _o, rep, force, p_4, _p, _q, r, stdout, p_5, dep_collection, seen, _r, _s, _t, k, v, r, _u, _v, r, package_json_installed;
+    var _this = this;
+    return __generator(this, function (_w) {
+        switch (_w.label) {
             case 0:
                 cache = new DirectoryCache(os_1.homedir() + "/.tsmono/cache");
                 config = {
@@ -901,7 +920,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 };
                 cfg = Object.assign({}, config, cfg_api(config));
                 p = new Repository(process.cwd());
-                update = function () { return __awaiter(void 0, void 0, void 0, function () {
+                update = function () { return __awaiter(_this, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0: return [4 /*yield*/, p.update(cfg, { link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force })];
@@ -928,16 +947,16 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 }
                 return [4 /*yield*/, p.add(cfg, d, dd)];
             case 1:
-                _u.sent();
+                _w.sent();
                 return [2 /*return*/];
             case 2:
                 if (!(args.main_action === "update")) return [3 /*break*/, 5];
                 return [4 /*yield*/, update()];
             case 3:
-                _u.sent();
+                _w.sent();
                 return [4 /*yield*/, tslint_hack()];
             case 4:
-                _u.sent();
+                _w.sent();
                 return [2 /*return*/];
             case 5:
                 if (!(args.main_action === "update_using_rootDirs")) return [3 /*break*/, 7];
@@ -945,7 +964,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [4 /*yield*/, tslint_hack()];
             case 6:
                 // await update_using_rootDirs();
-                _u.sent();
+                _w.sent();
                 return [2 /*return*/];
             case 7:
                 if (args.main_action === "add") {
@@ -954,22 +973,9 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 if (args.main_action === "list-local-dependencies") {
                     silent = true;
                     p_1 = new Repository(process.cwd());
-                    dep_collection = new DependencyCollection(p_1.path, p_1.tsmonojson.dirs());
-                    dep_collection.dependencies_of_repository(p_1, true);
-                    dep_collection.do();
-                    dep_collection.print_warnings();
-                    basenames_to_pull = [];
-                    seen = [] // TODO: why aret there duplicates ?
-                    ;
-                    for (_b = 0, _c = Object.entries(dep_collection.dependency_locactions); _b < _c.length; _b++) {
-                        _d = _c[_b], k = _d[0], v = _d[1];
-                        r = v[0].repository;
-                        if (r) {
-                            if (seen.includes(r.path))
-                                continue;
-                            console.log("rel-path: ", r.path);
-                            seen.push(r.path);
-                        }
+                    for (_b = 0, _c = p_1.repositories(); _b < _c.length; _b++) {
+                        r = _c[_b];
+                        console.log("rel-path: ", r.path);
                     }
                 }
                 if (args.main_action === "from-json-files") {
@@ -993,11 +999,11 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         tsconfig: tsconfig_contents || {},
                     };
                     // process package.json
-                    for (_e = 0, _f = Object.entries(package_contents || {}); _e < _f.length; _e++) {
-                        _g = _f[_e], k = _g[0], v = _g[1];
+                    for (_d = 0, _e = Object.entries(package_contents || {}); _d < _e.length; _d++) {
+                        _f = _e[_d], k = _f[0], v = _f[1];
                         if (k === "dependencies" || k === "devDependencies") {
-                            for (_h = 0, _j = Object.entries(v); _h < _j.length; _h++) {
-                                _k = _j[_h], pack = _k[0], version = _k[1];
+                            for (_g = 0, _h = Object.entries(v); _g < _h.length; _g++) {
+                                _j = _h[_g], pack = _j[0], version = _j[1];
                                 tsmono_contents[k].push(pack + ";version=" + version);
                             }
                         }
@@ -1011,26 +1017,26 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 cwd = process.cwd();
                 reponame = path.basename(cwd);
                 config_1 = JSON.parse(args.git_remote_config_json);
-                _u.label = 8;
+                _w.label = 8;
             case 8:
-                _u.trys.push([8, 10, , 11]);
+                _w.trys.push([8, 10, , 11]);
                 return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n      [ -f " + config_1.repositoriesPath + "/" + reponame + "/.git/config ]\n      " })];
             case 9:
-                _u.sent();
+                _w.sent();
                 return [3 /*break*/, 11];
             case 10:
-                e_1 = _u.sent();
+                e_1 = _w.sent();
                 info("remote directory " + config_1.repositoriesPath + "/" + reponame + "/.git/config does not exit, aborting");
                 return [2 /*return*/];
             case 11: return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n          cd " + config_1.repositoriesPath + "/" + reponame + " && tsmono list-local-dependencies\n    " })];
             case 12:
-                items = (_u.sent()).split("\n").filter(function (x) { return /rel-path: /.test(x); }).map(function (x) { return x.slice(11); });
+                items = (_w.sent()).split("\n").filter(function (x) { return /rel-path: /.test(x); }).map(function (x) { return x.slice(11); });
                 info("pulling " + JSON.stringify(items));
-                _l = 0, _m = [].concat(["../" + reponame]).concat(items);
-                _u.label = 13;
+                _k = 0, _l = [].concat(["../" + reponame]).concat(items);
+                _w.label = 13;
             case 13:
-                if (!(_l < _m.length)) return [3 /*break*/, 19];
-                path_ = _m[_l];
+                if (!(_k < _l.length)) return [3 /*break*/, 19];
+                path_ = _l[_k];
                 info("pulling " + path_);
                 p_2 = path.join(cwd, path_);
                 repo = path.basename(p_2);
@@ -1043,33 +1049,29 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [4 /*yield*/, run("ssh", { args: [config_1.server],
                         stdin: "\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + repo + "\n        repo=" + config_1.repositoriesPath + "/" + repo + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, repo), config_1.bareRepositoriesPath) + "/" + repo + "\n            git push --set-upstream origin master\n          )\n        }\n        ( cd $repo; git push  )\n        " })];
             case 14:
-                _u.sent();
+                _w.sent();
                 if (!!fs.existsSync(path.join(p_2, ".git/config"))) return [3 /*break*/, 16];
                 return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.bareRepositoriesPath + "/" + repo, p_2] })];
             case 15:
-                _u.sent();
-                _u.label = 16;
+                _w.sent();
+                _w.label = 16;
             case 16:
                 info("pulling " + p_2 + " ..");
                 return [4 /*yield*/, run("git", { args: ["pull"], cwd: p_2 })];
             case 17:
-                _u.sent();
-                _u.label = 18;
+                _w.sent();
+                _w.label = 18;
             case 18:
-                _l++;
+                _k++;
                 return [3 /*break*/, 13];
             case 19:
-                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 25];
+                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 23];
                 p_3 = new Repository(process.cwd());
-                dep_collection = new DependencyCollection(p_3.path, p_3.tsmonojson.dirs());
                 config_2 = JSON.parse(args.git_remote_config_json);
-                dep_collection.dependencies_of_repository(p_3, true);
-                dep_collection.do();
-                dep_collection.print_warnings();
                 basenames_to_pull = [];
                 seen = [] // TODO: why aret there duplicates ?
                 ;
-                ensure_repo_committed_and_clean_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                ensure_repo_committed_and_clean_1 = function (r) { return __awaiter(_this, void 0, void 0, function () {
                     var _a, _b;
                     return __generator(this, function (_c) {
                         switch (_c.label) {
@@ -1093,7 +1095,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         }
                     });
                 }); };
-                ensure_remote_location_setup_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                ensure_remote_location_setup_1 = function (r) { return __awaiter(_this, void 0, void 0, function () {
                     var reponame, _a;
                     return __generator(this, function (_b) {
                         switch (_b.label) {
@@ -1128,7 +1130,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         }
                     });
                 }); };
-                remote_update_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                remote_update_1 = function (r) { return __awaiter(_this, void 0, void 0, function () {
                     var reponame;
                     return __generator(this, function (_a) {
                         switch (_a.label) {
@@ -1142,7 +1144,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         }
                     });
                 }); };
-                push_to_remote_location = function (r) { return __awaiter(void 0, void 0, void 0, function () {
+                push_to_remote_location = function (r) { return __awaiter(_this, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0: return [4 /*yield*/, ensure_repo_committed_and_clean_1(r)];
@@ -1169,42 +1171,52 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         }
                     });
                 }); };
-                _o = 0, _p = Object.entries(dep_collection.dependency_locactions);
-                _u.label = 20;
+                _m = 0, _o = p_3.repositories({ includeThis: true });
+                _w.label = 20;
             case 20:
-                if (!(_o < _p.length)) return [3 /*break*/, 23];
-                _q = _p[_o], k = _q[0], v = _q[1];
-                r = v[0].repository;
-                if (!r) return [3 /*break*/, 22];
-                if (seen.includes(r.path))
-                    return [3 /*break*/, 22];
-                seen.push(r.path);
-                repo = path.basename(r.path);
-                if ((config_2.ignoreWhenPushing || []).includes(repo))
-                    return [3 /*break*/, 22];
-                return [4 /*yield*/, push_to_remote_location(r)];
+                if (!(_m < _o.length)) return [3 /*break*/, 23];
+                rep = _o[_m];
+                return [4 /*yield*/, push_to_remote_location(rep)];
             case 21:
-                _u.sent();
-                _u.label = 22;
+                _w.sent();
+                _w.label = 22;
             case 22:
-                _o++;
+                _m++;
                 return [3 /*break*/, 20];
-            case 23: return [4 /*yield*/, push_to_remote_location(p_3)
-                // for (const v of basenames_to_pull) {
-                //     const user_host  = args.run_remote_command.split(":")
-                //     const target_path = `${user_host[1]}/${v}`
-                //     console.log(`... pulling ${args.ssh_remote_location_git_pull}${v} ...`)
-                //     await run("ssh", {args: [user_host[0]], stdin: `cd ${target_path}; ${user_host[2]}`}  )
-                // }
-            ];
-            case 24:
-                _u.sent();
-                _u.label = 25;
-            case 25:
-                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 27];
+            case 23:
+                if (!(args.main_action === "commit-all")) return [3 /*break*/, 30];
+                force = args.force;
                 p_4 = new Repository(process.cwd());
-                dep_collection = new DependencyCollection(p_4.path, p_4.tsmonojson.dirs());
-                dep_collection.dependencies_of_repository(p_4, true);
+                _p = 0, _q = p_4.repositories();
+                _w.label = 24;
+            case 24:
+                if (!(_p < _q.length)) return [3 /*break*/, 30];
+                r = _q[_p];
+                if (!fs.existsSync(path.join(r.path, '.git'))) return [3 /*break*/, 29];
+                return [4 /*yield*/, run('git', { args: ['diff'], cwd: r.path })];
+            case 25:
+                stdout = _w.sent();
+                if (!(stdout !== "")) return [3 /*break*/, 29];
+                console.log(stdout);
+                if (!force) return [3 /*break*/, 27];
+                return [4 /*yield*/, run('git', { args: ['commit', '-am', args.message], cwd: r.path })];
+            case 26:
+                _w.sent();
+                return [3 /*break*/, 29];
+            case 27:
+                console.log(r.path, 'has uncommited changes, commit now');
+                return [4 /*yield*/, run(process.env['SHELL'], { cwd: r.path, stdout1: true })];
+            case 28:
+                _w.sent();
+                _w.label = 29;
+            case 29:
+                _p++;
+                return [3 /*break*/, 24];
+            case 30:
+                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 32];
+                p_5 = new Repository(process.cwd());
+                dep_collection = new DependencyCollection(p_5.path, p_5.tsmonojson.dirs());
+                dep_collection.dependencies_of_repository(p_5, true);
                 dep_collection.do();
                 dep_collection.print_warnings();
                 seen = [] // TODO: why aret there duplicates ?
@@ -1216,18 +1228,21 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         if (seen.includes(r.path))
                             continue;
                         seen.push(r.path);
-                        fs.removeSync(path.join(r.path, "node_modules"));
-                        package_json_installed = path.join(r.path, "package.json.installed");
-                        if (fs.existsSync(package_json_installed))
-                            fs.removeSync(package_json_installed);
                     }
                 }
-                return [4 /*yield*/, p_4.update(cfg, { link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
+                for (_u = 0, _v = p_5.repositories(); _u < _v.length; _u++) {
+                    r = _v[_u];
+                    fs.removeSync(path.join(r.path, "node_modules"));
+                    package_json_installed = path.join(r.path, "package.json.installed");
+                    if (fs.existsSync(package_json_installed))
+                        fs.removeSync(package_json_installed);
+                }
+                return [4 /*yield*/, p_5.update(cfg, { link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                     })];
-            case 26:
-                _u.sent();
-                _u.label = 27;
-            case 27: return [2 /*return*/];
+            case 31:
+                _w.sent();
+                _w.label = 32;
+            case 32: return [2 /*return*/];
         }
     });
 }); };

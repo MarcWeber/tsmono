@@ -260,6 +260,10 @@ command line options
   tsmono from-json-files
   # try to create tsmono.json fom package.json and tsconfig.json file
 
+  tsmono commit-all
+  # for each directory having changes start shell that you can commit
+  # use -f -m 'message' to use commit message on all
+
 ```
 
 Think about this:

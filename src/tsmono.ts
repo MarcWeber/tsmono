@@ -45,29 +45,30 @@ const assert_eql = (a: string, b: string) => {
     assert(a.trim() === b.trim(), `assertion ${JSON.stringify(a)} === ${JSON.stringify(b)} failed`)
 }
 
-const run = async (cmd: string, opts: {args?: string[], stdin?: string, exitcodes?: number[]} & SpawnOptions) => {
+const run = async (cmd: string, opts: {args?: string[], stdin?: string, stdout1?: boolean, exitcodes?: number[]} & SpawnOptions) => {
   const args = opts.args || [];
   info("running", cmd, args, "in", opts.cwd);
   let stdout = ""
     // duplicate code
   await new Promise((a, b) => {
       const child = spawn(cmd, args, Object.assign( opts, {
-          stdio: [ "pipe", "pipe", 2 ],
+          stdio: [ "stdin" in opts ? "pipe" : 0 , opts.stdout1 ? 1 : "pipe" , 2 ],
       }));
 
-      if ("stdin" in opts && child.stdin) {
-        verbose("stdin is", opts.stdin)
+      if (child.stdin) {
+        if ("stdin" in opts && child.stdin) {
+          verbose("stdin is", opts.stdin)
           // @ts-ignore
-        child.stdin.setEncoding("utf8");
-        child.stdin.write(opts.stdin)
+          child.stdin.setEncoding("utf8");
+          child.stdin.write(opts.stdin)
+        }
+        // @ts-ignore
+        child.stdin.end()
       }
-      // @ts-ignore
-      child.stdin.end()
 
-      if (!child.stdout)
-          throw new Error("child.stdout is null")
-
-      child.stdout.on("data", (s) => stdout += s)
+      if (child.stdout)
+        child.stdout.on("data", (s) => stdout += s)
+        
       child.on("close", (code, signal) => {
           const exitcodes = opts.exitcodes || [ 0 ]
           if (exitcodes.includes(code)) a()
@@ -447,6 +448,28 @@ class Repository {
     this.packagejson = new JSONFile(this.packagejson_path)
   }
 
+  public repositories(opts?: {includeThis?: boolean}):Array<Repository>{
+    const dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs())
+    dep_collection.dependencies_of_repository(this, true)
+    dep_collection.do()
+    dep_collection.print_warnings()
+
+    const result = []
+    if (opts && opts.includeThis)
+      result.push(this);
+
+    const seen: string[] = []
+    for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
+      const r = v[0].repository
+      if (r) {
+        if (seen.includes(r.path)) continue;
+        seen.push(r.path)
+        result.push(r);
+      }
+    }
+    return result;
+  }
+
   public flush() {
     this.tsmonojson.flush()
     this.packagejson.flush()
@@ -752,6 +775,11 @@ const update_using_rootDirs = sp.addParser("update-using-rootDirs", {addHelp: tr
 update_using_rootDirs.addArgument("--recurse", {action: "storeTrue"})
 update_using_rootDirs.addArgument("--force", {action: "storeTrue"})
 
+
+const commit_all  = sp.addParser("commit-all", {addHelp: true, description: "commit all changes of this repository and dependencies"})
+commit_all.addArgument("--force", {action: "storeTrue"})
+commit_all.addArgument("-message", {})
+
 const push = sp.addParser("push-with-dependencies", {addHelp: true, description: "upload to git repository"})
 push.addArgument("--shell-on-changes", {action: "storeTrue", help: "open shell so that you can commit changes"})
 push.addArgument("--git-push-remote-location-name", { help: "eg origin"})
@@ -860,20 +888,8 @@ const main = async () => {
   if (args.main_action === "list-local-dependencies") {
     silent = true;
     const p = new Repository(process.cwd())
-    const dep_collection = new DependencyCollection(p.path, p.tsmonojson.dirs())
-    dep_collection.dependencies_of_repository(p, true)
-    dep_collection.do()
-    dep_collection.print_warnings()
-
-    const basenames_to_pull: string[] = []
-    const seen: string[] = [] // TODO: why aret there duplicates ?
-    for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
-      const r = v[0].repository
-      if (r) {
-        if (seen.includes(r.path)) continue;
+    for (const r of p.repositories()){
         console.log("rel-path: ", r.path);
-        seen.push(r.path)
-      }
     }
   }
 
@@ -975,13 +991,7 @@ const main = async () => {
 
   if (args.main_action === "push-with-dependencies") {
     const p = new Repository(process.cwd())
-    const dep_collection = new DependencyCollection(p.path, p.tsmonojson.dirs())
-
     const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
-
-    dep_collection.dependencies_of_repository(p, true)
-    dep_collection.do()
-    dep_collection.print_warnings()
 
     const basenames_to_pull: string[] = []
     const seen: string[] = [] // TODO: why aret there duplicates ?
@@ -1040,20 +1050,9 @@ const main = async () => {
         await remote_update(r)
     }
 
-    for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
-      const r = v[0].repository
-      if (r) {
-        if (seen.includes(r.path)) continue;
-        seen.push(r.path)
-
-
-        const repo = path.basename(r.path)
-        if ((config.ignoreWhenPushing || []).includes(repo)) continue;
-
-        await push_to_remote_location(r)
-      }
+    for (const rep of p.repositories({includeThis: true})){
+        await push_to_remote_location(rep)
     }
-    await push_to_remote_location(p)
 
     // for (const v of basenames_to_pull) {
     //     const user_host  = args.run_remote_command.split(":")
@@ -1061,6 +1060,26 @@ const main = async () => {
     //     console.log(`... pulling ${args.ssh_remote_location_git_pull}${v} ...`)
     //     await run("ssh", {args: [user_host[0]], stdin: `cd ${target_path}; ${user_host[2]}`}  )
     // }
+  }
+
+  if (args.main_action === "commit-all") {
+    const force = args.force
+
+    const p = new Repository(process.cwd())
+    for (const r of p.repositories()){
+      if (fs.existsSync(path.join(r.path,'.git'))){
+        const stdout = await run('git', {args: ['diff'], cwd: r.path})
+        if (stdout !== ""){
+           console.log(stdout)
+           if (force){
+              await run('git', {args: ['commit','-am', args.message], cwd: r.path})
+           } else {
+              console.log(r.path, 'has uncommited changes, commit now')
+              await run(process.env['SHELL'] as string, {cwd: r.path, stdout1: true})
+           }
+        }
+      }
+    }
   }
 
   if (args.main_action === "reinstall-with-dependencies") {
@@ -1075,12 +1094,16 @@ const main = async () => {
       if (r) {
         if (seen.includes(r.path)) continue;
         seen.push(r.path)
+      }
+    }
+
+    for (const r of p.repositories()){
         fs.removeSync(path.join(r.path, "node_modules"))
         const package_json_installed = path.join(r.path, "package.json.installed");
         if (fs.existsSync(package_json_installed))
           fs.removeSync(package_json_installed)
-      }
     }
+
     await p.update(cfg, {link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
         // , update_cmd: {executable: "npm", args: ["i"]}
     })
