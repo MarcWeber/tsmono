@@ -68,7 +68,7 @@ const run = async (cmd: string, opts: {args?: string[], stdin?: string, stdout1?
 
       if (child.stdout)
         child.stdout.on("data", (s) => stdout += s)
-        
+
       child.on("close", (code, signal) => {
           const exitcodes = opts.exitcodes || [ 0 ]
           if (exitcodes.includes(code)) a()
@@ -448,7 +448,7 @@ class Repository {
     this.packagejson = new JSONFile(this.packagejson_path)
   }
 
-  public repositories(opts?: {includeThis?: boolean}):Array<Repository>{
+  public repositories(opts?: {includeThis?: boolean}): Repository[] {
     const dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs())
     dep_collection.dependencies_of_repository(this, true)
     dep_collection.do()
@@ -524,11 +524,16 @@ class Repository {
       return
     }
 
-    const link_dir: string = `${this.path}/tsmono/links`;
+    const this_tsmono = `${this.path}/tsmono`
+    const link_dir: string = `${this_tsmono}/links`;
 
-    (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach((x: string) => {
-      fs.unlinkSync(`${link_dir}/${x}`)
-    })
+    if (opts.link_to_links) {
+      (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach((x: string) => {
+        fs.unlinkSync(path.join(link_dir, x))
+      })
+    } else {
+      if (fs.existsSync(this_tsmono)) fs.unlinkSync(this_tsmono)
+    }
 
     const cwd = process.cwd()
     const tsmonojson: any = this.tsmonojson.json || {}
@@ -562,9 +567,8 @@ class Repository {
 
             const resolved = path.resolve(cwd,
               (!!opts.link_to_links)
-              ? `${link_dir}/${v[0].name}${src}`
-              : `${v[0].repository.path}${src}`,
-            )
+              ? path.join(link_dir, v[0].name, src)
+              : path.join(v[0].repository.path, src))
 
             const rhs = path.relative(tsconfig_dir, resolved)
             info("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
@@ -608,7 +612,6 @@ class Repository {
       x.compilerOptions.allowSyntheticDefaultImports = true
       x.compilerOptions.esModuleInterop = true
 
-
       // if you run tsc or such -> provide default dist folder to keep eventually created .js files apart
       ensure_path(x, "compilerOptions", "outDir", "./dist")
 
@@ -634,22 +637,24 @@ class Repository {
 
     // clone(tsmonojson.tsconfig) || {}
 
-    for (const [k, v] of Object.entries(expected_tools)) {
-      // todo should be self contained but
-      // node -r ts-node/register/transpile-only -r tsconfig-paths/register
-      // works so well that you sohuld have a shourtcut in your .bashrc anywaya
-      // so just making symlinks for now which should be good enough
-      ["tsmono/tools", "tsmono/tools-bin", "tsmono/tools-bin-check" ].forEach((x) => { if (!fs.existsSync(x)) fs.mkdirSync(x) })
+    if (opts.link_to_links) {
+      for (const [k, v] of Object.entries(expected_tools)) {
+        // todo should be self contained but
+        // node -r ts-node/register/transpile-only -r tsconfig-paths/register
+        // works so well that you sohuld have a shourtcut in your .bashrc anywaya
+        // so just making symlinks for now which should be good enough
+        ["tsmono/tools", "tsmono/tools-bin", "tsmono/tools-bin-check" ].forEach((x) => { if (!fs.existsSync(x)) fs.mkdirSync(x) })
 
-      // this is going to break if you have realtive symlinks ?
-      expected_symlinks[`${this.path}/}tsmono/tools/${k}`] = v
+        // this is going to break if you have realtive symlinks ?
+        expected_symlinks[`${this.path}/}tsmono/tools/${k}`] = v
 
-      // TODO windows
-      // boldly create in node_modules/.bin instead to make things just work ?
-      const t = `tsmono/tools-bin/${k}`;
-      del_if_exists(t);
-      fs.writeFileSync(t, `#!/bin/sh\nnode -r ts-node/register/transpile-only -r tsconfig-paths/register ${v} "$@" `, "utf8")
-      fs.writeFileSync(`tsmono/tools-bin-check/${k}`, `#!/bin/sh\nnode -r ts-node/register-only -r tsconfig-paths/register ${v} "$@"`, "utf8")
+        // TODO windows
+        // boldly create in node_modules/.bin instead to make things just work ?
+        const t = `tsmono/tools-bin/${k}`;
+        del_if_exists(t);
+        fs.writeFileSync(t, `#!/bin/sh\nnode -r ts-node/register/transpile-only -r tsconfig-paths/register ${v} "$@" `, "utf8")
+        fs.writeFileSync(`tsmono/tools-bin-check/${k}`, `#!/bin/sh\nnode -r ts-node/register-only -r tsconfig-paths/register ${v} "$@"`, "utf8")
+      }
     }
 
     for (const [k, v] of Object.entries(expected_symlinks)) {
@@ -779,7 +784,6 @@ const update_using_rootDirs = sp.addParser("update-using-rootDirs", {addHelp: tr
 update_using_rootDirs.addArgument("--recurse", {action: "storeTrue"})
 update_using_rootDirs.addArgument("--force", {action: "storeTrue"})
 
-
 const commit_all  = sp.addParser("commit-all", {addHelp: true, description: "commit all changes of this repository and dependencies"})
 commit_all.addArgument("--force", {action: "storeTrue"})
 commit_all.addArgument("-message", {})
@@ -807,6 +811,7 @@ const from_json_files = sp.addParser("from-json-files", {addHelp: true, descript
 push.addArgument("--force", {action: "storeTrue", help: "overwrites existing tsconfig.json file"})
 
 const reinstall = sp.addParser("reinstall-with-dependencies", {addHelp: true, description: "removes node_modules and reinstalls to match current node version"})
+reinstall.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
 
 const watch  = sp.addParser("watch", {addHelp: true})
 
@@ -892,7 +897,7 @@ const main = async () => {
   if (args.main_action === "list-local-dependencies") {
     silent = true;
     const p = new Repository(process.cwd())
-    for (const r of p.repositories()){
+    for (const r of p.repositories()) {
         console.log("rel-path: ", r.path);
     }
   }
@@ -1054,7 +1059,7 @@ const main = async () => {
         await remote_update(r)
     }
 
-    for (const rep of p.repositories({includeThis: true})){
+    for (const rep of p.repositories({includeThis: true})) {
         await push_to_remote_location(rep)
     }
 
@@ -1070,16 +1075,16 @@ const main = async () => {
     const force = args.force
 
     const p = new Repository(process.cwd())
-    for (const r of p.repositories()){
-      if (fs.existsSync(path.join(r.path,'.git'))){
-        const stdout = await run('git', {args: ['diff'], cwd: r.path})
-        if (stdout !== ""){
+    for (const r of p.repositories()) {
+      if (fs.existsSync(path.join(r.path, ".git"))) {
+        const stdout = await run("git", {args: ["diff"], cwd: r.path})
+        if (stdout !== "") {
            console.log(stdout)
-           if (force){
-              await run('git', {args: ['commit','-am', args.message], cwd: r.path})
+           if (force) {
+              await run("git", {args: ["commit", "-am", args.message], cwd: r.path})
            } else {
-              console.log(r.path, 'has uncommited changes, commit now')
-              await run(process.env['SHELL'] as string, {cwd: r.path, stdout1: true})
+              console.log(r.path, "has uncommited changes, commit now")
+              await run(process.env.SHELL as string, {cwd: r.path, stdout1: true})
            }
         }
       }
@@ -1101,14 +1106,14 @@ const main = async () => {
       }
     }
 
-    for (const r of p.repositories()){
+    for (const r of p.repositories()) {
         fs.removeSync(path.join(r.path, "node_modules"))
         const package_json_installed = path.join(r.path, "package.json.installed");
         if (fs.existsSync(package_json_installed))
           fs.removeSync(package_json_installed)
     }
 
-    await p.update(cfg, {link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
+    await p.update(cfg, {link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
         // , update_cmd: {executable: "npm", args: ["i"]}
     })
   }

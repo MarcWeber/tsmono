@@ -219,7 +219,7 @@ dep:
 On linux dependencies are symlinked to src/* so that you can
 grep/search/replace them
 
-On windows: untested, help me.
+On windows: seems to work without --link-to-links
 
 
 command line options

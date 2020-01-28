@@ -569,7 +569,7 @@ var Repository = /** @class */ (function () {
     Repository.prototype.update = function (cfg, opts) {
         if (opts === void 0) { opts = {}; }
         return __awaiter(this, void 0, void 0, function () {
-            var link_dir, cwd, tsmonojson, package_json, tsconfig, dep_collection, expected_symlinks, expected_tools, path_for_tsconfig, _i, _a, _b, k, v, src_tool, fix_ts_config, _c, _d, _e, path_, merge, tsconfig_path_1, json_1, _f, _g, _h, k, v, t, _j, _k, _l, k, v, add_dep, add_npm_packages, _m, _o, npm_install_cmd, to_be_installed, p_installed, installed, _p, _q, dir, n, opts2, repositories, _r, repositories_1, r;
+            var this_tsmono, link_dir, cwd, tsmonojson, package_json, tsconfig, dep_collection, expected_symlinks, expected_tools, path_for_tsconfig, _i, _a, _b, k, v, src_tool, fix_ts_config, _c, _d, _e, path_, merge, tsconfig_path_1, json_1, _f, _g, _h, k, v, t, _j, _k, _l, k, v, add_dep, add_npm_packages, _m, _o, npm_install_cmd, to_be_installed, p_installed, installed, _p, _q, dir, n, opts2, repositories, _r, repositories_1, r;
             var _this = this;
             return __generator(this, function (_s) {
                 switch (_s.label) {
@@ -585,10 +585,17 @@ var Repository = /** @class */ (function () {
                         _s.label = 2;
                     case 2: return [2 /*return*/];
                     case 3:
-                        link_dir = this.path + "/tsmono/links";
-                        (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach(function (x) {
-                            fs.unlinkSync(link_dir + "/" + x);
-                        });
+                        this_tsmono = this.path + "/tsmono";
+                        link_dir = this_tsmono + "/links";
+                        if (opts.link_to_links) {
+                            (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach(function (x) {
+                                fs.unlinkSync(path.join(link_dir, x));
+                            });
+                        }
+                        else {
+                            if (fs.existsSync(this_tsmono))
+                                fs.unlinkSync(this_tsmono);
+                        }
                         cwd = process.cwd();
                         tsmonojson = this.tsmonojson.json || {};
                         package_json = clone(get_path(tsmonojson, "package", {}));
@@ -616,8 +623,8 @@ var Repository = /** @class */ (function () {
                                             ? "/src"
                                             : "";
                                         var resolved = path.resolve(cwd, (!!opts.link_to_links)
-                                            ? link_dir + "/" + v[0].name + src
-                                            : "" + v[0].repository.path + src);
+                                            ? path.join(link_dir, v[0].name, src)
+                                            : path.join(v[0].repository.path, src));
                                         var rhs = path.relative(tsconfig_dir, resolved);
                                         info("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
                                         var a = function (lhs, rhs) {
@@ -679,20 +686,22 @@ var Repository = /** @class */ (function () {
                             protect(tsconfig_path_1, function () { fs.writeFileSync(tsconfig_path_1, json_1, "utf8"); }, opts.force);
                         }
                         // clone(tsmonojson.tsconfig) || {}
-                        for (_f = 0, _g = Object.entries(expected_tools); _f < _g.length; _f++) {
-                            _h = _g[_f], k = _h[0], v = _h[1];
-                            // todo should be self contained but
-                            // node -r ts-node/register/transpile-only -r tsconfig-paths/register
-                            // works so well that you sohuld have a shourtcut in your .bashrc anywaya
-                            // so just making symlinks for now which should be good enough
-                            ["tsmono/tools", "tsmono/tools-bin", "tsmono/tools-bin-check"].forEach(function (x) { if (!fs.existsSync(x))
-                                fs.mkdirSync(x); });
-                            // this is going to break if you have realtive symlinks ?
-                            expected_symlinks[this.path + "/}tsmono/tools/" + k] = v;
-                            t = "tsmono/tools-bin/" + k;
-                            del_if_exists(t);
-                            fs.writeFileSync(t, "#!/bin/sh\nnode -r ts-node/register/transpile-only -r tsconfig-paths/register " + v + " \"$@\" ", "utf8");
-                            fs.writeFileSync("tsmono/tools-bin-check/" + k, "#!/bin/sh\nnode -r ts-node/register-only -r tsconfig-paths/register " + v + " \"$@\"", "utf8");
+                        if (opts.link_to_links) {
+                            for (_f = 0, _g = Object.entries(expected_tools); _f < _g.length; _f++) {
+                                _h = _g[_f], k = _h[0], v = _h[1];
+                                // todo should be self contained but
+                                // node -r ts-node/register/transpile-only -r tsconfig-paths/register
+                                // works so well that you sohuld have a shourtcut in your .bashrc anywaya
+                                // so just making symlinks for now which should be good enough
+                                ["tsmono/tools", "tsmono/tools-bin", "tsmono/tools-bin-check"].forEach(function (x) { if (!fs.existsSync(x))
+                                    fs.mkdirSync(x); });
+                                // this is going to break if you have realtive symlinks ?
+                                expected_symlinks[this.path + "/}tsmono/tools/" + k] = v;
+                                t = "tsmono/tools-bin/" + k;
+                                del_if_exists(t);
+                                fs.writeFileSync(t, "#!/bin/sh\nnode -r ts-node/register/transpile-only -r tsconfig-paths/register " + v + " \"$@\" ", "utf8");
+                                fs.writeFileSync("tsmono/tools-bin-check/" + k, "#!/bin/sh\nnode -r ts-node/register-only -r tsconfig-paths/register " + v + " \"$@\"", "utf8");
+                            }
                         }
                         for (_j = 0, _k = Object.entries(expected_symlinks); _j < _k.length; _j++) {
                             _l = _k[_j], k = _l[0], v = _l[1];
@@ -899,6 +908,7 @@ var list_dependencies = sp.addParser("list-local-dependencies", { addHelp: true,
 var from_json_files = sp.addParser("from-json-files", { addHelp: true, description: "try to create tsmono.json fom package.json and tsconfig.json file" });
 push.addArgument("--force", { action: "storeTrue", help: "overwrites existing tsconfig.json file" });
 var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, description: "removes node_modules and reinstalls to match current node version" });
+reinstall.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks" });
 var watch = sp.addParser("watch", { addHelp: true });
 var args = parser.parseArgs();
 var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
@@ -1200,20 +1210,20 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
             case 24:
                 if (!(_p < _q.length)) return [3 /*break*/, 30];
                 r = _q[_p];
-                if (!fs.existsSync(path.join(r.path, '.git'))) return [3 /*break*/, 29];
-                return [4 /*yield*/, run('git', { args: ['diff'], cwd: r.path })];
+                if (!fs.existsSync(path.join(r.path, ".git"))) return [3 /*break*/, 29];
+                return [4 /*yield*/, run("git", { args: ["diff"], cwd: r.path })];
             case 25:
                 stdout = _w.sent();
                 if (!(stdout !== "")) return [3 /*break*/, 29];
                 console.log(stdout);
                 if (!force) return [3 /*break*/, 27];
-                return [4 /*yield*/, run('git', { args: ['commit', '-am', args.message], cwd: r.path })];
+                return [4 /*yield*/, run("git", { args: ["commit", "-am", args.message], cwd: r.path })];
             case 26:
                 _w.sent();
                 return [3 /*break*/, 29];
             case 27:
-                console.log(r.path, 'has uncommited changes, commit now');
-                return [4 /*yield*/, run(process.env['SHELL'], { cwd: r.path, stdout1: true })];
+                console.log(r.path, "has uncommited changes, commit now");
+                return [4 /*yield*/, run(process.env.SHELL, { cwd: r.path, stdout1: true })];
             case 28:
                 _w.sent();
                 _w.label = 29;
@@ -1245,7 +1255,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     if (fs.existsSync(package_json_installed))
                         fs.removeSync(package_json_installed);
                 }
-                return [4 /*yield*/, p_5.update(cfg, { link_to_links: true, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
+                return [4 /*yield*/, p_5.update(cfg, { link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                     })];
             case 31:
                 _w.sent();
