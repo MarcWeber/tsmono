@@ -608,6 +608,10 @@ class Repository {
       x.compilerOptions.allowSyntheticDefaultImports = true
       x.compilerOptions.esModuleInterop = true
 
+
+      // if you run tsc or such -> provide default dist folder to keep eventually created .js files apart
+      ensure_path(x, "compilerOptions", "outDir", "./dist")
+
       // if we have an dist/outDir add to exclude
       for (const key of ["outDir", "outFile"]) {
         if (x.compilerOptions[key])

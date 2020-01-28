@@ -13,10 +13,11 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
@@ -47,6 +48,13 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArrays = (this && this.__spreadArrays) || function () {
+    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+    for (var r = Array(s), k = 0, i = 0; i < il; i++)
+        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
+            r[k] = a[j];
+    return r;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -57,7 +65,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-var _this = this;
 Object.defineProperty(exports, "__esModule", { value: true });
 var argparse_1 = require("argparse");
 var debug_1 = __importDefault(require("debug"));
@@ -107,7 +114,7 @@ var assert = function (a, msg) {
 var assert_eql = function (a, b) {
     assert(a.trim() === b.trim(), "assertion " + JSON.stringify(a) + " === " + JSON.stringify(b) + " failed");
 };
-var run = function (cmd, opts) { return __awaiter(_this, void 0, void 0, function () {
+var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, function () {
     var args, stdout;
     return __generator(this, function (_a) {
         switch (_a.label) {
@@ -239,7 +246,7 @@ var parse_dependency = function (s, origin) {
 };
 var cfg_api = function (cfg) {
     var fetch_from_registry = function (name) {
-        return cfg.cache.get_async("fetch-" + name + "-registry.npmjs.org", function () { return __awaiter(_this, void 0, void 0, function () {
+        return cfg.cache.get_async("fetch-" + name + "-registry.npmjs.org", function () { return __awaiter(void 0, void 0, void 0, function () {
             var url, res;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -256,7 +263,7 @@ var cfg_api = function (cfg) {
             });
         }); }, cfg.fetch_ttl_seconds);
     };
-    var npm_version_for_name = function (name) { return __awaiter(_this, void 0, void 0, function () {
+    var npm_version_for_name = function (name) { return __awaiter(void 0, void 0, void 0, function () {
         var lock, r;
         return __generator(this, function (_a) {
             switch (_a.label) {
@@ -443,7 +450,7 @@ var DependencyCollection = /** @class */ (function () {
                         versions.push(f(dep.version));
                     }
                 }
-                all_versions = all_versions.concat(versions);
+                all_versions = __spreadArrays(all_versions, versions);
                 return { dep: dep, versions: versions };
             }).filter(function (x) { return x.versions.length > 0; });
             if (unique(all_versions).length > 1) {
@@ -466,8 +473,8 @@ var DependencyCollection = /** @class */ (function () {
         var deps = r.dependencies();
         var add = function (key, filter) {
             if (filter === void 0) { filter = function (x) { return true; }; }
-            _this.todo = _this.todo.concat(deps[key]);
-            _this[key] = _this[key].concat(deps[key].map(function (x) { return x.name; }).filter(filter));
+            _this.todo = __spreadArrays(_this.todo, deps[key]);
+            _this[key] = __spreadArrays(_this[key], deps[key].map(function (x) { return x.name; }).filter(filter));
         };
         add("dependencies");
         if (dev === true || dev === "dev-types")
@@ -648,6 +655,8 @@ var Repository = /** @class */ (function () {
                             // otherwise a lot of imports will not work
                             x.compilerOptions.allowSyntheticDefaultImports = true;
                             x.compilerOptions.esModuleInterop = true;
+                            // if you run tsc or such -> provide default dist folder to keep eventually created .js files apart
+                            ensure_path(x, "compilerOptions", "outDir", "./dist");
                             // if we have an dist/outDir add to exclude
                             for (var _i = 0, _a = ["outDir", "outFile"]; _i < _a.length; _i++) {
                                 var key = _a[_i];
@@ -839,8 +848,8 @@ var Repository = /** @class */ (function () {
                         // TODO: check prefix "auto" etc to keep unique or overwrite
                         this.init();
                         j = this.tsmonojson.json;
-                        j.dependencies = j.dependencies.concat(dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
-                        j.devDependencies = j.devDependencies.concat(devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
+                        j.dependencies = __spreadArrays(j.dependencies, dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
+                        j.devDependencies = __spreadArrays(j.devDependencies, devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
                         return [4 /*yield*/, this.update(cfg, { link_to_links: true, install_npm_packages: true })];
                     case 1:
                         _a.sent();
@@ -892,7 +901,7 @@ push.addArgument("--force", { action: "storeTrue", help: "overwrites existing ts
 var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, description: "removes node_modules and reinstalls to match current node version" });
 var watch = sp.addParser("watch", { addHelp: true });
 var args = parser.parseArgs();
-var tslint_hack = function () { return __awaiter(_this, void 0, void 0, function () {
+var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
     var j;
     return __generator(this, function (_a) {
         // this is biased  but its going to save your ass
@@ -907,9 +916,8 @@ var tslint_hack = function () { return __awaiter(_this, void 0, void 0, function
         return [2 /*return*/];
     });
 }); };
-var main = function () { return __awaiter(_this, void 0, void 0, function () {
+var main = function () { return __awaiter(void 0, void 0, void 0, function () {
     var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, package_contents, tsconfig_contents, tsmono_contents, _d, _e, _f, k, v, _g, _h, _j, pack, version, cwd, reponame, config_1, e_1, items, _k, _l, path_, p_2, repo, p_3, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _m, _o, rep, force, p_4, _p, _q, r, stdout, p_5, dep_collection, seen, _r, _s, _t, k, v, r, _u, _v, r, package_json_installed;
-    var _this = this;
     return __generator(this, function (_w) {
         switch (_w.label) {
             case 0:
@@ -920,7 +928,7 @@ var main = function () { return __awaiter(_this, void 0, void 0, function () {
                 };
                 cfg = Object.assign({}, config, cfg_api(config));
                 p = new Repository(process.cwd());
-                update = function () { return __awaiter(_this, void 0, void 0, function () {
+                update = function () { return __awaiter(void 0, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0: return [4 /*yield*/, p.update(cfg, { link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force })];
@@ -1071,7 +1079,7 @@ var main = function () { return __awaiter(_this, void 0, void 0, function () {
                 basenames_to_pull = [];
                 seen = [] // TODO: why aret there duplicates ?
                 ;
-                ensure_repo_committed_and_clean_1 = function (r) { return __awaiter(_this, void 0, void 0, function () {
+                ensure_repo_committed_and_clean_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
                     var _a, _b;
                     return __generator(this, function (_c) {
                         switch (_c.label) {
@@ -1095,7 +1103,7 @@ var main = function () { return __awaiter(_this, void 0, void 0, function () {
                         }
                     });
                 }); };
-                ensure_remote_location_setup_1 = function (r) { return __awaiter(_this, void 0, void 0, function () {
+                ensure_remote_location_setup_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
                     var reponame, _a;
                     return __generator(this, function (_b) {
                         switch (_b.label) {
@@ -1130,7 +1138,7 @@ var main = function () { return __awaiter(_this, void 0, void 0, function () {
                         }
                     });
                 }); };
-                remote_update_1 = function (r) { return __awaiter(_this, void 0, void 0, function () {
+                remote_update_1 = function (r) { return __awaiter(void 0, void 0, void 0, function () {
                     var reponame;
                     return __generator(this, function (_a) {
                         switch (_a.label) {
@@ -1144,7 +1152,7 @@ var main = function () { return __awaiter(_this, void 0, void 0, function () {
                         }
                     });
                 }); };
-                push_to_remote_location = function (r) { return __awaiter(_this, void 0, void 0, function () {
+                push_to_remote_location = function (r) { return __awaiter(void 0, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0: return [4 /*yield*/, ensure_repo_committed_and_clean_1(r)];

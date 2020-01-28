@@ -33,7 +33,7 @@ then create bash function like this:
 
 ```
 # first run tsc -p . in directory to create dist/tsomon.json
-tsmono(){ node $TSMONO/dist/tsmono.js "$@"; }
+tsmono(){ NODE_MODULES=$TSMONO/node_modules node $TSMONO/dist/tsmono.js "$@"; }
 ```
 
 ```
