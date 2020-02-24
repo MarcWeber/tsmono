@@ -56,6 +56,10 @@ ROADMAP / TODO:
      * add typings to tsconfig
      * conifgure webpack plugins
 
+[ ] think about adding JS git support to always work everywhere:
+      https://github.com/isomorphic-git/isomorphic-git
+      https://github.com/creationix/js-git
+
 peer dependecny support
 =======================
 

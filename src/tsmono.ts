@@ -115,7 +115,7 @@ class DirectoryCache implements Cache {
   }
 
   private path_(key: string) {
-    return `${this.path}/${btoa(key)}`;
+    return path.join(this.path, btoa(key));
   }
 
   private get_(key: string, ttl: number|undefined) {
@@ -817,6 +817,29 @@ const watch  = sp.addParser("watch", {addHelp: true})
 
 const args = parser.parseArgs();
 
+const dot_git_ignore_hack = async () =>  {
+  if (!fs.pathExistsSync("tsmono.json")) return;
+
+  const f = ".gitignore"
+  const lines = (fs.existsSync(f) ? fs.readFileSync(f, "utf-8") : "").split("\n")
+
+  const to_be_added = [
+    "/node_modules",
+    "/.vscode",
+    "/dist",
+    "/.fyn",
+    "/tsconfig.json.protect",
+    "/package.json.installed",
+    "/package.json.protect",
+    "/package.json",
+    "/tsconfig.json",
+  ].filter((a) => ! lines.find((x) => x.startsWith(a)))
+
+  if (to_be_added.length > 0) {
+    fs.writeFileSync(f, [...lines, ...to_be_added].join("\n"), "utf8")
+  }
+}
+
 const tslint_hack = async () => {
   // this is biased  but its going to save your ass
   if (!fs.existsSync("tslint.json")) {
@@ -884,6 +907,7 @@ const main = async () => {
   if (args.main_action === "update") {
     await update();
     await tslint_hack();
+    await dot_git_ignore_hack()
     return
   }
   if (args.main_action === "update_using_rootDirs") {

@@ -189,7 +189,7 @@ var DirectoryCache = /** @class */ (function () {
         return new Date().getTime();
     };
     DirectoryCache.prototype.path_ = function (key) {
-        return this.path + "/" + btoa_1.default(key);
+        return path.join(this.path, btoa_1.default(key));
     };
     DirectoryCache.prototype.get_ = function (key, ttl) {
         var p = this.path_(key);
@@ -911,6 +911,28 @@ var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, des
 reinstall.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks" });
 var watch = sp.addParser("watch", { addHelp: true });
 var args = parser.parseArgs();
+var dot_git_ignore_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
+    var f, lines, to_be_added;
+    return __generator(this, function (_a) {
+        f = ".gitignore";
+        lines = (fs.existsSync(f) ? fs.readFileSync(f, "utf-8") : "").split("\n");
+        to_be_added = [
+            "/node_modules",
+            "/.vscode",
+            "/dist",
+            "/.fyn",
+            "/tsconfig.json.protect",
+            "/package.json.installed",
+            "/package.json.protect",
+            "/package.json",
+            "/tsconfig.json",
+        ].filter(function (a) { return !lines.find(function (x) { return x.startsWith(a); }); });
+        if (to_be_added.length > 0) {
+            fs.writeFileSync(f, __spreadArrays(lines, to_be_added).join("\n"), "utf8");
+        }
+        return [2 /*return*/];
+    });
+}); };
 var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
     var j;
     return __generator(this, function (_a) {
@@ -968,23 +990,26 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 _w.sent();
                 return [2 /*return*/];
             case 2:
-                if (!(args.main_action === "update")) return [3 /*break*/, 5];
+                if (!(args.main_action === "update")) return [3 /*break*/, 6];
                 return [4 /*yield*/, update()];
             case 3:
                 _w.sent();
                 return [4 /*yield*/, tslint_hack()];
             case 4:
                 _w.sent();
-                return [2 /*return*/];
+                return [4 /*yield*/, dot_git_ignore_hack()];
             case 5:
-                if (!(args.main_action === "update_using_rootDirs")) return [3 /*break*/, 7];
+                _w.sent();
+                return [2 /*return*/];
+            case 6:
+                if (!(args.main_action === "update_using_rootDirs")) return [3 /*break*/, 8];
                 // await update_using_rootDirs();
                 return [4 /*yield*/, tslint_hack()];
-            case 6:
+            case 7:
                 // await update_using_rootDirs();
                 _w.sent();
                 return [2 /*return*/];
-            case 7:
+            case 8:
                 if (args.main_action === "add") {
                     throw new Error("TODO");
                 }
@@ -1031,59 +1056,59 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     }
                     fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "uft8");
                 }
-                if (!(args.main_action === "pull-with-dependencies")) return [3 /*break*/, 19];
+                if (!(args.main_action === "pull-with-dependencies")) return [3 /*break*/, 20];
                 cwd = process.cwd();
                 reponame = path.basename(cwd);
                 config_1 = JSON.parse(args.git_remote_config_json);
-                _w.label = 8;
-            case 8:
-                _w.trys.push([8, 10, , 11]);
-                return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n      [ -f " + config_1.repositoriesPath + "/" + reponame + "/.git/config ]\n      " })];
+                _w.label = 9;
             case 9:
-                _w.sent();
-                return [3 /*break*/, 11];
+                _w.trys.push([9, 11, , 12]);
+                return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n      [ -f " + config_1.repositoriesPath + "/" + reponame + "/.git/config ]\n      " })];
             case 10:
+                _w.sent();
+                return [3 /*break*/, 12];
+            case 11:
                 e_1 = _w.sent();
                 info("remote directory " + config_1.repositoriesPath + "/" + reponame + "/.git/config does not exit, aborting");
                 return [2 /*return*/];
-            case 11: return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n          cd " + config_1.repositoriesPath + "/" + reponame + " && tsmono list-local-dependencies\n    " })];
-            case 12:
+            case 12: return [4 /*yield*/, run("ssh", { args: [config_1.server], stdin: "\n          cd " + config_1.repositoriesPath + "/" + reponame + " && tsmono list-local-dependencies\n    " })];
+            case 13:
                 items = (_w.sent()).split("\n").filter(function (x) { return /rel-path: /.test(x); }).map(function (x) { return x.slice(11); });
                 info("pulling " + JSON.stringify(items));
                 _k = 0, _l = [].concat(["../" + reponame]).concat(items);
-                _w.label = 13;
-            case 13:
-                if (!(_k < _l.length)) return [3 /*break*/, 19];
+                _w.label = 14;
+            case 14:
+                if (!(_k < _l.length)) return [3 /*break*/, 20];
                 path_ = _l[_k];
                 info("pulling " + path_);
                 p_2 = path.join(cwd, path_);
                 repo = path.basename(p_2);
                 if ((config_1.ignoreWhenPulling || []).includes(repo))
-                    return [3 /*break*/, 18];
+                    return [3 /*break*/, 19];
                 if (!fs.existsSync(p_2)) {
                     info("creating " + p_2);
                     fs.mkdirpSync(p_2);
                 }
                 return [4 /*yield*/, run("ssh", { args: [config_1.server],
                         stdin: "\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + repo + "\n        repo=" + config_1.repositoriesPath + "/" + repo + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, repo), config_1.bareRepositoriesPath) + "/" + repo + "\n            git push --set-upstream origin master\n          )\n        }\n        ( cd $repo; git push  )\n        " })];
-            case 14:
-                _w.sent();
-                if (!!fs.existsSync(path.join(p_2, ".git/config"))) return [3 /*break*/, 16];
-                return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.bareRepositoriesPath + "/" + repo, p_2] })];
             case 15:
                 _w.sent();
-                _w.label = 16;
+                if (!!fs.existsSync(path.join(p_2, ".git/config"))) return [3 /*break*/, 17];
+                return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.bareRepositoriesPath + "/" + repo, p_2] })];
             case 16:
+                _w.sent();
+                _w.label = 17;
+            case 17:
                 info("pulling " + p_2 + " ..");
                 return [4 /*yield*/, run("git", { args: ["pull"], cwd: p_2 })];
-            case 17:
-                _w.sent();
-                _w.label = 18;
             case 18:
-                _k++;
-                return [3 /*break*/, 13];
+                _w.sent();
+                _w.label = 19;
             case 19:
-                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 23];
+                _k++;
+                return [3 /*break*/, 14];
+            case 20:
+                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 24];
                 p_3 = new Repository(process.cwd());
                 config_2 = JSON.parse(args.git_remote_config_json);
                 basenames_to_pull = [];
@@ -1190,48 +1215,48 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     });
                 }); };
                 _m = 0, _o = p_3.repositories({ includeThis: true });
-                _w.label = 20;
-            case 20:
-                if (!(_m < _o.length)) return [3 /*break*/, 23];
+                _w.label = 21;
+            case 21:
+                if (!(_m < _o.length)) return [3 /*break*/, 24];
                 rep = _o[_m];
                 return [4 /*yield*/, push_to_remote_location(rep)];
-            case 21:
-                _w.sent();
-                _w.label = 22;
             case 22:
-                _m++;
-                return [3 /*break*/, 20];
+                _w.sent();
+                _w.label = 23;
             case 23:
-                if (!(args.main_action === "commit-all")) return [3 /*break*/, 30];
+                _m++;
+                return [3 /*break*/, 21];
+            case 24:
+                if (!(args.main_action === "commit-all")) return [3 /*break*/, 31];
                 force = args.force;
                 p_4 = new Repository(process.cwd());
                 _p = 0, _q = p_4.repositories();
-                _w.label = 24;
-            case 24:
-                if (!(_p < _q.length)) return [3 /*break*/, 30];
-                r = _q[_p];
-                if (!fs.existsSync(path.join(r.path, ".git"))) return [3 /*break*/, 29];
-                return [4 /*yield*/, run("git", { args: ["diff"], cwd: r.path })];
+                _w.label = 25;
             case 25:
-                stdout = _w.sent();
-                if (!(stdout !== "")) return [3 /*break*/, 29];
-                console.log(stdout);
-                if (!force) return [3 /*break*/, 27];
-                return [4 /*yield*/, run("git", { args: ["commit", "-am", args.message], cwd: r.path })];
+                if (!(_p < _q.length)) return [3 /*break*/, 31];
+                r = _q[_p];
+                if (!fs.existsSync(path.join(r.path, ".git"))) return [3 /*break*/, 30];
+                return [4 /*yield*/, run("git", { args: ["diff"], cwd: r.path })];
             case 26:
-                _w.sent();
-                return [3 /*break*/, 29];
+                stdout = _w.sent();
+                if (!(stdout !== "")) return [3 /*break*/, 30];
+                console.log(stdout);
+                if (!force) return [3 /*break*/, 28];
+                return [4 /*yield*/, run("git", { args: ["commit", "-am", args.message], cwd: r.path })];
             case 27:
+                _w.sent();
+                return [3 /*break*/, 30];
+            case 28:
                 console.log(r.path, "has uncommited changes, commit now");
                 return [4 /*yield*/, run(process.env.SHELL, { cwd: r.path, stdout1: true })];
-            case 28:
-                _w.sent();
-                _w.label = 29;
             case 29:
-                _p++;
-                return [3 /*break*/, 24];
+                _w.sent();
+                _w.label = 30;
             case 30:
-                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 32];
+                _p++;
+                return [3 /*break*/, 25];
+            case 31:
+                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 33];
                 p_5 = new Repository(process.cwd());
                 dep_collection = new DependencyCollection(p_5.path, p_5.tsmonojson.dirs());
                 dep_collection.dependencies_of_repository(p_5, true);
@@ -1257,10 +1282,10 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 }
                 return [4 /*yield*/, p_5.update(cfg, { link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                     })];
-            case 31:
+            case 32:
                 _w.sent();
-                _w.label = 32;
-            case 32: return [2 /*return*/];
+                _w.label = 33;
+            case 33: return [2 /*return*/];
         }
     });
 }); };
