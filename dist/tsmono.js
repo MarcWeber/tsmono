@@ -384,10 +384,10 @@ var TSMONOJSONFile = /** @class */ (function (_super) {
     function TSMONOJSONFile() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    TSMONOJSONFile.prototype.init = function (tsconfig) {
+    TSMONOJSONFile.prototype.init = function (cfg, tsconfig) {
         ensure_path(this.json, "name", "");
         ensure_path(this.json, "version", "0.0.0");
-        ensure_path(this.json, "package-manager-install-cmd", ["fyn"]);
+        ensure_path(this.json, "package-manager-install-cmd", [cfg.fyn]);
         ensure_path(this.json, "dependencies", []);
         ensure_path(this.json, "devDependencies", []);
         ensure_path(this.json, "tsconfig", tsconfig);
@@ -409,7 +409,8 @@ var dependency_to_str = function (d) {
     return d.name + " " + (d.npm && d.repository ? "npm and repository?" : (d.repository ? "from " + d.repository.path : "from npm " + (d.version ? d.version : ""))) + " requested from " + d.origin;
 };
 var DependencyCollection = /** @class */ (function () {
-    function DependencyCollection(origin, dirs) {
+    function DependencyCollection(cfg, origin, dirs) {
+        this.cfg = cfg;
         this.origin = origin;
         this.dirs = dirs;
         this.dependency_locactions = {};
@@ -503,7 +504,7 @@ var DependencyCollection = /** @class */ (function () {
             dep.npm = true;
             return;
         }
-        var r = new Repository(d);
+        var r = new Repository(this.cfg, d);
         dep.repository = r;
         // devDependencies are likely to contain @types thus pull them, too ?
         // TODO: only pull @types/*?
@@ -512,7 +513,8 @@ var DependencyCollection = /** @class */ (function () {
     return DependencyCollection;
 }());
 var Repository = /** @class */ (function () {
-    function Repository(path) {
+    function Repository(cfg, path) {
+        this.cfg = cfg;
         this.path = path;
         if (/\/\//.test(path))
             throw new Error("bad path " + path);
@@ -521,7 +523,7 @@ var Repository = /** @class */ (function () {
         this.packagejson = new JSONFile(this.packagejson_path);
     }
     Repository.prototype.repositories = function (opts) {
-        var dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs());
+        var dep_collection = new DependencyCollection(this.cfg, this.path, this.tsmonojson.dirs());
         dep_collection.dependencies_of_repository(this, true);
         dep_collection.do();
         dep_collection.print_warnings();
@@ -547,7 +549,7 @@ var Repository = /** @class */ (function () {
     };
     Repository.prototype.init = function () {
         var tsconfig = path.join(this.path, "tsconfig.json");
-        this.tsmonojson.init(fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, "utf8")) : {});
+        this.tsmonojson.init(this.cfg, fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, "utf8")) : {});
     };
     Repository.prototype.dependencies = function () {
         var _this = this;
@@ -579,7 +581,7 @@ var Repository = /** @class */ (function () {
                         info("!! NO tsmono.json found, only trying to run fyn");
                         if (!(opts.install_npm_packages && fs.existsSync(this.path + "/package.json"))) return [3 /*break*/, 2];
                         info("running fyn in dependency " + this.path);
-                        return [4 /*yield*/, run(opts.update_cmd && opts.update_cmd.executable || "fyn", { args: opts.update_cmd && opts.update_cmd.args, cwd: this.path })];
+                        return [4 /*yield*/, run(opts.update_cmd && opts.update_cmd.executable || cfg.fyn, { args: opts.update_cmd && opts.update_cmd.args, cwd: this.path })];
                     case 1:
                         _s.sent();
                         _s.label = 2;
@@ -606,7 +608,7 @@ var Repository = /** @class */ (function () {
                         package_json.devDependencies = {};
                         delete package_json.tsconfig;
                         tsconfig = {};
-                        dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs());
+                        dep_collection = new DependencyCollection(cfg, this.path, this.tsmonojson.dirs());
                         dep_collection.dependencies_of_repository(this, true);
                         dep_collection.do();
                         dep_collection.print_warnings();
@@ -799,7 +801,7 @@ var Repository = /** @class */ (function () {
                         this.packagejson.flush_protect_user_changes(opts.force);
                         if (!opts.install_npm_packages) return [3 /*break*/, 9];
                         debug("install_npm_packages");
-                        npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"]);
+                        npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", [cfg.fyn]);
                         to_be_installed = fs.readFileSync(this.packagejson_path, "utf-8");
                         p_installed = this.packagejson_path + ".installed";
                         installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf-8") : undefined;
@@ -888,6 +890,9 @@ update.addArgument("--link-via-root-dirs", { action: "storeTrue", help: "add dep
 update.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks" });
 update.addArgument("--recurse", { action: "storeTrue" });
 update.addArgument("--force", { action: "storeTrue" });
+var print_config_path = sp.addParser("print-config-path", { addHelp: true, description: "print tsmon.json path location" });
+var write_config_path = sp.addParser("write-sample-config", { addHelp: true, description: "write sample configuration file" });
+write_config_path.addArgument("--force", { action: "storeTrue" });
 var update_using_rootDirs = sp.addParser("update-using-rootDirs", { addHelp: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way" });
 // update_using_rootDirs.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
 // update_using_rootDirs.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
@@ -914,6 +919,8 @@ var args = parser.parseArgs();
 var dot_git_ignore_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
     var f, lines, to_be_added;
     return __generator(this, function (_a) {
+        if (!fs.pathExistsSync("tsmono.json"))
+            return [2 /*return*/];
         f = ".gitignore";
         lines = (fs.existsSync(f) ? fs.readFileSync(f, "utf-8") : "").split("\n");
         to_be_added = [
@@ -949,17 +956,22 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
     });
 }); };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var cache, config, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, package_contents, tsconfig_contents, tsmono_contents, _d, _e, _f, k, v, _g, _h, _j, pack, version, cwd, reponame, config_1, e_1, items, _k, _l, path_, p_2, repo, p_3, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _m, _o, rep, force, p_4, _p, _q, r, stdout, p_5, dep_collection, seen, _r, _s, _t, k, v, r, _u, _v, r, package_json_installed;
+    var hd, cache, config, config_from_home_dir_path, config_from_home_dir, cfg, p, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, package_contents, tsconfig_contents, tsmono_contents, _d, _e, _f, k, v, _g, _h, _j, pack, version, cwd, reponame, config_1, e_1, items, _k, _l, path_, p_2, repo, p_3, config_2, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _m, _o, rep, force, p_4, _p, _q, r, stdout, p_5, dep_collection, seen, _r, _s, _t, k, v, r, _u, _v, r, package_json_installed;
     return __generator(this, function (_w) {
         switch (_w.label) {
             case 0:
-                cache = new DirectoryCache(os_1.homedir() + "/.tsmono/cache");
+                hd = os_1.homedir();
+                cache = new DirectoryCache(hd + "/.tsmono/cache");
                 config = {
                     cache: cache,
                     fetch_ttl_seconds: 60 * 24,
+                    bin_sh: "/bin/sh",
+                    fyn: "fyn",
                 };
-                cfg = Object.assign({}, config, cfg_api(config));
-                p = new Repository(process.cwd());
+                config_from_home_dir_path = path.join(hd, ".tsmmono.json");
+                config_from_home_dir = fs.existsSync(config_from_home_dir_path) ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8")) : {};
+                cfg = Object.assign({}, config, cfg_api(config), config_from_home_dir);
+                p = new Repository(cfg, process.cwd());
                 update = function () { return __awaiter(void 0, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
@@ -1010,12 +1022,25 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 _w.sent();
                 return [2 /*return*/];
             case 8:
+                if (args.main_action === "print-config-path") {
+                    console.log("config path:", config_from_home_dir_path);
+                    return [2 /*return*/];
+                }
+                if (args.main_action === "write-sample-config") {
+                    if (!fs.existsSync(config_from_home_dir_path) || args.force) {
+                        fs.writeFileSync(config_from_home_dir_path, config);
+                    }
+                    else {
+                        console.log(config_from_home_dir_path, "not written because it exists. Try --force");
+                    }
+                    return [2 /*return*/];
+                }
                 if (args.main_action === "add") {
                     throw new Error("TODO");
                 }
                 if (args.main_action === "list-local-dependencies") {
                     silent = true;
-                    p_1 = new Repository(process.cwd());
+                    p_1 = new Repository(cfg, process.cwd());
                     for (_b = 0, _c = p_1.repositories(); _b < _c.length; _b++) {
                         r = _c[_b];
                         console.log("rel-path: ", r.path);
@@ -1109,7 +1134,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [3 /*break*/, 14];
             case 20:
                 if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 24];
-                p_3 = new Repository(process.cwd());
+                p_3 = new Repository(cfg, process.cwd());
                 config_2 = JSON.parse(args.git_remote_config_json);
                 basenames_to_pull = [];
                 seen = [] // TODO: why aret there duplicates ?
@@ -1130,7 +1155,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                             case 2:
                                 if (!_a) return [3 /*break*/, 4];
                                 info(r.path + " is dirty, please commit changes starting shell");
-                                return [4 /*yield*/, run("/bin/sh", { cwd: r.path })];
+                                return [4 /*yield*/, run(cfg.bin_sh, { cwd: r.path, stdout1: true })];
                             case 3:
                                 _c.sent();
                                 _c.label = 4;
@@ -1229,7 +1254,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
             case 24:
                 if (!(args.main_action === "commit-all")) return [3 /*break*/, 31];
                 force = args.force;
-                p_4 = new Repository(process.cwd());
+                p_4 = new Repository(cfg, process.cwd());
                 _p = 0, _q = p_4.repositories();
                 _w.label = 25;
             case 25:
@@ -1257,8 +1282,8 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [3 /*break*/, 25];
             case 31:
                 if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 33];
-                p_5 = new Repository(process.cwd());
-                dep_collection = new DependencyCollection(p_5.path, p_5.tsmonojson.dirs());
+                p_5 = new Repository(cfg, process.cwd());
+                dep_collection = new DependencyCollection(cfg, p_5.path, p_5.tsmonojson.dirs());
                 dep_collection.dependencies_of_repository(p_5, true);
                 dep_collection.do();
                 dep_collection.print_warnings();

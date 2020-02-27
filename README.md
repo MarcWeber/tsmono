@@ -45,6 +45,12 @@ Then see tsmono.json example below, run tsmono update and be done.
 
 Add your package.json contents to the tsmono.json file ..
 
+
+CONFIG eg for MSYS2
+===========
+tsmono --print-config-path
+tsmono --write-sample-config
+
 ROADMAP / TODO:
 ===============
 

@@ -137,6 +137,8 @@ class DirectoryCache implements Cache {
 interface ConfigData {
   cache: DirectoryCache,
   fetch_ttl_seconds: number,
+  fyn: string,
+  bin_sh: string,
 }
 
 type Config = ConfigData & ReturnType<typeof cfg_api>
@@ -296,10 +298,11 @@ class JSONFile {
 }
 
 class TSMONOJSONFile extends JSONFile {
-  public init(tsconfig: any|undefined) {
+
+  public init(cfg: Config, tsconfig: any|undefined) {
     ensure_path(this.json, "name", "")
     ensure_path(this.json, "version", "0.0.0")
-    ensure_path(this.json, "package-manager-install-cmd", ["fyn"])
+    ensure_path(this.json, "package-manager-install-cmd", [cfg.fyn])
     ensure_path(this.json, "dependencies", [])
     ensure_path(this.json, "devDependencies", [])
     ensure_path(this.json, "tsconfig", tsconfig)
@@ -340,7 +343,7 @@ class DependencyCollection {
   public todo: Dependency[] = []
   public recursed: string[] = []
 
-  constructor(public origin: string, public dirs: string[]) { }
+  constructor(public cfg: Config, public origin: string, public dirs: string[]) { }
 
   public print_warnings(): any {
     for (const [k, v] of Object.entries(this.dependency_locactions)) {
@@ -426,7 +429,7 @@ class DependencyCollection {
         info(`dependency ${dependency_to_str(dep)} not found, forcing npm`);
         dep.npm = true; return
       }
-      const r = new Repository(d)
+      const r = new Repository(this.cfg, d)
       dep.repository = r
       // devDependencies are likely to contain @types thus pull them, too ?
       // TODO: only pull @types/*?
@@ -441,7 +444,7 @@ class Repository {
   public packagejson: JSONFile;
   public packagejson_path: string;
 
-  constructor(public path: string) {
+  constructor(public cfg: Config, public path: string) {
     if (/\/\//.test(path)) throw new Error(`bad path ${path}`)
     this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
     this.packagejson_path = `${path}/package.json`
@@ -449,7 +452,7 @@ class Repository {
   }
 
   public repositories(opts?: {includeThis?: boolean}): Repository[] {
-    const dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs())
+    const dep_collection = new DependencyCollection(this.cfg, this.path, this.tsmonojson.dirs())
     dep_collection.dependencies_of_repository(this, true)
     dep_collection.do()
     dep_collection.print_warnings()
@@ -477,7 +480,7 @@ class Repository {
 
   public init() {
     const tsconfig = path.join(this.path, "tsconfig.json")
-    this.tsmonojson.init(fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, "utf8")) : {})
+    this.tsmonojson.init(this.cfg, fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, "utf8")) : {})
   }
 
   public dependencies(): {
@@ -519,7 +522,7 @@ class Repository {
       info("!! NO tsmono.json found, only trying to run fyn")
       if (opts.install_npm_packages && fs.existsSync(`${this.path}/package.json`)) {
         info(`running fyn in dependency ${this.path}`)
-        await run(opts.update_cmd && opts.update_cmd.executable || "fyn", {args: opts.update_cmd && opts.update_cmd.args, cwd: this.path})
+        await run(opts.update_cmd && opts.update_cmd.executable || cfg.fyn, {args: opts.update_cmd && opts.update_cmd.args, cwd: this.path})
       }
       return
     }
@@ -545,7 +548,7 @@ class Repository {
     package_json.devDependencies = {}
     delete package_json.tsconfig
     const tsconfig: any = {}
-    const dep_collection = new DependencyCollection(this.path, this.tsmonojson.dirs())
+    const dep_collection = new DependencyCollection(cfg, this.path, this.tsmonojson.dirs())
     dep_collection.dependencies_of_repository(this, true)
     dep_collection.do()
     dep_collection.print_warnings()
@@ -707,7 +710,7 @@ class Repository {
 
     if (opts.install_npm_packages) {
       debug("install_npm_packages");
-      const npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", ["fyn"])
+      const npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", [cfg.fyn])
 
       // 2²
 
@@ -776,6 +779,11 @@ update.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add depe
 update.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
 update.addArgument("--recurse", {action: "storeTrue"})
 update.addArgument("--force", {action: "storeTrue"})
+
+const print_config_path = sp.addParser("print-config-path", {addHelp: true, description: "print tsmon.json path location"})
+
+const write_config_path = sp.addParser("write-sample-config", {addHelp: true, description: "write sample configuration file"})
+write_config_path.addArgument("--force", {action: "storeTrue"})
 
 const update_using_rootDirs = sp.addParser("update-using-rootDirs", {addHelp: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way"})
 // update_using_rootDirs.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
@@ -872,16 +880,22 @@ const tslint_hack = async () => {
 }
 
 const main = async () => {
-  const cache = new DirectoryCache(`${homedir()}/.tsmono/cache`)
+  const hd = homedir()
+  const cache = new DirectoryCache(`${hd}/.tsmono/cache`)
 
   const config = {
     cache,
     fetch_ttl_seconds : 60 * 24,
+    bin_sh: "/bin/sh",
+    fyn: "fyn",
   }
 
-  const cfg = Object.assign({}, config, cfg_api(config))
+  const config_from_home_dir_path = path.join(hd, ".tsmmono.json")
+  const config_from_home_dir = fs.existsSync(config_from_home_dir_path) ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8")) : {}
 
-  const p = new Repository(process.cwd())
+  const cfg = Object.assign({ }, config, cfg_api(config), config_from_home_dir )
+
+  const p = new Repository(cfg, process.cwd())
 
   const update = async () => {
     await p.update(cfg, {link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force})
@@ -915,12 +929,26 @@ const main = async () => {
     await tslint_hack();
     return
   }
+
+  if (args.main_action === "print-config-path") {
+    console.log("config path:", config_from_home_dir_path)
+    return
+  }
+  if (args.main_action === "write-sample-config") {
+    if (!fs.existsSync(config_from_home_dir_path) || args.force) {
+      fs.writeFileSync(config_from_home_dir_path, config)
+    } else {
+      console.log(config_from_home_dir_path, "not written because it exists. Try --force")
+    }
+    return;
+  }
+
   if (args.main_action === "add") {
     throw new Error("TODO")  }
 
   if (args.main_action === "list-local-dependencies") {
     silent = true;
-    const p = new Repository(process.cwd())
+    const p = new Repository(cfg, process.cwd())
     for (const r of p.repositories()) {
         console.log("rel-path: ", r.path);
     }
@@ -1023,7 +1051,7 @@ const main = async () => {
   }
 
   if (args.main_action === "push-with-dependencies") {
-    const p = new Repository(process.cwd())
+    const p = new Repository(cfg, process.cwd())
     const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
 
     const basenames_to_pull: string[] = []
@@ -1034,7 +1062,7 @@ const main = async () => {
       // 1 updates / commit
       if (args.shell_on_changes && "" !== await run("git", {args: ["diff"], cwd: r.path})) {
           info(`${r.path} is dirty, please commit changes starting shell`)
-          await run("/bin/sh", {cwd: r.path})
+          await run(cfg.bin_sh, {cwd: r.path, stdout1: true})
        }
     }
 
@@ -1098,7 +1126,7 @@ const main = async () => {
   if (args.main_action === "commit-all") {
     const force = args.force
 
-    const p = new Repository(process.cwd())
+    const p = new Repository(cfg, process.cwd())
     for (const r of p.repositories()) {
       if (fs.existsSync(path.join(r.path, ".git"))) {
         const stdout = await run("git", {args: ["diff"], cwd: r.path})
@@ -1116,8 +1144,8 @@ const main = async () => {
   }
 
   if (args.main_action === "reinstall-with-dependencies") {
-    const p = new Repository(process.cwd())
-    const dep_collection = new DependencyCollection(p.path, p.tsmonojson.dirs())
+    const p = new Repository(cfg, process.cwd())
+    const dep_collection = new DependencyCollection(cfg, p.path, p.tsmonojson.dirs())
     dep_collection.dependencies_of_repository(p, true)
     dep_collection.do()
     dep_collection.print_warnings()
