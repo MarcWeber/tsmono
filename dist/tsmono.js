@@ -596,7 +596,7 @@ var Repository = /** @class */ (function () {
                         }
                         else {
                             if (fs.existsSync(this_tsmono))
-                                fs.unlinkSync(this_tsmono);
+                                fs.removeSync(this_tsmono);
                         }
                         cwd = process.cwd();
                         tsmonojson = this.tsmonojson.json || {};

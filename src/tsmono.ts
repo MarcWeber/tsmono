@@ -535,7 +535,7 @@ class Repository {
         fs.unlinkSync(path.join(link_dir, x))
       })
     } else {
-      if (fs.existsSync(this_tsmono)) fs.unlinkSync(this_tsmono)
+      if (fs.existsSync(this_tsmono)) fs.removeSync(this_tsmono)
     }
 
     const cwd = process.cwd()
