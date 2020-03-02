@@ -359,6 +359,27 @@ tsc --build .
 )
 
 
+Making VSCODE run tsmono update on tsmono.json save:
+====================================================
+
+Config:
+	- go to settings of VS Code, User, Extensions, Save and Run, on save --->settings.json and 
+	paste this code inside opened file.
+
+```
+"saveAndRun": {
+  "commands": [
+    {
+      "match": "tsmono.json",
+      "cmd": "cd ${fileDirname}; node tsmono update --force",
+      "useShortcut": false,
+      "silent": false
+    }
+  ]
+}
+```
+
+
 # TODO
 If a local dependency is a version controlled package each time tsmono update is run record that hash
 This way you have some control over updates. Thus if s.th breakes you know where to start looking for changes
