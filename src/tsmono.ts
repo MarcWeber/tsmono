@@ -714,9 +714,9 @@ class Repository {
 
       // 2²
 
-      const to_be_installed = fs.readFileSync(this.packagejson_path, "utf-8")
+      const to_be_installed = fs.readFileSync(this.packagejson_path, "utf8")
       const p_installed = `${this.packagejson_path}.installed`
-      const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf-8") : undefined
+      const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined
       info("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
       if (installed !== to_be_installed) {
         await run(npm_install_cmd[0], {args: npm_install_cmd.slice(1), cwd: this.path})
@@ -776,7 +776,7 @@ add.addArgument("args", {nargs: "*"})
 const update = sp.addParser("update", {addHelp: true, description: "This also is default action"})
 update.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
 update.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
-update.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
+update.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files"})
 update.addArgument("--recurse", {action: "storeTrue"})
 update.addArgument("--force", {action: "storeTrue"})
 
@@ -812,6 +812,8 @@ push.addArgument("--run-remote-command", {help: "remote ssh location to run git 
 
 const pull = sp.addParser("pull-with-dependencies", {addHelp: true, description: "pull current directory from remote location with dependencies"})
 pull.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
+pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono update"})
+pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details"})
 
 const list_dependencies = sp.addParser("list-local-dependencies", {addHelp: true, description: "list dependencies"})
 
@@ -829,7 +831,7 @@ const dot_git_ignore_hack = async () =>  {
   if (!fs.pathExistsSync("tsmono.json")) return;
 
   const f = ".gitignore"
-  const lines = (fs.existsSync(f) ? fs.readFileSync(f, "utf-8") : "").split("\n")
+  const lines = (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "").split("\n")
 
   const to_be_added = [
     "/node_modules",
@@ -839,8 +841,8 @@ const dot_git_ignore_hack = async () =>  {
     "/tsconfig.json.protect",
     "/package.json.installed",
     "/package.json.protect",
-    "/package.json",
-    "/tsconfig.json",
+    "/package.json",  // derived by tsmono, but could be comitted
+    "/tsconfig.json", // derived by tsmono, contains local setup paths
   ].filter((a) => ! lines.find((x) => x.startsWith(a)))
 
   if (to_be_added.length > 0) {
@@ -896,6 +898,13 @@ const main = async () => {
   const cfg = Object.assign({ }, config, cfg_api(config), config_from_home_dir )
 
   const p = new Repository(cfg, process.cwd())
+
+  const ensure_is_git = async (r: Repository) => {
+    if (!fs.existsSync(path.join(r.path, ".git"))) {
+      console.log(`Please add .git so that this dependency ${r.path} can be pushed`)
+      await run(cfg.bin_sh, { cwd: r.path, stdout1: true })
+    }
+  }
 
   const update = async () => {
     await p.update(cfg, {link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: args.symlink_node_modules_hack, recurse: args.recurse, force: args.force})
@@ -959,12 +968,14 @@ const main = async () => {
     // TODO: test this
 
       if (fs.existsSync("tsmono.json") && ! args.force) {
-          console.log("not overwriting tsconfig.json, use --force");
+          console.log("not overwriting tsmono.json, use --force");
           return;
       }
 
-      const package_contents = fs.existsSync("package.json") ? require("pcakage.json") : undefined;
-      let tsconfig_contents = fs.existsSync("tsconfig.json") ? require("tsconfig.json") : undefined;
+      console.log("pwd", process.cwd())
+      const pwd = process.cwd()
+      const package_contents = fs.existsSync("package.json") ? require(path.join(pwd, "./package.json"))  : undefined;
+      let tsconfig_contents = fs.existsSync("tsconfig.json") ? require(path.join(pwd, "./tsconfig.json")) : undefined;
 
       if (package_contents === undefined && tsconfig_contents === undefined) {
           console.log("Neither package.json nor tsconfig.json found");
@@ -990,7 +1001,7 @@ const main = async () => {
               tsmono_contents.package[k] = v
           }
       }
-      fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "uft8")
+      fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "utf8")
   }
 
   if (args.main_action === "pull-with-dependencies") {
@@ -1017,14 +1028,14 @@ const main = async () => {
 
     for (const path_ of ([] as string[]).concat([`../${reponame}`]).concat(items)) {
       info(`pulling ${path_}`)
-      const p = path.join(cwd, path_)
-      const repo = path.basename(p)
+      const p_ = path.join(cwd, path_)
+      const repo = path.basename(p_)
 
       if ((config.ignoreWhenPulling || []).includes(repo)) continue;
 
-      if (!fs.existsSync(p)) {
-        info(`creating ${p}`)
-        fs.mkdirpSync(p)
+      if (!fs.existsSync(p_)) {
+        info(`creating ${p_}`)
+        fs.mkdirpSync(p_)
       }
       await run("ssh", { args: [config.server],
         stdin: `
@@ -1041,11 +1052,20 @@ const main = async () => {
         }
         ( cd $repo; git push  )
         `})
-      if (!fs.existsSync(path.join(p, ".git/config"))) {
-        await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${repo}`, p] })
+      if (!fs.existsSync(path.join(p_, ".git/config"))) {
+        await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${repo}`, p_] })
       }
-      info(`pulling ${p} ..`)
-      await run("git", { args: ["pull"], cwd: p })
+      info(`pulling ${p_} ..`)
+      await run("git", { args: ["pull"], cwd: p_ })
+
+      if (args.update && fs.existsSync(path.join(p_, "tsmono.json"))) {
+          // run tsmono update
+          const p = new Repository(cfg, p_)
+          await p.update(cfg, {
+            link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
+            // , update_cmd: {executable: "npm", args: ["i"]}
+          })
+      }
     }
 
   }
@@ -1099,6 +1119,7 @@ const main = async () => {
     }
 
     const push_to_remote_location = async ( r: Repository) => {
+        await ensure_is_git(r)
         await ensure_repo_committed_and_clean(r)
         await ensure_remote_location_setup(r)
 

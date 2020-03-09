@@ -54,17 +54,21 @@ tsmono --write-sample-config
 ROADMAP / TODO:
 ===============
 
-[ ] add support turning into npm module
+  [ ] add support turning into npm module
 
-[ ] turn this repository into npm module
+  [ ] turn this repository into npm module
 
-[ ] think about polyfills
-     * add typings to tsconfig
-     * conifgure webpack plugins
+  [ ] think about polyfills
+       * add typings to tsconfig
+       * conifgure webpack plugins
 
-[ ] think about adding JS git support to always work everywhere:
-      https://github.com/isomorphic-git/isomorphic-git
-      https://github.com/creationix/js-git
+  [ ] think about adding JS git support to always work everywhere:
+        https://github.com/isomorphic-git/isomorphic-git
+        https://github.com/creationix/js-git
+
+  [ ] transient dependencies
+
+  [ ] make pull/push jobs run in parallel
 
 peer dependecny support
 =======================
