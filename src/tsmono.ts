@@ -443,12 +443,14 @@ class Repository {
   public tsmonojson: TSMONOJSONFile;
   public packagejson: JSONFile;
   public packagejson_path: string;
+  public basename: string;
 
   constructor(public cfg: Config, public path: string) {
-    if (/\/\//.test(path)) throw new Error(`bad path ${path}`)
-    this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
-    this.packagejson_path = `${path}/package.json`
-    this.packagejson = new JSONFile(this.packagejson_path)
+      this.basename = basename(path)
+      if (/\/\//.test(path)) throw new Error(`bad path ${path}`)
+      this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
+      this.packagejson_path = `${path}/package.json`
+      this.packagejson = new JSONFile(this.packagejson_path)
   }
 
   public repositories(opts?: {includeThis?: boolean}): Repository[] {
@@ -815,6 +817,12 @@ pull.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"
 pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono update"})
 pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details"})
 
+const clean = sp.addParser("is-clean", {addHelp: true, description: "check whether git repositories on local/ remote side are clean"})
+clean.addArgument("--no-local", { help: "don't look at local directories"})
+clean.addArgument("--no-remote", { help: "don't\t look at remote directories"})
+clean.addArgument("--shell", {action: "storeTrue", help: "if dirty start shell so that you can commit"})
+clean.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
+
 const list_dependencies = sp.addParser("list-local-dependencies", {addHelp: true, description: "list dependencies"})
 
 const from_json_files = sp.addParser("from-json-files", {addHelp: true, description: "try to create tsmono.json fom package.json and tsconfig.json file"})
@@ -881,6 +889,62 @@ const tslint_hack = async () => {
 
 }
 
+type WithUser = <R>(run: () => Promise<R>) => Promise < R >
+
+type Task = <R>(o: {with_user: WithUser}) => Promise < void >
+
+interface TaskDescription {
+    task: string,
+    start: Task,
+}
+
+interface Wait < R > {r: (r: R) => void, action: () => Promise<R>}
+
+const run_tasks = async (tasks: TaskDescription[]) => {
+    // parallel implementation of running tasks but synchronize when requesting
+    // action from user
+
+    let waiting: undefined | Array<Wait<any>>
+    const with_user: WithUser = async (run) => {
+        if (waiting === undefined) {
+            // lucky
+            waiting = []
+            const r = await run()
+
+            const run_waiting = () => {
+              if (waiting === undefined) { throw new Error("x") } // should never hapen
+              const next = waiting.shift()
+              if (next === undefined) {
+                waiting = undefined
+              } else {
+                next.action().then(next.r)
+                run_waiting()
+              }
+            }
+            run_waiting()
+
+            return r
+        } else {
+            return new Promise ((r, j) => {
+              if (waiting === undefined) { throw new Error("x") } // should never hapen
+              waiting.push({ action: run, r })
+            })
+        }
+
+    }
+
+    await Promise.all(tasks.map(async (x) => {
+        await with_user(async () => info(`starting ${x.task}`) )
+        await x.start({with_user: (run) => {
+            return with_user(async () => {
+                info(`!=== task ${x.task} requires your attention`)
+                return run()
+            })
+        }})
+        await with_user(async () => info(`done ${x.task}`) )
+    }))
+}
+
 const main = async () => {
   const hd = homedir()
   const cache = new DirectoryCache(`${hd}/.tsmono/cache`)
@@ -896,6 +960,10 @@ const main = async () => {
   const config_from_home_dir = fs.existsSync(config_from_home_dir_path) ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8")) : {}
 
   const cfg = Object.assign({ }, config, cfg_api(config), config_from_home_dir )
+
+  const ssh_cmd = (server: string) =>  async (stdin: string, args?: {stdout1: true}): Promise<string> => {
+      return run("ssh", {args: [server], stdin, ...args})
+  }
 
   const p = new Repository(cfg, process.cwd())
 
@@ -1009,27 +1077,28 @@ const main = async () => {
     const cwd = process.cwd()
     const reponame: string = path.basename(cwd)
     const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
+    const sc = ssh_cmd(config.server)
 
     // test remote is git repository
     try {
-      await run("ssh", {args: [config.server], stdin: `
+      await sc(`
       [ -f ${config.repositoriesPath}/${reponame}/.git/config ]
-      `})
+      `, {stdout1: true})
     } catch (e) {
       info(`remote directory ${config.repositoriesPath}/${reponame}/.git/config does not exit, aborting`)
       return;
     }
 
-    const items = (await run("ssh", {args: [config.server], stdin: `
+    const items = (await sc(`
           cd ${config.repositoriesPath}/${reponame} && tsmono list-local-dependencies
-    `})).split("\n").filter((x) => /rel-path: /.test( x) ).map((x) => x.slice(11) )
+    `)).split("\n").filter((x) => /rel-path: /.test( x) ).map((x) => x.slice(11) )
 
     info("pulling " + JSON.stringify(items))
 
     for (const path_ of ([] as string[]).concat([`../${reponame}`]).concat(items)) {
       info(`pulling ${path_}`)
       const p_ = path.join(cwd, path_)
-      const repo = path.basename(p_)
+      const repo = basename(p_)
 
       if ((config.ignoreWhenPulling || []).includes(repo)) continue;
 
@@ -1037,8 +1106,7 @@ const main = async () => {
         info(`creating ${p_}`)
         fs.mkdirpSync(p_)
       }
-      await run("ssh", { args: [config.server],
-        stdin: `
+      await sc(`
         exec 2>&1
         set -x
         bare=${config.bareRepositoriesPath}/${repo}
@@ -1051,7 +1119,7 @@ const main = async () => {
           )
         }
         ( cd $repo; git push  )
-        `})
+        `)
       if (!fs.existsSync(path.join(p_, ".git/config"))) {
         await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${repo}`, p_] })
       }
@@ -1068,6 +1136,61 @@ const main = async () => {
       }
     }
 
+  }
+
+  if (args.main_action === "is-clean") {
+      info("using local dependencies as reference")
+      const repositories = p.repositories({includeThis: true})
+
+      const config: RemoteLocation  = args.git_remote_config_json ? JSON.parse(args.git_remote_config_json) : undefined
+      const sc = ssh_cmd(config.server)
+
+      const results: string[] = []
+
+      const check_local =  (r: Repository): Task => async (o) => {
+        const is_clean = async () => ("" === await run("git", { args: ["diff"], cwd: r.path }) ? "clean" : "dirty")
+        const clean_before = await is_clean()
+        if (clean_before === "dirty"  && args.shell) {
+          await o.with_user(async () => {
+            info(`${r.path} is not clean, starting shell`)
+            await run(cfg.bin_sh, { cwd: r.path, stdout1: true })
+          })
+        }
+        results.push(`${r.basename}: ${clean_before} -> ${await is_clean()}`)
+      }
+
+      const check_remote =  (r: Repository): Task => async (o) => {
+       const is_clean = async () => ("" === await sc(`cd ${config.repositoriesPath}/${r.basename}; git diff`) ? "clean" : "dirty")
+       const clean_before = await is_clean()
+       if (clean_before === "dirty"  && args.shell) {
+          await o.with_user(async () => {
+            info(`${r.path} is not clean, starting shell`)
+            await run("ssh", {args: [config.server, `cd ${config.repositoriesPath}/${r.basename}; exec $SHELL -i`], stdout1: true })
+          })
+        }
+       results.push(`remote ${r.basename}: ${clean_before} -> ${await is_clean()}`)
+
+      }
+
+    // check local
+
+      const tasks: TaskDescription[] = [
+        ...(
+          (!args.no_local)
+          ?  repositories.map((x) => ({ task: `local clean? ${x.path}`, start: check_local(x)}))
+          : []),
+        ...(
+          (!args.no_remote)
+          ?  repositories.map((x) => ({task: `remote clean? ${x.path}`, start: check_remote(x)}))
+          : []),
+    ]
+
+      await run_tasks(tasks)
+
+      info("=== results ===")
+      for (const i of results) {
+        info(i)
+      }
   }
 
   if (args.main_action === "push-with-dependencies") {
@@ -1089,7 +1212,7 @@ const main = async () => {
     const ensure_remote_location_setup = async (r: Repository) => {
       info(r.path, "ensuring remote setup")
         // ensure remote location is there
-      const reponame = path.basename(r.path)
+      const reponame = r.basename
       if ("" === await run(`git`, {exitcodes: [0, 1], args: `config --get remote.${config.gitRemoteLocationName}.url`.split(" "), cwd: r.path})) {
           // local side
           await run(`git`, {args: `remote add ${config.gitRemoteLocationName} ${config.server}:${config.bareRepositoriesPath}/${reponame}`.split(" "), cwd: r.path })
@@ -1108,7 +1231,7 @@ const main = async () => {
     }
 
     const remote_update = async (r: Repository) => {
-      const reponame = path.basename(r.path)
+      const reponame = r.basename
       await run(`ssh`, {args: [ config.server],
         cwd: r.path, stdin: `
           target=${config.repositoriesPath}/${reponame}
@@ -1157,7 +1280,7 @@ const main = async () => {
               await run("git", {args: ["commit", "-am", args.message], cwd: r.path})
            } else {
               console.log(r.path, "has uncommited changes, commit now")
-              await run(process.env.SHELL as string, {cwd: r.path, stdout1: true})
+              await run(cfg.bin_sh, { cwd: r.path, stdout1: true })
            }
         }
       }

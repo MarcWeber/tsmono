@@ -56,6 +56,9 @@ ROADMAP / TODO:
 
   [ ] add support turning into npm module
 
+
+  [ ] implement pull-with-dependencies and push-with-dependencies using run_tasks
+
   [ ] turn this repository into npm module
 
   [ ] think about polyfills
@@ -268,6 +271,8 @@ command line options
   # tsmono must be runnable by ssh on the remote site (eg add to .bashrc or .zprofile or such)
   # because tsmono list-local-dependencies is used to determine what repositories to fetch
 
+  tsmono is-clean [--no-local] [--no-remote] [--shell] --git_remote_config_json={..}
+
   tsmono list-local-dependencies
   # just lists all dependencies so that you can pack them manually
 
@@ -398,3 +403,10 @@ NOTES FOR WINDOWS
 Symlinks seem to reqiure special privileges.
 Eg run as administrator or google how to change priviledges.
 Maybe there are more ways.
+
+
+
+alternatives
+============
+Maybe I have missed the point and there are alternatives ..
+https://classic.yarnpkg.com/en/docs/workspaces/
