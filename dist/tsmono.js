@@ -398,7 +398,6 @@ var TSMONOJSONFile = /** @class */ (function (_super) {
     TSMONOJSONFile.prototype.init = function (cfg, tsconfig) {
         ensure_path(this.json, "name", "");
         ensure_path(this.json, "version", "0.0.0");
-        ensure_path(this.json, "package-manager-install-cmd", [cfg.fyn]);
         ensure_path(this.json, "dependencies", []);
         ensure_path(this.json, "devDependencies", []);
         ensure_path(this.json, "tsconfig", tsconfig);
@@ -583,7 +582,7 @@ var Repository = /** @class */ (function () {
     Repository.prototype.update = function (cfg, opts) {
         if (opts === void 0) { opts = {}; }
         return __awaiter(this, void 0, void 0, function () {
-            var this_tsmono, link_dir, cwd, tsmonojson, package_json, tsconfig, dep_collection, expected_symlinks, expected_tools, path_for_tsconfig, _i, _a, _b, k, v, src_tool, fix_ts_config, _c, _d, _e, path_, merge, tsconfig_path_1, json_1, _f, _g, _h, k, v, t, _j, _k, _l, k, v, add_dep, add_npm_packages, _m, _o, npm_install_cmd, to_be_installed, p_installed, installed, _p, _q, dir, n, opts2, repositories, _r, repositories_1, r;
+            var this_tsmono, link_dir, cwd, tsmonojson, package_json, tsconfig, dep_collection, expected_symlinks, expected_tools, path_for_tsconfig, _i, _a, _b, k, v, src_tool, fix_ts_config, _c, _d, _e, path_, merge, tsconfig_path_1, json_1, _f, _g, _h, k, v, t, _j, _k, _l, k, v, add_dep, add_npm_packages, _m, _o, to_be_installed, p_installed, installed, _p, _q, dir, n, opts2, repositories, _r, repositories_1, r;
             var _this = this;
             return __generator(this, function (_s) {
                 switch (_s.label) {
@@ -592,8 +591,8 @@ var Repository = /** @class */ (function () {
                         // only run fyn if package.json exists
                         info("!! NO tsmono.json found, only trying to run fyn");
                         if (!(opts.install_npm_packages && fs.existsSync(this.path + "/package.json"))) return [3 /*break*/, 2];
-                        info("running fyn in dependency " + this.path);
-                        return [4 /*yield*/, run(opts.update_cmd && opts.update_cmd.executable || cfg.fyn, { args: opts.update_cmd && opts.update_cmd.args, cwd: this.path })];
+                        info("running " + cfg.npm_install_cmd + " in dependency " + this.path);
+                        return [4 /*yield*/, run(cfg.npm_install_cmd[0], { args: cfg.npm_install_cmd.slice(1), cwd: this.path })];
                     case 1:
                         _s.sent();
                         _s.label = 2;
@@ -813,13 +812,12 @@ var Repository = /** @class */ (function () {
                         this.packagejson.flush_protect_user_changes(opts.force);
                         if (!opts.install_npm_packages) return [3 /*break*/, 9];
                         debug("install_npm_packages");
-                        npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", [cfg.fyn]);
                         to_be_installed = fs.readFileSync(this.packagejson_path, "utf8");
                         p_installed = this.packagejson_path + ".installed";
                         installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined;
                         info("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
                         if (!(installed !== to_be_installed)) return [3 /*break*/, 8];
-                        return [4 /*yield*/, run(npm_install_cmd[0], { args: npm_install_cmd.slice(1), cwd: this.path })];
+                        return [4 /*yield*/, run(cfg.npm_install_cmd[0], { args: cfg.npm_install_cmd.slice(1), cwd: this.path })];
                     case 7:
                         _s.sent();
                         _s.label = 8;
@@ -899,12 +897,13 @@ add.addArgument("args", { nargs: "*" });
 var update = sp.addParser("update", { addHelp: true, description: "This also is default action" });
 update.addArgument("--symlink-node-modules-hack", { action: "storeTrue" });
 update.addArgument("--link-via-root-dirs", { action: "storeTrue", help: "add dependencies by populating root-dirs. See README " });
-update.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files" });
+update.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files. On Windows 10 cconsider activating dev mode to allow creating symlinks without special priviledges." });
 update.addArgument("--recurse", { action: "storeTrue" });
 update.addArgument("--force", { action: "storeTrue" });
 var print_config_path = sp.addParser("print-config-path", { addHelp: true, description: "print tsmon.json path location" });
 var write_config_path = sp.addParser("write-sample-config", { addHelp: true, description: "write sample configuration file" });
 write_config_path.addArgument("--force", { action: "storeTrue" });
+var echo_config_path = sp.addParser("echo-sample-config", { addHelp: true, description: "echo sample config for TSMONO_CONFIG_JSON env var" });
 var update_using_rootDirs = sp.addParser("update-using-rootDirs", { addHelp: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way" });
 // update_using_rootDirs.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
 // update_using_rootDirs.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
@@ -1048,7 +1047,7 @@ var run_tasks = function (tasks) { return __awaiter(void 0, void 0, void 0, func
     });
 }); };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var hd, cache, config, config_from_home_dir_path, config_from_home_dir, cfg, ssh_cmd, p, ensure_is_git, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, pwd, package_contents, tsconfig_contents, tsmono_contents, _d, _e, _f, k, v, _g, _h, _j, pack, version, cwd, reponame, config_1, sc, e_1, items, _k, _l, path_, p_, repo, p_2, repositories, config_2, sc_1, results_2, check_local_1, check_remote_1, tasks, _m, results_1, i, p_3, config_3, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _o, _p, rep, force, p_4, _q, _r, r, stdout, p_5, dep_collection, seen, _s, _t, _u, k, v, r, _v, _w, r, package_json_installed;
+    var hd, cache, config, config_from_home_dir_path, env_config, homedir_config, cfg, ssh_cmd, p, ensure_is_git, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, pwd, package_contents, tsconfig_contents, tsmono_contents, _d, _e, _f, k, v, _g, _h, _j, pack, version, cwd, reponame, config_1, sc, e_1, items, _k, _l, path_, p_, repo, p_2, repositories, config_2, sc_1, results_2, check_local_1, check_remote_1, tasks, _m, results_1, i, p_3, config_3, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _o, _p, rep, force, p_4, _q, _r, r, stdout, p_5, dep_collection, seen, _s, _t, _u, k, v, r, _v, _w, r, package_json_installed;
     return __generator(this, function (_x) {
         switch (_x.label) {
             case 0:
@@ -1058,11 +1057,16 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     cache: cache,
                     fetch_ttl_seconds: 60 * 24,
                     bin_sh: "/bin/sh",
-                    fyn: "fyn",
+                    npm_install_cmd: ["fyn"],
                 };
                 config_from_home_dir_path = path.join(hd, ".tsmmono.json");
-                config_from_home_dir = fs.existsSync(config_from_home_dir_path) ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8")) : {};
-                cfg = Object.assign({}, config, cfg_api(config), config_from_home_dir);
+                env_config = process.env.TSMONO_CONFIG_JSON
+                    ? JSON.parse(process.env.TSMONO_CONFIG_JSON)
+                    : {};
+                homedir_config = fs.existsSync(config_from_home_dir_path)
+                    ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8"))
+                    : {};
+                cfg = Object.assign({}, config, cfg_api(config), homedir_config, env_config);
                 ssh_cmd = function (server) { return function (stdin, args) { return __awaiter(void 0, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         return [2 /*return*/, run("ssh", __assign({ args: [server], stdin: stdin }, args))];
@@ -1144,6 +1148,10 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     else {
                         console.log(config_from_home_dir_path, "not written because it exists. Try --force");
                     }
+                    return [2 /*return*/];
+                }
+                if (args.main_action === "echo-sample-config") {
+                    console.log("TSMONO_CONFIG_JSON=" + JSON.stringify(config));
                     return [2 /*return*/];
                 }
                 if (args.main_action === "add") {

@@ -51,6 +51,8 @@ CONFIG eg for MSYS2
 tsmono --print-config-path
 tsmono --write-sample-config
 
+or export TSMONO_CONFIG_JSON
+
 ROADMAP / TODO:
 ===============
 
@@ -58,6 +60,10 @@ ROADMAP / TODO:
 
 
   [ ] implement pull-with-dependencies and push-with-dependencies using run_tasks
+
+  [ ] some tools egnext.js have issues with files being outside of current directory.
+      Thus think about finally implementing the tsconfig compile other projects
+      and create .js files with sourcemapping but loosing ability to refactor instead ?
 
   [ ] turn this repository into npm module
 
@@ -72,6 +78,8 @@ ROADMAP / TODO:
   [ ] transient dependencies
 
   [ ] make pull/push jobs run in parallel
+
+  
 
 peer dependecny support
 =======================

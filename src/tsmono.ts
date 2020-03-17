@@ -137,7 +137,7 @@ class DirectoryCache implements Cache {
 interface ConfigData {
   cache: DirectoryCache,
   fetch_ttl_seconds: number,
-  fyn: string,
+  npm_install_cmd: string[], // eg ['fyn'] or ['npm', 'i']
   bin_sh: string,
 }
 
@@ -302,7 +302,6 @@ class TSMONOJSONFile extends JSONFile {
   public init(cfg: Config, tsconfig: any|undefined) {
     ensure_path(this.json, "name", "")
     ensure_path(this.json, "version", "0.0.0")
-    ensure_path(this.json, "package-manager-install-cmd", [cfg.fyn])
     ensure_path(this.json, "dependencies", [])
     ensure_path(this.json, "devDependencies", [])
     ensure_path(this.json, "tsconfig", tsconfig)
@@ -508,8 +507,7 @@ class Repository {
   }
 
   public async update(cfg: Config, opts: {link_to_links?: boolean, install_npm_packages?: boolean, symlink_node_modules_hack?: boolean, recurse?: boolean, force?: boolean,
-
-    update_cmd?: {executable: string, args: string[]} } = {}) {
+    } = {}) {
     /*
     * symlink_node_modules_hack -> see README. This will break other repos - thus you can only work on one repository
     * recurse -> run update on each dependency folder, too. This will result in duplicate installations (TODO: test on non tsmono on those just run fyn)
@@ -523,8 +521,8 @@ class Repository {
       // only run fyn if package.json exists
       info("!! NO tsmono.json found, only trying to run fyn")
       if (opts.install_npm_packages && fs.existsSync(`${this.path}/package.json`)) {
-        info(`running fyn in dependency ${this.path}`)
-        await run(opts.update_cmd && opts.update_cmd.executable || cfg.fyn, {args: opts.update_cmd && opts.update_cmd.args, cwd: this.path})
+        info(`running ${cfg.npm_install_cmd} in dependency ${this.path}`)
+        await run(cfg.npm_install_cmd[0] , {args: cfg.npm_install_cmd.slice(1), cwd: this.path})
       }
       return
     }
@@ -712,7 +710,6 @@ class Repository {
 
     if (opts.install_npm_packages) {
       debug("install_npm_packages");
-      const npm_install_cmd = get_path(this.tsmonojson.json, "npm-install-cmd", [cfg.fyn])
 
       // 2²
 
@@ -721,7 +718,7 @@ class Repository {
       const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined
       info("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
       if (installed !== to_be_installed) {
-        await run(npm_install_cmd[0], {args: npm_install_cmd.slice(1), cwd: this.path})
+        await run(cfg.npm_install_cmd[0], {args: cfg.npm_install_cmd.slice(1), cwd: this.path})
       }
       fs.writeFileSync(p_installed, to_be_installed)
     }
@@ -778,7 +775,7 @@ add.addArgument("args", {nargs: "*"})
 const update = sp.addParser("update", {addHelp: true, description: "This also is default action"})
 update.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
 update.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
-update.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files"})
+update.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files. On Windows 10 cconsider activating dev mode to allow creating symlinks without special priviledges."})
 update.addArgument("--recurse", {action: "storeTrue"})
 update.addArgument("--force", {action: "storeTrue"})
 
@@ -786,6 +783,7 @@ const print_config_path = sp.addParser("print-config-path", {addHelp: true, desc
 
 const write_config_path = sp.addParser("write-sample-config", {addHelp: true, description: "write sample configuration file"})
 write_config_path.addArgument("--force", {action: "storeTrue"})
+const echo_config_path = sp.addParser("echo-sample-config", {addHelp: true, description: "echo sample config for TSMONO_CONFIG_JSON env var"})
 
 const update_using_rootDirs = sp.addParser("update-using-rootDirs", {addHelp: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way"})
 // update_using_rootDirs.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
@@ -953,13 +951,20 @@ const main = async () => {
     cache,
     fetch_ttl_seconds : 60 * 24,
     bin_sh: "/bin/sh",
-    fyn: "fyn",
+    npm_install_cmd: ["fyn"],
   }
 
   const config_from_home_dir_path = path.join(hd, ".tsmmono.json")
-  const config_from_home_dir = fs.existsSync(config_from_home_dir_path) ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8")) : {}
+  const env_config =
+   process.env.TSMONO_CONFIG_JSON
+   ? JSON.parse(process.env.TSMONO_CONFIG_JSON)
+   : {}
 
-  const cfg = Object.assign({ }, config, cfg_api(config), config_from_home_dir )
+  const homedir_config = fs.existsSync(config_from_home_dir_path)
+     ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8"))
+     : {}
+
+  const cfg = Object.assign({ }, config, cfg_api(config), homedir_config, env_config )
 
   const ssh_cmd = (server: string) =>  async (stdin: string, args?: {stdout1: true}): Promise<string> => {
       return run("ssh", {args: [server], stdin, ...args})
@@ -1020,6 +1025,10 @@ const main = async () => {
     return;
   }
 
+  if (args.main_action === "echo-sample-config") {
+    console.log(`TSMONO_CONFIG_JSON=${JSON.stringify(config)}`)
+    return;
+  }
   if (args.main_action === "add") {
     throw new Error("TODO")  }
 
