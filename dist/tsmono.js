@@ -126,17 +126,18 @@ var assert_eql = function (a, b) {
     assert(a.trim() === b.trim(), "assertion " + JSON.stringify(a) + " === " + JSON.stringify(b) + " failed");
 };
 var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, function () {
-    var args, stdout;
+    var args, stdout, stderr;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 args = opts.args || [];
                 info("running", cmd, args, "in", opts.cwd);
                 stdout = "";
+                stderr = "";
                 // duplicate code
                 return [4 /*yield*/, new Promise(function (a, b) {
                         var child = child_process_1.spawn(cmd, args, Object.assign(opts, {
-                            stdio: ["stdin" in opts ? "pipe" : 0, opts.stdout1 ? 1 : "pipe", 2],
+                            stdio: ["stdin" in opts ? "pipe" : 0, opts.stdout1 ? 1 : "pipe", "pipe"],
                         }));
                         if (child.stdin) {
                             if ("stdin" in opts && child.stdin) {
@@ -150,11 +151,13 @@ var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, functi
                         }
                         if (child.stdout)
                             child.stdout.on("data", function (s) { return stdout += s; });
+                        if (child.stderr)
+                            child.stderr.on("data", function (s) { return stderr += s; });
                         child.on("close", function (code, signal) {
-                            var exitcodes = opts.exitcodes || [0];
-                            if (exitcodes.includes(code))
+                            if ((opts.expected_exitcodes || [0]).includes(code))
                                 a();
-                            b(cmd.toString() + " " + args.join(" ").toString() + " failed with code " + code);
+                            else
+                                b(cmd.toString() + " " + args.join(" ").toString() + " failed with code " + code + "\nstdout:\n" + stdout + "\nstderr:\n" + stderr);
                         });
                     })];
             case 1:
@@ -1404,7 +1407,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                                 info(r.path, "ensuring remote setup");
                                 reponame = r.basename;
                                 _a = "";
-                                return [4 /*yield*/, run("git", { exitcodes: [0, 1], args: ("config --get remote." + config_3.gitRemoteLocationName + ".url").split(" "), cwd: r.path })];
+                                return [4 /*yield*/, run("git", { expected_exitcodes: [0, 1], args: ("config --get remote." + config_3.gitRemoteLocationName + ".url").split(" "), cwd: r.path })];
                             case 1:
                                 if (!(_a === (_b.sent()))) return [3 /*break*/, 5];
                                 // local side

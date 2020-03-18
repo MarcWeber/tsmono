@@ -45,14 +45,20 @@ const assert_eql = (a: string, b: string) => {
     assert(a.trim() === b.trim(), `assertion ${JSON.stringify(a)} === ${JSON.stringify(b)} failed`)
 }
 
-const run = async (cmd: string, opts: {args?: string[], stdin?: string, stdout1?: boolean, exitcodes?: number[]} & SpawnOptions) => {
+const run = async (cmd: string, opts: {
+  args?: string[],
+  stdin?: string,
+  stdout1?: boolean,
+  expected_exitcodes?: number[],
+} & SpawnOptions) => {
   const args = opts.args || [];
   info("running", cmd, args, "in", opts.cwd);
   let stdout = ""
+  let stderr = ""
     // duplicate code
   await new Promise((a, b) => {
       const child = spawn(cmd, args, Object.assign( opts, {
-          stdio: [ "stdin" in opts ? "pipe" : 0 , opts.stdout1 ? 1 : "pipe" , 2 ],
+          stdio: [ "stdin" in opts ? "pipe" : 0 , opts.stdout1 ? 1 : "pipe" , "pipe" ],
       }));
 
       if (child.stdin) {
@@ -68,11 +74,12 @@ const run = async (cmd: string, opts: {args?: string[], stdin?: string, stdout1?
 
       if (child.stdout)
         child.stdout.on("data", (s) => stdout += s)
+      if (child.stderr)
+        child.stderr.on("data", (s) => stderr += s)
 
       child.on("close", (code, signal) => {
-          const exitcodes = opts.exitcodes || [ 0 ]
-          if (exitcodes.includes(code)) a()
-          b(`${cmd.toString()} ${args.join(" ").toString()} failed with code ${code}`)
+          if ((opts.expected_exitcodes || [ 0 ]).includes(code)) a()
+          else b(`${cmd.toString()} ${args.join(" ").toString()} failed with code ${code}\nstdout:\n${stdout}\nstderr:\n${stderr}`)
       })
   })
   return stdout
@@ -1222,7 +1229,7 @@ const main = async () => {
       info(r.path, "ensuring remote setup")
         // ensure remote location is there
       const reponame = r.basename
-      if ("" === await run(`git`, {exitcodes: [0, 1], args: `config --get remote.${config.gitRemoteLocationName}.url`.split(" "), cwd: r.path})) {
+      if ("" === await run(`git`, {expected_exitcodes: [0, 1], args: `config --get remote.${config.gitRemoteLocationName}.url`.split(" "), cwd: r.path})) {
           // local side
           await run(`git`, {args: `remote add ${config.gitRemoteLocationName} ${config.server}:${config.bareRepositoriesPath}/${reponame}`.split(" "), cwd: r.path })
 
