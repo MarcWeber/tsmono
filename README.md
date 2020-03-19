@@ -57,9 +57,17 @@ ROADMAP / TODO:
 ===============
 
   [ ] add support turning into npm module
-
+      or use postinstall hooks tu run tsc -p . instead ?
 
   [ ] implement pull-with-dependencies and push-with-dependencies using run_tasks
+       thus make them parallel unless user action is required
+
+      When refactoring eventually implement two different 'push' locations:
+      from loca to ssh location (see --care-about-remote-checkout)
+
+      But also allow to local bare repositories (eg when working one remote
+      checkouts on remote locations so that tsmono_pull/push can be used to pull/push
+      all dependencies as well)
 
   [ ] some tools egnext.js have issues with files being outside of current directory.
       Thus think about finally implementing the tsconfig compile other projects
@@ -77,9 +85,6 @@ ROADMAP / TODO:
 
   [ ] transient dependencies
 
-  [ ] make pull/push jobs run in parallel
-
-  
 
 peer dependecny support
 =======================

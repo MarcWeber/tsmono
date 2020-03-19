@@ -592,7 +592,7 @@ var Repository = /** @class */ (function () {
                     case 0:
                         if (!!fs.existsSync(this.path + "/tsmono.json")) return [3 /*break*/, 3];
                         // only run fyn if package.json exists
-                        info("!! NO tsmono.json found, only trying to run fyn");
+                        info("!! NO tsmono.json found, only trying to install npm packages");
                         if (!(opts.install_npm_packages && fs.existsSync(this.path + "/package.json"))) return [3 /*break*/, 2];
                         info("running " + cfg.npm_install_cmd + " in dependency " + this.path);
                         return [4 /*yield*/, run(cfg.npm_install_cmd[0], { args: cfg.npm_install_cmd.slice(1), cwd: this.path })];
@@ -818,7 +818,7 @@ var Repository = /** @class */ (function () {
                         to_be_installed = fs.readFileSync(this.packagejson_path, "utf8");
                         p_installed = this.packagejson_path + ".installed";
                         installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined;
-                        info("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
+                        info("deciding to run npm_install_cmd in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
                         if (!(installed !== to_be_installed)) return [3 /*break*/, 8];
                         return [4 /*yield*/, run(cfg.npm_install_cmd[0], { args: cfg.npm_install_cmd.slice(1), cwd: this.path })];
                     case 7:
@@ -897,6 +897,7 @@ var sp = parser.addSubparsers({
 var init = sp.addParser("init", { addHelp: true });
 var add = sp.addParser("add", { addHelp: true });
 add.addArgument("args", { nargs: "*" });
+var care_about_remote_checkout = function (x) { return x.addArgument("--care-about-remote-checkout", { help: "on remote site update the checked out repository and make sure they are clean" }); };
 var update = sp.addParser("update", { addHelp: true, description: "This also is default action" });
 update.addArgument("--symlink-node-modules-hack", { action: "storeTrue" });
 update.addArgument("--link-via-root-dirs", { action: "storeTrue", help: "add dependencies by populating root-dirs. See README " });
@@ -919,12 +920,14 @@ commit_all.addArgument("-message", {});
 var push = sp.addParser("push-with-dependencies", { addHelp: true, description: "upload to git repository" });
 push.addArgument("--shell-on-changes", { action: "storeTrue", help: "open shell so that you can commit changes" });
 push.addArgument("--git-push-remote-location-name", { help: "eg origin" });
+care_about_remote_checkout(push);
 push.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}' });
 push.addArgument("--run-remote-command", { help: "remote ssh location to run git pull in user@host:path:cmd" });
 var pull = sp.addParser("pull-with-dependencies", { addHelp: true, description: "pull current directory from remote location with dependencies" });
 pull.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}' });
 pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono update" });
 pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details" });
+care_about_remote_checkout(pull);
 var clean = sp.addParser("is-clean", { addHelp: true, description: "check whether git repositories on local/ remote side are clean" });
 clean.addArgument("--no-local", { help: "don't look at local directories" });
 clean.addArgument("--no-remote", { help: "don't\t look at remote directories" });
@@ -1239,7 +1242,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     info("creating " + p_);
                     fs.mkdirpSync(p_);
                 }
-                return [4 /*yield*/, sc("\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + repo + "\n        repo=" + config_1.repositoriesPath + "/" + repo + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, repo), config_1.bareRepositoriesPath) + "/" + repo + "\n            git push --set-upstream origin master\n          )\n        }\n        ( cd $repo; git push  )\n        ")];
+                return [4 /*yield*/, sc("\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + repo + "\n        repo=" + config_1.repositoriesPath + "/" + repo + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, repo), config_1.bareRepositoriesPath) + "/" + repo + "\n            git push --set-upstream origin master\n          )\n        }\n        " + (args.care_about_remote_checkout ? "( cd $repo; git push  )" : "") + "\n        ")];
             case 15:
                 _x.sent();
                 if (!!fs.existsSync(path.join(p_, ".git/config"))) return [3 /*break*/, 17];
@@ -1418,7 +1421,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                                 // local side
                                 _b.sent();
                                 // remote side
-                                return [4 /*yield*/, run("ssh", { args: [config_3.server], cwd: r.path, stdin: "\n          bare=" + config_3.bareRepositoriesPath + "/" + reponame + "\n          target=" + config_3.repositoriesPath + "/" + reponame + "\n          [ -d \"$bare\" ] || mkdir -p \"$bare\"; ( cd \"$bare\"; git init --bare; )\n          [ -d \"$target\" ] || git clone $bare $target\n          " })
+                                return [4 /*yield*/, run("ssh", { args: [config_3.server], cwd: r.path, stdin: "\n          bare=" + config_3.bareRepositoriesPath + "/" + reponame + "\n          target=" + config_3.repositoriesPath + "/" + reponame + "\n          [ -d \"$bare\" ] || mkdir -p \"$bare\"; ( cd \"$bare\"; git init --bare; )\n          " + (args.care_about_remote_checkout ? "[ -d \"$target\" ] || git clone $bare $target" : "") + "\n          " })
                                     // local side .git/config
                                 ];
                             case 3:
@@ -1439,6 +1442,8 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0:
+                                if (!args.care_about_remote_checkout)
+                                    return [2 /*return*/];
                                 reponame = r.basename;
                                 return [4 /*yield*/, run("ssh", { args: [config_3.server],
                                         cwd: r.path, stdin: "\n          target=" + config_3.repositoriesPath + "/" + reponame + "\n          cd $target\n          git pull\n      " })];

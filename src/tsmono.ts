@@ -526,7 +526,7 @@ class Repository {
 
     if (!fs.existsSync(`${this.path}/tsmono.json`)) {
       // only run fyn if package.json exists
-      info("!! NO tsmono.json found, only trying to run fyn")
+      info("!! NO tsmono.json found, only trying to install npm packages")
       if (opts.install_npm_packages && fs.existsSync(`${this.path}/package.json`)) {
         info(`running ${cfg.npm_install_cmd} in dependency ${this.path}`)
         await run(cfg.npm_install_cmd[0] , {args: cfg.npm_install_cmd.slice(1), cwd: this.path})
@@ -723,7 +723,7 @@ class Repository {
       const to_be_installed = fs.readFileSync(this.packagejson_path, "utf8")
       const p_installed = `${this.packagejson_path}.installed`
       const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined
-      info("deciding to run fyn in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
+      info("deciding to run npm_install_cmd in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
       if (installed !== to_be_installed) {
         await run(cfg.npm_install_cmd[0], {args: cfg.npm_install_cmd.slice(1), cwd: this.path})
       }
@@ -779,6 +779,8 @@ const init   = sp.addParser("init", {addHelp: true})
 const add    = sp.addParser("add", {addHelp: true})
 add.addArgument("args", {nargs: "*"})
 
+const care_about_remote_checkout = (x: ArgumentParser) => x.addArgument("--care-about-remote-checkout", { help: "on remote site update the checked out repository and make sure they are clean"})
+
 const update = sp.addParser("update", {addHelp: true, description: "This also is default action"})
 update.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
 update.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
@@ -806,6 +808,8 @@ commit_all.addArgument("-message", {})
 const push = sp.addParser("push-with-dependencies", {addHelp: true, description: "upload to git repository"})
 push.addArgument("--shell-on-changes", {action: "storeTrue", help: "open shell so that you can commit changes"})
 push.addArgument("--git-push-remote-location-name", { help: "eg origin"})
+care_about_remote_checkout(push)
+
 interface RemoteLocation {
     server: string,
     bareRepositoriesPath: string,
@@ -821,6 +825,7 @@ const pull = sp.addParser("pull-with-dependencies", {addHelp: true, description:
 pull.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
 pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono update"})
 pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details"})
+care_about_remote_checkout(pull)
 
 const clean = sp.addParser("is-clean", {addHelp: true, description: "check whether git repositories on local/ remote side are clean"})
 clean.addArgument("--no-local", { help: "don't look at local directories"})
@@ -1134,7 +1139,7 @@ const main = async () => {
             git push --set-upstream origin master
           )
         }
-        ( cd $repo; git push  )
+        ${ args.care_about_remote_checkout ? `( cd $repo; git push  )` : ""}
         `)
       if (!fs.existsSync(path.join(p_, ".git/config"))) {
         await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${repo}`, p_] })
@@ -1238,7 +1243,7 @@ const main = async () => {
           bare=${config.bareRepositoriesPath}/${reponame}
           target=${config.repositoriesPath}/${reponame}
           [ -d "$bare" ] || mkdir -p "$bare"; ( cd "$bare"; git init --bare; )
-          [ -d "$target" ] || git clone $bare $target
+          ${ args.care_about_remote_checkout ? `[ -d "$target" ] || git clone $bare $target` : ""}
           ` })
 
           // local side .git/config
@@ -1247,6 +1252,7 @@ const main = async () => {
     }
 
     const remote_update = async (r: Repository) => {
+      if (!args.care_about_remote_checkout) return;
       const reponame = r.basename
       await run(`ssh`, {args: [ config.server],
         cwd: r.path, stdin: `
