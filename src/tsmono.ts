@@ -52,6 +52,7 @@ const run = async (cmd: string, opts: {
   expected_exitcodes?: number[],
 } & SpawnOptions) => {
   const args = opts.args || [];
+  console.log("args", args)
   info("running", cmd, args, "in", opts.cwd);
   let stdout = ""
   let stderr = ""
@@ -779,7 +780,7 @@ const init   = sp.addParser("init", {addHelp: true})
 const add    = sp.addParser("add", {addHelp: true})
 add.addArgument("args", {nargs: "*"})
 
-const care_about_remote_checkout = (x: ArgumentParser) => x.addArgument("--care-about-remote-checkout", { help: "on remote site update the checked out repository and make sure they are clean"})
+const care_about_remote_checkout = (x: ArgumentParser) => x.addArgument("--care-about-remote-checkout", { action: "storeTrue", help: "on remote site update the checked out repository and make sure they are clean"})
 
 const update = sp.addParser("update", {addHelp: true, description: "This also is default action"})
 update.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
@@ -1100,19 +1101,24 @@ const main = async () => {
     const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
     const sc = ssh_cmd(config.server)
 
+    let remote_exists = true;
+
     // test remote is git repository
     try {
       await sc(`
       [ -f ${config.repositoriesPath}/${reponame}/.git/config ]
       `, {stdout1: true})
     } catch (e) {
-      info(`remote directory ${config.repositoriesPath}/${reponame}/.git/config does not exit, aborting`)
-      return;
+      info(`remote directory ${config.repositoriesPath}/${reponame}/.git/config does not exit, cannot determine dependencies`)
+      remote_exists = false
     }
 
-    const items = (await sc(`
-          cd ${config.repositoriesPath}/${reponame} && tsmono list-local-dependencies
-    `)).split("\n").filter((x) => /rel-path: /.test( x) ).map((x) => x.slice(11) )
+    const items =
+    remote_exists
+    ? (await sc(`
+            cd ${config.repositoriesPath}/${reponame} && tsmono list-local-dependencies
+      `)).split("\n").filter((x) => /rel-path: /.test( x) ).map((x) => x.slice(11) )
+    : []
 
     info("pulling " + JSON.stringify(items))
 
@@ -1139,7 +1145,7 @@ const main = async () => {
             git push --set-upstream origin master
           )
         }
-        ${ args.care_about_remote_checkout ? `( cd $repo; git push  )` : ""}
+        ${ args.care_about_remote_checkout ? `( cd $repo; git pull  )` : ""}
         `)
       if (!fs.existsSync(path.join(p_, ".git/config"))) {
         await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${repo}`, p_] })
