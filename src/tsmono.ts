@@ -725,7 +725,7 @@ class Repository {
       const p_installed = `${this.packagejson_path}.installed`
       const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined
       info("deciding to run npm_install_cmd in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
-      if (installed !== to_be_installed) {
+      if (installed !== to_be_installed || !fs.existsSync(path.join(this.path, "node_modules")))  {
         await run(cfg.npm_install_cmd[0], {args: cfg.npm_install_cmd.slice(1), cwd: this.path})
       }
       fs.writeFileSync(p_installed, to_be_installed)

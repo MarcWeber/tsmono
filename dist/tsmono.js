@@ -820,7 +820,7 @@ var Repository = /** @class */ (function () {
                         p_installed = this.packagejson_path + ".installed";
                         installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined;
                         info("deciding to run npm_install_cmd in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
-                        if (!(installed !== to_be_installed)) return [3 /*break*/, 8];
+                        if (!(installed !== to_be_installed || !fs.existsSync(path.join(this.path, "node_modules")))) return [3 /*break*/, 8];
                         return [4 /*yield*/, run(cfg.npm_install_cmd[0], { args: cfg.npm_install_cmd.slice(1), cwd: this.path })];
                     case 7:
                         _s.sent();
