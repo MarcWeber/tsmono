@@ -1282,7 +1282,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 info("using local dependencies as reference");
                 repositories = p.repositories({ includeThis: true });
                 config_2 = args.git_remote_config_json ? JSON.parse(args.git_remote_config_json) : undefined;
-                sc_1 = ssh_cmd(config_2.server);
+                sc_1 = function () { return ssh_cmd(config_2.server); };
                 results_2 = [];
                 check_local_1 = function (r) { return function (o) { return __awaiter(void 0, void 0, void 0, function () {
                     var is_clean, clean_before, _a, _b, _c;
@@ -1335,7 +1335,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                                     switch (_b.label) {
                                         case 0:
                                             _a = "";
-                                            return [4 /*yield*/, sc_1("cd " + config_2.repositoriesPath + "/" + r.basename + "; git diff")];
+                                            return [4 /*yield*/, sc_1()("cd " + config_2.repositoriesPath + "/" + r.basename + "; git diff")];
                                         case 1: return [2 /*return*/, (_a === (_b.sent()) ? "clean" : "dirty")];
                                     }
                                 }); }); };
