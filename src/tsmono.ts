@@ -1172,7 +1172,7 @@ const main = async () => {
       const repositories = p.repositories({includeThis: true})
 
       const config: RemoteLocation  = args.git_remote_config_json ? JSON.parse(args.git_remote_config_json) : undefined
-      const sc = ssh_cmd(config.server)
+      const sc = () => ssh_cmd(config.server)
 
       const results: string[] = []
 
@@ -1189,7 +1189,7 @@ const main = async () => {
       }
 
       const check_remote =  (r: Repository): Task => async (o) => {
-       const is_clean = async () => ("" === await sc(`cd ${config.repositoriesPath}/${r.basename}; git diff`) ? "clean" : "dirty")
+       const is_clean = async () => ("" === await sc()(`cd ${config.repositoriesPath}/${r.basename}; git diff`) ? "clean" : "dirty")
        const clean_before = await is_clean()
        if (clean_before === "dirty"  && args.shell) {
           await o.with_user(async () => {
