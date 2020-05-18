@@ -829,8 +829,8 @@ pull.addArgument("--link-to-links", { help: "when --update use --link-to-links s
 care_about_remote_checkout(pull)
 
 const clean = sp.addParser("is-clean", {addHelp: true, description: "check whether git repositories on local/ remote side are clean"})
-clean.addArgument("--no-local", { help: "don't look at local directories"})
-clean.addArgument("--no-remote", { help: "don't\t look at remote directories"})
+clean.addArgument("--no-local", { action: 'storeTrue', help: "don't look at local directories"})
+clean.addArgument("--no-remote", { action: 'storeTrue', help: "don't\t look at remote directories"})
 clean.addArgument("--shell", {action: "storeTrue", help: "if dirty start shell so that you can commit"})
 clean.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
 
@@ -880,7 +880,9 @@ const tslint_hack = async () => {
         "rules": {
             "no-floating-promises": true,
             "no-return-await": true,
-            "await-promise": [true, "PromiseLike"]
+            "await-promise": [true, "PromiseLike"],
+            "max-line-length": false,
+            "variable-name": false
         }
     }
     `, "utf8")

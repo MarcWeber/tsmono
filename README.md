@@ -1,4 +1,5 @@
 tsmono: work with modular repositories as if they were a monorepository
+and sync multiple repositories to a remote location with one command
 =======================================================================
 
 WHY?
@@ -32,13 +33,8 @@ then create bash function like this:
 
 
 ```
-# first run tsc -p . in directory to create dist/tsomon.json
+# recommended way: use the dist/tsmono.json, cause ts-node messes up with target project's configuration
 tsmono(){ NODE_MODULES=$TSMONO/node_modules node $TSMONO/dist/tsmono.js "$@"; }
-```
-
-```
-# or use ts-node
-tsmono_solwer(){ node -r ts-node/register/trasnpile-only $TSMONO/src/tsmono.ts "$@"; }
 ```
 
 Then see tsmono.json example below, run tsmono update and be done.
@@ -55,6 +51,13 @@ or export TSMONO_CONFIG_JSON
 
 ROADMAP / TODO:
 ===============
+
+  [ ] completion for vscode & vim to find libraries nearby ?
+
+  [ ] propagated dependencies
+      I think best is to use functional modular languages.
+
+  [ ] document and test https://nodejs.org/api/cli.html#cli_preserve_symlinks
 
   [ ] add support turning into npm module
       or use postinstall hooks tu run tsc -p . instead ?
@@ -85,8 +88,16 @@ ROADMAP / TODO:
 
   [ ] transient dependencies
 
+  [ ] tslint by eslint cause projects should be merged ?
+      Only consider doing so if missing await floating promises get caught
 
-peer dependecny support
+  [ ]
+      https://github.com/jfgodoy/knex-postgis/issues/35
+      How to handel this cases - automatically add fixes?
+      Yarn has solutions.
+
+
+peer dependency support
 =======================
 
 support peer dependencies, how?
@@ -295,6 +306,10 @@ command line options
   tsmono commit-all
   # for each directory having changes start shell that you can commit
   # use -f -m 'message' to use commit message on all
+
+  tsmono reinstall-with-dependencies [--link-to-links]
+  Maybe --preserve-symlinks not required. Maybe update is enough
+
 
 ```
 

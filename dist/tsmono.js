@@ -930,8 +930,8 @@ pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono 
 pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details" });
 care_about_remote_checkout(pull);
 var clean = sp.addParser("is-clean", { addHelp: true, description: "check whether git repositories on local/ remote side are clean" });
-clean.addArgument("--no-local", { help: "don't look at local directories" });
-clean.addArgument("--no-remote", { help: "don't\t look at remote directories" });
+clean.addArgument("--no-local", { action: 'storeTrue', help: "don't look at local directories" });
+clean.addArgument("--no-remote", { action: 'storeTrue', help: "don't\t look at remote directories" });
 clean.addArgument("--shell", { action: "storeTrue", help: "if dirty start shell so that you can commit" });
 clean.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}' });
 var list_dependencies = sp.addParser("list-local-dependencies", { addHelp: true, description: "list dependencies" });
@@ -970,7 +970,7 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
     return __generator(this, function (_a) {
         // this is biased  but its going to save your ass
         if (!fs.existsSync("tslint.json")) {
-            fs.writeFileSync("tslint.json", "\n    {\n        \"extends\": [\n            \"tslint:recommended\"\n        ],\n        \"rules\": {\n            \"no-floating-promises\": true,\n            \"no-return-await\": true,\n            \"await-promise\": [true, \"PromiseLike\"]\n        }\n    }\n    ", "utf8");
+            fs.writeFileSync("tslint.json", "\n    {\n        \"extends\": [\n            \"tslint:recommended\"\n        ],\n        \"rules\": {\n            \"no-floating-promises\": true,\n            \"no-return-await\": true,\n            \"await-promise\": [true, \"PromiseLike\"],\n            \"max-line-length\": false,\n            \"variable-name\": false\n        }\n    }\n    ", "utf8");
         }
         else {
             j = JSON5.parse(fs.readFileSync("tslint.json", "utf8"));
