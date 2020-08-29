@@ -211,7 +211,11 @@ tsmono.json example file:
   "tsconfig": {
     // if given write a tsconfig.json
     // if tsconfigs is given, this gets merged into tsconfigs
-  }
+  },
+
+  "presets": {
+    react: {},
+  },
 
   "tsconfigs": {
 
@@ -262,6 +266,11 @@ grep/search/replace them
 
 On windows: seems to work without --link-to-links
 
+
+presets
+=======
+Because I am tired of adding some libraries over and over again I introduced presets.
+They add sets of dependencies (I use)..
 
 command line options
 ====================
@@ -438,3 +447,7 @@ alternatives
 ============
 Maybe I have missed the point and there are alternatives ..
 https://classic.yarnpkg.com/en/docs/workspaces/
+
+TROUBLE SHOOTING
+=================
+drop baseUrl (should be "./")

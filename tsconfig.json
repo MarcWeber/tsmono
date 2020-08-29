@@ -6,7 +6,10 @@
     "strict": true,
     "allowSyntheticDefaultImports": true,
     "outDir": "dist",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "lib": [
+      "es2019"
+    ]
   },
   "include": ["src/tsmono.ts"]
 }

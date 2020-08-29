@@ -3,7 +3,7 @@ var __extends = (this && this.__extends) || (function () {
     var extendStatics = function (d, b) {
         extendStatics = Object.setPrototypeOf ||
             ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
         return extendStatics(d, b);
     };
     return function (d, b) {
@@ -22,6 +22,25 @@ var __assign = (this && this.__assign) || function () {
         return t;
     };
     return __assign.apply(this, arguments);
+};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
 };
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -69,15 +88,9 @@ var __spreadArrays = (this && this.__spreadArrays) || function () {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 var argparse_1 = require("argparse");
+var chalk_1 = __importDefault(require("chalk"));
 var debug_1 = __importDefault(require("debug"));
 var fs = __importStar(require("fs-extra"));
 var JSON5 = __importStar(require("json5"));
@@ -91,6 +104,8 @@ var deep_equal_1 = __importDefault(require("deep-equal"));
 var deepmerge_1 = __importDefault(require("deepmerge"));
 var os_1 = require("os");
 var path_1 = require("path");
+var add_types_1 = __importDefault(require("./add-types"));
+var lock_1 = require("./lock");
 // TODO: use path.join everywhere
 var silent = false;
 var info = function () {
@@ -232,6 +247,9 @@ var parse_dependency = function (s, origin) {
         r.url = r.name;
         r.name = path.basename(r.name).replace(/\.git$/, "");
     }
+    if (r.name in add_types_1.default) {
+        r.types = true;
+    } // TODO: add versions constraints
     for (var _i = 0, _a = l.slice(1); _i < _a.length; _i++) {
         var v = _a[_i];
         var x = v.split("=");
@@ -569,13 +587,17 @@ var Repository = /** @class */ (function () {
     Repository.prototype.dependencies = function () {
         var _this = this;
         var to_dependency = function (dep) { return parse_dependency(dep, _this.path); };
+        var presets = function (key) {
+            var c_presets = get_path(_this.tsmonojson.json, "presets", {});
+            return Object.keys(c_presets).map(function (p) { return get_path(presets, p, key, []); }).flat(1);
+        };
         // get dependencies from
         // tsmono.json
         // package.json otherwise
         if (fs.existsSync(this.path + "/tsmono.json")) {
             return {
-                dependencies: __spreadArrays(["tslib"], clone(get_path(this.tsmonojson.json, "dependencies", []))).map(to_dependency),
-                devDependencies: clone(get_path(this.tsmonojson.json, "devDependencies", [])).map(to_dependency),
+                dependencies: unique(__spreadArrays(["tslib"], presets("dependencies"), clone(get_path(this.tsmonojson.json, "dependencies", [])))).map(to_dependency),
+                devDependencies: unique(__spreadArrays(presets("devDependencies"), clone(get_path(this.tsmonojson.json, "devDependencies", [])))).map(to_dependency),
             };
         }
         return {
@@ -674,8 +696,15 @@ var Repository = /** @class */ (function () {
                         }
                         fix_ts_config = function (x) {
                             ensure_path(x, "compilerOptions", {});
-                            if ("paths" in x.compilerOptions && !("baseUrl" in x.compilerOptions))
-                                x.compilerOptions.baseUrl = ".";
+                            if ("paths" in x.compilerOptions) {
+                                if (!("baseUrl" in x.compilerOptions)) {
+                                    x.compilerOptions.baseUrl = ".";
+                                }
+                                else {
+                                    // Is this causing more problems than modules not being found
+                                    throw "please drop baseUrl from your config. cause we have paths e.g. due to referenced dependencies it should be '.'";
+                                }
+                            }
                             // otherwise a lot of imports will not work
                             x.compilerOptions.allowSyntheticDefaultImports = true;
                             x.compilerOptions.esModuleInterop = true;
@@ -981,42 +1010,27 @@ var tslint_hack = function () { return __awaiter(void 0, void 0, void 0, functio
     });
 }); };
 var run_tasks = function (tasks) { return __awaiter(void 0, void 0, void 0, function () {
-    var waiting, with_user;
+    var lock, with_user;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
+                lock = lock_1.createLock({ preventExit: true });
                 with_user = function (run) { return __awaiter(void 0, void 0, void 0, function () {
-                    var r, run_waiting_1;
+                    var release;
                     return __generator(this, function (_a) {
                         switch (_a.label) {
-                            case 0:
-                                if (!(waiting === undefined)) return [3 /*break*/, 2];
-                                // lucky
-                                waiting = [];
-                                return [4 /*yield*/, run()];
+                            case 0: return [4 /*yield*/, lock.aquire_lock()];
                             case 1:
-                                r = _a.sent();
-                                run_waiting_1 = function () {
-                                    if (waiting === undefined) {
-                                        throw new Error("x");
-                                    } // should never hapen
-                                    var next = waiting.shift();
-                                    if (next === undefined) {
-                                        waiting = undefined;
-                                    }
-                                    else {
-                                        next.action().then(next.r);
-                                        run_waiting_1();
-                                    }
-                                };
-                                run_waiting_1();
-                                return [2 /*return*/, r];
-                            case 2: return [2 /*return*/, new Promise(function (r, j) {
-                                    if (waiting === undefined) {
-                                        throw new Error("x");
-                                    } // should never hapen
-                                    waiting.push({ action: run, r: r });
-                                })];
+                                release = _a.sent();
+                                _a.label = 2;
+                            case 2:
+                                _a.trys.push([2, , 4, 5]);
+                                return [4 /*yield*/, run()];
+                            case 3: return [2 /*return*/, _a.sent()];
+                            case 4:
+                                release();
+                                return [7 /*endfinally*/];
+                            case 5: return [2 /*return*/];
                         }
                     });
                 }); };
@@ -1575,4 +1589,7 @@ process.on("unhandledRejection", function (error) {
         console.error(error.message); // the error above does not print the message for whatever reason, so do so
     throw error; // Following best practices re-throw error and let the process exit with error code
 });
-main().then(function () { }, console.log);
+main().then(function () { }, function (e) {
+    console.log(chalk_1.default.red(e));
+    process.exit(1);
+});

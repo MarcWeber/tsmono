@@ -1,4 +1,6 @@
 import { ArgumentParser } from "argparse";
+import chalk from "chalk";
+
 import debug_ from "debug";
 import * as fs from "fs-extra";
 import * as JSON5 from "json5";
@@ -12,6 +14,9 @@ import deepequal from "deep-equal"
 import deepmerge from "deepmerge"
 import {homedir} from "os"
 import { basename, dirname, normalize } from "path";
+import { presets } from "./presets"
+import addTypes from "./add-types"
+import {createLock} from "./lock"
 
 // TODO: use path.join everywhere
 
@@ -174,6 +179,8 @@ const parse_dependency = (s: string, origin?: string): Dependency => {
     r.url = r.name
     r.name = path.basename(r.name).replace(/\.git$/, "")
   }
+
+  if (r.name in addTypes){ r.types = true; } // TODO: add versions constraints
   for (const v of l.slice(1)) {
     let x = v.split("=")
     if (x.length >= 2) {
@@ -497,13 +504,19 @@ class Repository {
     "devDependencies": Dependency[],
   } {
     const to_dependency = (dep: string) => parse_dependency(dep, this.path)
+
+    const presets = (key: "dependencies" | "devDependencies") => {
+        const c_presets = get_path(this.tsmonojson.json, "presets", {})
+        return Object.keys(c_presets).map(p => get_path(presets, p, key, []) as any[] ).flat(1)
+    }
+
     // get dependencies from
     // tsmono.json
     // package.json otherwise
     if (fs.existsSync(`${this.path}/tsmono.json`)) {
       return {
-        dependencies: ["tslib", ...clone(get_path(this.tsmonojson.json, "dependencies", []))].map(to_dependency),
-        devDependencies: clone(get_path(this.tsmonojson.json, "devDependencies", [])).map(to_dependency),
+        dependencies:    unique(["tslib", ...presets("dependencies"),    ...clone(get_path(this.tsmonojson.json,    "dependencies", []))]).map(to_dependency),
+        devDependencies: unique([ ...presets("devDependencies"), ...clone(get_path(this.tsmonojson.json, "devDependencies", []))]).map(to_dependency),
       }
     }
 
@@ -616,8 +629,14 @@ class Repository {
 
     const fix_ts_config = (x: any) => {
       ensure_path(x, "compilerOptions", {})
-      if ("paths" in x.compilerOptions && !("baseUrl" in x.compilerOptions))
-      x.compilerOptions.baseUrl = "."
+      if ("paths" in x.compilerOptions){
+          if (!("baseUrl" in x.compilerOptions)){
+              x.compilerOptions.baseUrl = "."
+          } else {
+              // Is this causing more problems than modules not being found
+              throw "please drop baseUrl from your config. cause we have paths e.g. due to referenced dependencies it should be '.'"
+          }
+      }
 
       // otherwise a lot of imports will not work
       x.compilerOptions.allowSyntheticDefaultImports = true
@@ -916,34 +935,16 @@ interface Wait < R > {r: (r: R) => void, action: () => Promise<R>}
 const run_tasks = async (tasks: TaskDescription[]) => {
     // parallel implementation of running tasks but synchronize when requesting
     // action from user
+    //
+    const lock = createLock({preventExit: true})
 
-    let waiting: undefined | Array<Wait<any>>
     const with_user: WithUser = async (run) => {
-        if (waiting === undefined) {
-            // lucky
-            waiting = []
-            const r = await run()
-
-            const run_waiting = () => {
-              if (waiting === undefined) { throw new Error("x") } // should never hapen
-              const next = waiting.shift()
-              if (next === undefined) {
-                waiting = undefined
-              } else {
-                next.action().then(next.r)
-                run_waiting()
-              }
-            }
-            run_waiting()
-
-            return r
-        } else {
-            return new Promise ((r, j) => {
-              if (waiting === undefined) { throw new Error("x") } // should never hapen
-              waiting.push({ action: run, r })
-            })
+        const release = await lock.aquire_lock()
+        try {
+            return await run()
+        } finally {
+            release();
         }
-
     }
 
     await Promise.all(tasks.map(async (x) => {
@@ -1358,5 +1359,8 @@ process.on("unhandledRejection", (error: any) => {
 
 main().then(
   () => {},
-  console.log,
+  (e) => {
+      console.log(chalk.red(e))
+      process.exit(1)
+  },
 )
