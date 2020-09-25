@@ -91,7 +91,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var argparse_1 = require("argparse");
 var chalk_1 = __importDefault(require("chalk"));
-var debug_1 = __importDefault(require("debug"));
+var debug_1 = __importDefault(require("./debug"));
 var fs = __importStar(require("fs-extra"));
 var JSON5 = __importStar(require("json5"));
 var path = __importStar(require("path"));
@@ -1446,7 +1446,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                                 // local side
                                 _b.sent();
                                 // remote side
-                                return [4 /*yield*/, run("ssh", { args: [config_3.server], cwd: r.path, stdin: "\n          bare=" + config_3.bareRepositoriesPath + "/" + reponame + "\n          target=" + config_3.repositoriesPath + "/" + reponame + "\n          [ -d \"$bare\" ] || mkdir -p \"$bare\"; ( cd \"$bare\"; git init --bare; )\n          " + (args.care_about_remote_checkout ? "[ -d \"$target\" ] || git clone $bare $target" : "") + "\n          " })
+                                return [4 /*yield*/, run("ssh", { args: [config_3.server], cwd: r.path, stdin: "\n          bare=" + config_3.bareRepositoriesPath + "/" + reponame + "\n          target=" + config_3.repositoriesPath + "/" + reponame + "\n          [ -d \"$bare\" ] || mkdir -p \"$bare\"; ( cd \"$bare\"; git init --bare; )\n          " + (args.care_about_remote_checkout ? "[ -d \"$target\" ] || ( git clone $bare $target; cd $target; git config pull.rebase true; )" : "") + "\n          " })
                                     // local side .git/config
                                 ];
                             case 3:

@@ -1,7 +1,6 @@
 import { ArgumentParser } from "argparse";
 import chalk from "chalk";
-
-import debug_ from "debug";
+import debug_ from "./debug";
 import * as fs from "fs-extra";
 import * as JSON5 from "json5";
 import * as path from "path";
@@ -1252,7 +1251,7 @@ const main = async () => {
           bare=${config.bareRepositoriesPath}/${reponame}
           target=${config.repositoriesPath}/${reponame}
           [ -d "$bare" ] || mkdir -p "$bare"; ( cd "$bare"; git init --bare; )
-          ${ args.care_about_remote_checkout ? `[ -d "$target" ] || git clone $bare $target` : ""}
+          ${ args.care_about_remote_checkout ? `[ -d "$target" ] || ( git clone $bare $target; cd $target; git config pull.rebase true; )` : ""}
           ` })
 
           // local side .git/config
