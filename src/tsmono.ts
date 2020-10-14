@@ -16,6 +16,7 @@ import { basename, dirname, normalize } from "path";
 import { presets } from "./presets"
 import addTypes from "./add-types"
 import {createLock} from "./lock"
+import ln from "./library-notes"
 
 // TODO: use path.join everywhere
 
@@ -360,6 +361,10 @@ class DependencyCollection {
 
   public print_warnings(): any {
     for (const [k, v] of Object.entries(this.dependency_locactions)) {
+        if (k in ln){
+            console.log(chalk.magenta(`HINT: ${k} repo: ${v[0].origin} ${ln[k]}`));
+        }
+
       // TODO: check that all v's are same constraints ..
       const npms    = v.filter((x) => x.npm)
       const no_npms = v.filter((x) => !x.npm)

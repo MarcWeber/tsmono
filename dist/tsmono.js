@@ -106,6 +106,7 @@ var os_1 = require("os");
 var path_1 = require("path");
 var add_types_1 = __importDefault(require("./add-types"));
 var lock_1 = require("./lock");
+var library_notes_1 = __importDefault(require("./library-notes"));
 // TODO: use path.join everywhere
 var silent = false;
 var info = function () {
@@ -453,6 +454,9 @@ var DependencyCollection = /** @class */ (function () {
     }
     DependencyCollection.prototype.print_warnings = function () {
         var _loop_1 = function (k, v) {
+            if (k in library_notes_1.default) {
+                console.log(chalk_1.default.magenta("HINT: " + k + " repo: " + v[0].origin + " " + library_notes_1.default[k]));
+            }
             // TODO: check that all v's are same constraints ..
             var npms = v.filter(function (x) { return x.npm; });
             var no_npms = v.filter(function (x) { return !x.npm; });
