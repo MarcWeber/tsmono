@@ -104,9 +104,23 @@ var deep_equal_1 = __importDefault(require("deep-equal"));
 var deepmerge_1 = __importDefault(require("deepmerge"));
 var os_1 = require("os");
 var path_1 = require("path");
-var add_types_1 = __importDefault(require("./add-types"));
 var lock_1 = require("./lock");
 var library_notes_1 = __importDefault(require("./library-notes"));
+var json_file_plus_1 = __importDefault(require("json-file-plus"));
+var patches_1 = require("./patches");
+var readJsonFile = function (path) { return __awaiter(void 0, void 0, void 0, function () {
+    var jf;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0:
+                console.log("reading", path);
+                return [4 /*yield*/, json_file_plus_1.default(path)];
+            case 1:
+                jf = _a.sent();
+                return [2 /*return*/, jf.data];
+        }
+    });
+}); };
 // TODO: use path.join everywhere
 var silent = false;
 var info = function () {
@@ -242,17 +256,18 @@ var config = {
     cacheDir: "~/.tsmono/cache",
 };
 var parse_dependency = function (s, origin) {
+    var _a;
     var l = s.split(";");
     var r = { name: l[0] };
     if (/git\+https/.test(r.name)) {
         r.url = r.name;
         r.name = path.basename(r.name).replace(/\.git$/, "");
     }
-    if (r.name in add_types_1.default) {
+    if ((_a = patches_1.patches[r.name]) === null || _a === void 0 ? void 0 : _a.npm_also_types) {
         r.types = true;
     } // TODO: add versions constraints
-    for (var _i = 0, _a = l.slice(1); _i < _a.length; _i++) {
-        var v = _a[_i];
+    for (var _i = 0, _b = l.slice(1); _i < _b.length; _i++) {
+        var v = _b[_i];
         var x = v.split("=");
         if (x.length >= 2) {
             x = [x[0], x.slice(1).join("=")];
@@ -328,6 +343,7 @@ var backup_file = function (path) {
             fs.renameSync(path, bak);
     }
 };
+// use object-path instead ?
 var get_path = function () {
     var args = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -628,8 +644,8 @@ var Repository = /** @class */ (function () {
                         _s.label = 2;
                     case 2: return [2 /*return*/];
                     case 3:
-                        this_tsmono = this.path + "/tsmono";
-                        link_dir = this_tsmono + "/links";
+                        this_tsmono = this.path + "/src/tsmono";
+                        link_dir = "" + this_tsmono;
                         if (opts.link_to_links) {
                             (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach(function (x) {
                                 fs.unlinkSync(path.join(link_dir, x));
@@ -656,15 +672,19 @@ var Repository = /** @class */ (function () {
                         expected_symlinks = {};
                         expected_tools = {};
                         path_for_tsconfig = function (tsconfig_dir) {
+                            var _a;
                             var r = {};
                             { // always set path
-                                for (var _i = 0, _a = Object.entries(dep_collection.dependency_locactions); _i < _a.length; _i++) {
-                                    var _b = _a[_i], k = _b[0], v = _b[1];
+                                for (var _i = 0, _b = Object.entries(dep_collection.dependency_locactions); _i < _b.length; _i++) {
+                                    var _c = _b[_i], k = _c[0], v = _c[1];
                                     if (v[0].repository) {
                                         // path.absolute path.relative(from,to) ?
-                                        var src = !v[0].ignore_src && fs.existsSync(v[0].repository.path + "/src")
-                                            ? "/src"
-                                            : "";
+                                        var local_subdirectory = (_a = patches_1.patches[v[0].name]) === null || _a === void 0 ? void 0 : _a.local_subdirectory;
+                                        var src = local_subdirectory
+                                            ? local_subdirectory
+                                            : !v[0].ignore_src && fs.existsSync(v[0].repository.path + "/src")
+                                                ? "/src"
+                                                : "";
                                         var resolved = path.resolve(cwd, (!!opts.link_to_links)
                                             ? path.join(link_dir, v[0].name, src)
                                             : path.join(v[0].repository.path, src));
@@ -700,6 +720,20 @@ var Repository = /** @class */ (function () {
                         }
                         fix_ts_config = function (x) {
                             ensure_path(x, "compilerOptions", {});
+                            // some sane defaults uer can overwrite which make most code just work
+                            // If you're not happy with these defaults you can always set the keys to overwrite these
+                            ensure_path(x, "compilerOptions", "esModuleInterop", true); // eg to import m from "mithril"
+                            ensure_path(x, "compilerOptions", "module", "commonjs"); // eg to import m from "mithril"
+                            ensure_path(x, "compilerOptions", "target", "esnext"); // eg to import m from "mithril"
+                            ensure_path(x, "compilerOptions", "strict", true); // eg to import m from "mithril"
+                            ensure_path(x, "compilerOptions", "lib", [
+                                "es5",
+                                "dom",
+                                "es2015.promise",
+                                "es2015.collection",
+                                "es2015.iterable",
+                                "es2019",
+                            ]); // eg to import m from "mithril"
                             if ("paths" in x.compilerOptions) {
                                 if (!("baseUrl" in x.compilerOptions)) {
                                     x.compilerOptions.baseUrl = ".";
@@ -973,6 +1007,9 @@ push.addArgument("--force", { action: "storeTrue", help: "overwrites existing ts
 var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, description: "removes node_modules and reinstalls to match current node version" });
 reinstall.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks" });
 var watch = sp.addParser("watch", { addHelp: true });
+var esbuild_server_client_dev = sp.addParser("esbuild-server-client-dev", { addHelp: true, description: "check whether git repositories on local/ remote side are clean" });
+esbuild_server_client_dev.addArgument("--server-ts-file", { help: "server.ts" });
+esbuild_server_client_dev.addArgument("--web-ts-file", { help: "web client .ts files" });
 var args = parser.parseArgs();
 var dot_git_ignore_hack = function () { return __awaiter(void 0, void 0, void 0, function () {
     var f, lines, to_be_added;
@@ -1072,9 +1109,9 @@ var run_tasks = function (tasks) { return __awaiter(void 0, void 0, void 0, func
     });
 }); };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var hd, cache, config, config_from_home_dir_path, env_config, homedir_config, cfg, ssh_cmd, p, ensure_is_git, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, pwd, package_contents, tsconfig_contents, tsmono_contents, _d, _e, _f, k, v, _g, _h, _j, pack, version, cwd, reponame, config_1, sc, remote_exists, e_1, items, _k, _l, _m, path_, p_, repo, p_2, repositories, config_2, sc_1, results_2, check_local_1, check_remote_1, tasks, _o, results_1, i, p_3, config_3, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _p, _q, rep, force, p_4, _r, _s, r, stdout, p_5, dep_collection, seen, _t, _u, _v, k, v, r, _w, _x, r, package_json_installed;
-    return __generator(this, function (_y) {
-        switch (_y.label) {
+    var hd, cache, config, config_from_home_dir_path, env_config, homedir_config, cfg, ssh_cmd, p, ensure_is_git, update, d, dd, add_1, _i, _a, v, p_1, _b, _c, r, pwd, package_contents, _d, tsconfig_contents, _e, tsmono_contents, _f, _g, _h, k, v, _j, _k, _l, pack, version, cwd, reponame, config_1, sc, remote_exists, e_1, items, _m, _o, _p, path_, p_, repo, p_2, repositories, config_2, sc_1, results_2, check_local_1, check_remote_1, tasks, _q, results_1, i, p_3, config_3, basenames_to_pull, seen, ensure_repo_committed_and_clean_1, ensure_remote_location_setup_1, remote_update_1, push_to_remote_location, _r, _s, rep, force, p_4, _t, _u, r, stdout, p_5, dep_collection, seen, _v, _w, _x, k, v, r, _y, _z, r, package_json_installed, server_ts_1, web_ts_1, processes_1, spawn_1, compile_server_1, compile_web_1, restart_server_1, recompileAndStart_1, timer_1;
+    return __generator(this, function (_0) {
+        switch (_0.label) {
             case 0:
                 hd = os_1.homedir();
                 cache = new DirectoryCache(hd + "/.tsmono/cache");
@@ -1139,19 +1176,19 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 }
                 return [4 /*yield*/, p.add(cfg, d, dd)];
             case 1:
-                _y.sent();
+                _0.sent();
                 return [2 /*return*/];
             case 2:
                 if (!(args.main_action === "update")) return [3 /*break*/, 6];
                 return [4 /*yield*/, update()];
             case 3:
-                _y.sent();
+                _0.sent();
                 return [4 /*yield*/, tslint_hack()];
             case 4:
-                _y.sent();
+                _0.sent();
                 return [4 /*yield*/, dot_git_ignore_hack()];
             case 5:
-                _y.sent();
+                _0.sent();
                 return [2 /*return*/];
             case 6:
                 if (!(args.main_action === "update_using_rootDirs")) return [3 /*break*/, 8];
@@ -1159,7 +1196,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [4 /*yield*/, tslint_hack()];
             case 7:
                 // await update_using_rootDirs();
-                _y.sent();
+                _0.sent();
                 return [2 /*return*/];
             case 8:
                 if (args.main_action === "print-config-path") {
@@ -1190,113 +1227,132 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         console.log("rel-path: ", r.path);
                     }
                 }
-                if (args.main_action === "from-json-files") {
-                    // try creating tsmono from json files
-                    // TODO: test this
-                    if (fs.existsSync("tsmono.json") && !args.force) {
-                        console.log("not overwriting tsmono.json, use --force");
-                        return [2 /*return*/];
-                    }
-                    console.log("pwd", process.cwd());
-                    pwd = process.cwd();
-                    package_contents = fs.existsSync("package.json") ? require(path.join(pwd, "./package.json")) : undefined;
-                    tsconfig_contents = fs.existsSync("tsconfig.json") ? require(path.join(pwd, "./tsconfig.json")) : undefined;
-                    if (package_contents === undefined && tsconfig_contents === undefined) {
-                        console.log("Neither package.json nor tsconfig.json found");
-                        return [2 /*return*/];
-                    }
-                    tsconfig_contents = tsconfig_contents || {};
-                    tsmono_contents = {
-                        package: {},
-                        dependencies: [],
-                        devDependencies: [],
-                        tsconfig: tsconfig_contents || {},
-                    };
-                    // process package.json
-                    for (_d = 0, _e = Object.entries(package_contents || {}); _d < _e.length; _d++) {
-                        _f = _e[_d], k = _f[0], v = _f[1];
-                        if (k === "dependencies" || k === "devDependencies") {
-                            for (_g = 0, _h = Object.entries(v); _g < _h.length; _g++) {
-                                _j = _h[_g], pack = _j[0], version = _j[1];
-                                tsmono_contents[k].push(pack + ";version=" + version);
-                            }
-                        }
-                        else {
-                            tsmono_contents.package[k] = v;
-                        }
-                    }
-                    fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "utf8");
+                if (!(args.main_action === "from-json-files")) return [3 /*break*/, 15];
+                // try creating tsmono from json files
+                // TODO: test this
+                if (fs.existsSync("tsmono.json") && !args.force) {
+                    console.log("not overwriting tsmono.json, use --force");
+                    return [2 /*return*/];
                 }
-                if (!(args.main_action === "pull-with-dependencies")) return [3 /*break*/, 23];
+                console.log("pwd", process.cwd());
+                pwd = process.cwd();
+                if (!fs.existsSync("package.json")) return [3 /*break*/, 10];
+                return [4 /*yield*/, readJsonFile(path.join(pwd, "./package.json"))];
+            case 9:
+                _d = (_0.sent());
+                return [3 /*break*/, 11];
+            case 10:
+                _d = undefined;
+                _0.label = 11;
+            case 11:
+                package_contents = _d;
+                if (!fs.existsSync("tsconfig.json")) return [3 /*break*/, 13];
+                return [4 /*yield*/, readJsonFile(path.join(pwd, "./tsconfig.json"))];
+            case 12:
+                _e = (_0.sent());
+                return [3 /*break*/, 14];
+            case 13:
+                _e = undefined;
+                _0.label = 14;
+            case 14:
+                tsconfig_contents = _e;
+                if (package_contents === undefined && tsconfig_contents === undefined) {
+                    console.log("Neither package.json nor tsconfig.json found");
+                    return [2 /*return*/];
+                }
+                tsconfig_contents = tsconfig_contents || {};
+                tsmono_contents = {
+                    package: {},
+                    dependencies: [],
+                    devDependencies: [],
+                    tsconfig: tsconfig_contents || {},
+                };
+                // process package.json
+                for (_f = 0, _g = Object.entries(package_contents || {}); _f < _g.length; _f++) {
+                    _h = _g[_f], k = _h[0], v = _h[1];
+                    if (k === "dependencies" || k === "devDependencies") {
+                        for (_j = 0, _k = Object.entries(v); _j < _k.length; _j++) {
+                            _l = _k[_j], pack = _l[0], version = _l[1];
+                            tsmono_contents[k].push(pack + ";version=" + version);
+                        }
+                    }
+                    else {
+                        tsmono_contents.package[k] = v;
+                    }
+                }
+                fs.writeFileSync("tsmono.json", JSON.stringify(tsmono_contents, undefined, 2), "utf8");
+                _0.label = 15;
+            case 15:
+                if (!(args.main_action === "pull-with-dependencies")) return [3 /*break*/, 30];
                 cwd = process.cwd();
                 reponame = path.basename(cwd);
                 config_1 = JSON.parse(args.git_remote_config_json);
                 sc = ssh_cmd(config_1.server);
                 remote_exists = true;
-                _y.label = 9;
-            case 9:
-                _y.trys.push([9, 11, , 12]);
+                _0.label = 16;
+            case 16:
+                _0.trys.push([16, 18, , 19]);
                 return [4 /*yield*/, sc("\n      [ -f " + config_1.repositoriesPath + "/" + reponame + "/.git/config ]\n      ", { stdout1: true })];
-            case 10:
-                _y.sent();
-                return [3 /*break*/, 12];
-            case 11:
-                e_1 = _y.sent();
+            case 17:
+                _0.sent();
+                return [3 /*break*/, 19];
+            case 18:
+                e_1 = _0.sent();
                 info("remote directory " + config_1.repositoriesPath + "/" + reponame + "/.git/config does not exit, cannot determine dependencies");
                 remote_exists = false;
-                return [3 /*break*/, 12];
-            case 12:
-                if (!remote_exists) return [3 /*break*/, 14];
+                return [3 /*break*/, 19];
+            case 19:
+                if (!remote_exists) return [3 /*break*/, 21];
                 return [4 /*yield*/, sc("\n            cd " + config_1.repositoriesPath + "/" + reponame + " && tsmono list-local-dependencies\n      ")];
-            case 13:
-                _k = (_y.sent()).split("\n").filter(function (x) { return /rel-path: /.test(x); }).map(function (x) { return x.slice(11); });
-                return [3 /*break*/, 15];
-            case 14:
-                _k = [];
-                _y.label = 15;
-            case 15:
-                items = _k;
+            case 20:
+                _m = (_0.sent()).split("\n").filter(function (x) { return /rel-path: /.test(x); }).map(function (x) { return x.slice(11); });
+                return [3 /*break*/, 22];
+            case 21:
+                _m = [];
+                _0.label = 22;
+            case 22:
+                items = _m;
                 info("pulling " + JSON.stringify(items));
-                _l = 0, _m = [].concat(["../" + reponame]).concat(items);
-                _y.label = 16;
-            case 16:
-                if (!(_l < _m.length)) return [3 /*break*/, 23];
-                path_ = _m[_l];
+                _o = 0, _p = [].concat(["../" + reponame]).concat(items);
+                _0.label = 23;
+            case 23:
+                if (!(_o < _p.length)) return [3 /*break*/, 30];
+                path_ = _p[_o];
                 info("pulling " + path_);
                 p_ = path.join(cwd, path_);
                 repo = path_1.basename(p_);
                 if ((config_1.ignoreWhenPulling || []).includes(repo))
-                    return [3 /*break*/, 22];
+                    return [3 /*break*/, 29];
                 if (!fs.existsSync(p_)) {
                     info("creating " + p_);
                     fs.mkdirpSync(p_);
                 }
                 return [4 /*yield*/, sc("\n        exec 2>&1\n        set -x\n        bare=" + config_1.bareRepositoriesPath + "/" + repo + "\n        repo=" + config_1.repositoriesPath + "/" + repo + "\n        [ -d $bare ] || {\n          mkdir -p $bare; ( cd $bare; git init --bare )\n          ( cd $repo;\n            git remote add origin " + path.relative(path.join(config_1.repositoriesPath, repo), config_1.bareRepositoriesPath) + "/" + repo + "\n            git push --set-upstream origin master\n          )\n        }\n        " + (args.care_about_remote_checkout ? "( cd $repo; git pull  )" : "") + "\n        ")];
-            case 17:
-                _y.sent();
-                if (!!fs.existsSync(path.join(p_, ".git/config"))) return [3 /*break*/, 19];
+            case 24:
+                _0.sent();
+                if (!!fs.existsSync(path.join(p_, ".git/config"))) return [3 /*break*/, 26];
                 return [4 /*yield*/, run("git", { args: ["clone", config_1.server + ":" + config_1.bareRepositoriesPath + "/" + repo, p_] })];
-            case 18:
-                _y.sent();
-                _y.label = 19;
-            case 19:
+            case 25:
+                _0.sent();
+                _0.label = 26;
+            case 26:
                 info("pulling " + p_ + " ..");
                 return [4 /*yield*/, run("git", { args: ["pull"], cwd: p_ })];
-            case 20:
-                _y.sent();
-                if (!(args.update && fs.existsSync(path.join(p_, "tsmono.json")))) return [3 /*break*/, 22];
+            case 27:
+                _0.sent();
+                if (!(args.update && fs.existsSync(path.join(p_, "tsmono.json")))) return [3 /*break*/, 29];
                 p_2 = new Repository(cfg, p_);
                 return [4 /*yield*/, p_2.update(cfg, {
                         link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                     })];
-            case 21:
-                _y.sent();
-                _y.label = 22;
-            case 22:
-                _l++;
-                return [3 /*break*/, 16];
-            case 23:
-                if (!(args.main_action === "is-clean")) return [3 /*break*/, 25];
+            case 28:
+                _0.sent();
+                _0.label = 29;
+            case 29:
+                _o++;
+                return [3 /*break*/, 23];
+            case 30:
+                if (!(args.main_action === "is-clean")) return [3 /*break*/, 32];
                 info("using local dependencies as reference");
                 repositories = p.repositories({ includeThis: true });
                 config_2 = args.git_remote_config_json ? JSON.parse(args.git_remote_config_json) : undefined;
@@ -1392,16 +1448,16 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                     ? repositories.map(function (x) { return ({ task: "remote clean? " + x.path, start: check_remote_1(x) }); })
                     : []));
                 return [4 /*yield*/, run_tasks(tasks)];
-            case 24:
-                _y.sent();
+            case 31:
+                _0.sent();
                 info("=== results ===");
-                for (_o = 0, results_1 = results_2; _o < results_1.length; _o++) {
-                    i = results_1[_o];
+                for (_q = 0, results_1 = results_2; _q < results_1.length; _q++) {
+                    i = results_1[_q];
                     info(i);
                 }
-                _y.label = 25;
-            case 25:
-                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 29];
+                _0.label = 32;
+            case 32:
+                if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 36];
                 p_3 = new Repository(cfg, process.cwd());
                 config_3 = JSON.parse(args.git_remote_config_json);
                 basenames_to_pull = [];
@@ -1512,49 +1568,49 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         }
                     });
                 }); };
-                _p = 0, _q = p_3.repositories({ includeThis: true });
-                _y.label = 26;
-            case 26:
-                if (!(_p < _q.length)) return [3 /*break*/, 29];
-                rep = _q[_p];
-                return [4 /*yield*/, push_to_remote_location(rep)];
-            case 27:
-                _y.sent();
-                _y.label = 28;
-            case 28:
-                _p++;
-                return [3 /*break*/, 26];
-            case 29:
-                if (!(args.main_action === "commit-all")) return [3 /*break*/, 36];
-                force = args.force;
-                p_4 = new Repository(cfg, process.cwd());
-                _r = 0, _s = p_4.repositories();
-                _y.label = 30;
-            case 30:
-                if (!(_r < _s.length)) return [3 /*break*/, 36];
-                r = _s[_r];
-                if (!fs.existsSync(path.join(r.path, ".git"))) return [3 /*break*/, 35];
-                return [4 /*yield*/, run("git", { args: ["diff"], cwd: r.path })];
-            case 31:
-                stdout = _y.sent();
-                if (!(stdout !== "")) return [3 /*break*/, 35];
-                console.log(stdout);
-                if (!force) return [3 /*break*/, 33];
-                return [4 /*yield*/, run("git", { args: ["commit", "-am", args.message], cwd: r.path })];
-            case 32:
-                _y.sent();
-                return [3 /*break*/, 35];
+                _r = 0, _s = p_3.repositories({ includeThis: true });
+                _0.label = 33;
             case 33:
-                console.log(r.path, "has uncommited changes, commit now");
-                return [4 /*yield*/, run(cfg.bin_sh, { cwd: r.path, stdout1: true })];
+                if (!(_r < _s.length)) return [3 /*break*/, 36];
+                rep = _s[_r];
+                return [4 /*yield*/, push_to_remote_location(rep)];
             case 34:
-                _y.sent();
-                _y.label = 35;
+                _0.sent();
+                _0.label = 35;
             case 35:
                 _r++;
-                return [3 /*break*/, 30];
+                return [3 /*break*/, 33];
             case 36:
-                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 38];
+                if (!(args.main_action === "commit-all")) return [3 /*break*/, 43];
+                force = args.force;
+                p_4 = new Repository(cfg, process.cwd());
+                _t = 0, _u = p_4.repositories();
+                _0.label = 37;
+            case 37:
+                if (!(_t < _u.length)) return [3 /*break*/, 43];
+                r = _u[_t];
+                if (!fs.existsSync(path.join(r.path, ".git"))) return [3 /*break*/, 42];
+                return [4 /*yield*/, run("git", { args: ["diff"], cwd: r.path })];
+            case 38:
+                stdout = _0.sent();
+                if (!(stdout !== "")) return [3 /*break*/, 42];
+                console.log(stdout);
+                if (!force) return [3 /*break*/, 40];
+                return [4 /*yield*/, run("git", { args: ["commit", "-am", args.message], cwd: r.path })];
+            case 39:
+                _0.sent();
+                return [3 /*break*/, 42];
+            case 40:
+                console.log(r.path, "has uncommited changes, commit now");
+                return [4 /*yield*/, run(cfg.bin_sh, { cwd: r.path, stdout1: true })];
+            case 41:
+                _0.sent();
+                _0.label = 42;
+            case 42:
+                _t++;
+                return [3 /*break*/, 37];
+            case 43:
+                if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 45];
                 p_5 = new Repository(cfg, process.cwd());
                 dep_collection = new DependencyCollection(cfg, p_5.path, p_5.tsmonojson.dirs());
                 dep_collection.dependencies_of_repository(p_5, true);
@@ -1562,8 +1618,8 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 dep_collection.print_warnings();
                 seen = [] // TODO: why aret there duplicates ?
                 ;
-                for (_t = 0, _u = Object.entries(dep_collection.dependency_locactions); _t < _u.length; _t++) {
-                    _v = _u[_t], k = _v[0], v = _v[1];
+                for (_v = 0, _w = Object.entries(dep_collection.dependency_locactions); _v < _w.length; _v++) {
+                    _x = _w[_v], k = _x[0], v = _x[1];
                     r = v[0].repository;
                     if (r) {
                         if (seen.includes(r.path))
@@ -1571,8 +1627,8 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         seen.push(r.path);
                     }
                 }
-                for (_w = 0, _x = p_5.repositories(); _w < _x.length; _w++) {
-                    r = _x[_w];
+                for (_y = 0, _z = p_5.repositories(); _y < _z.length; _y++) {
+                    r = _z[_y];
                     fs.removeSync(path.join(r.path, "node_modules"));
                     package_json_installed = path.join(r.path, "package.json.installed");
                     if (fs.existsSync(package_json_installed))
@@ -1580,10 +1636,87 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 }
                 return [4 /*yield*/, p_5.update(cfg, { link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                     })];
-            case 37:
-                _y.sent();
-                _y.label = 38;
-            case 38: return [2 /*return*/];
+            case 44:
+                _0.sent();
+                _0.label = 45;
+            case 45:
+                if (args.main_action == "esbuild-server-client-dev") {
+                    server_ts_1 = args.server_ts_file;
+                    web_ts_1 = args.web_ts_file;
+                    processes_1 = {};
+                    process.on('SIGINT', function () { for (var _i = 0, _a = Object.values(processes_1); _i < _a.length; _i++) {
+                        var v = _a[_i];
+                        v.kill();
+                    } process.exit(); });
+                    spawn_1 = function (x, cmd, args, echo) { return new Promise(function (r, j) {
+                        var _a, _b;
+                        var out = "";
+                        if (processes_1[x]) {
+                            console.log('killing');
+                            processes_1[x].kill();
+                        }
+                        var y = child_process_1.spawn(cmd, args, { stdio: [undefined, 'pipe', 1] });
+                        console.log("== " + x + " spawned");
+                        processes_1[x] = y;
+                        (_a = y.stdout) === null || _a === void 0 ? void 0 : _a.on("data", function (s) { out += s; if (echo)
+                            console.log("" + s); });
+                        (_b = y.stderr) === null || _b === void 0 ? void 0 : _b.on("data", function (s) { out += s; if (echo)
+                            console.log("" + s); });
+                        processes_1[x].on("close", function (code, signal) {
+                            if (code == 0)
+                                r();
+                            fs.writeFileSync(x + ".log", out);
+                            console.log("== " + x + " exited with : " + code + " ");
+                            if (!echo)
+                                console.log(out);
+                            if (code == 0)
+                                console.log(chalk_1.default.green(x + " exited gracefully"));
+                            else
+                                console.log(chalk_1.default.red(x + " exited with code " + code));
+                            j("code " + code);
+                        });
+                    }); };
+                    compile_server_1 = function () { return spawn_1("server_ts", 'esbuild', ["--outdir=./dist", "--bundle", "--platform=node", server_ts_1]); };
+                    compile_web_1 = function () { return spawn_1("web_ts", 'esbuild', ["--outdir=./dist", "--bundle", "--sourcemap", web_ts_1]); };
+                    restart_server_1 = function () { return spawn_1("server", 'node', [path.join('dist/', path.basename(server_ts_1).replace(/\.ts/, '.js'))], true); };
+                    recompileAndStart_1 = function () {
+                        compile_web_1().catch(function (e) { });
+                        if (server_ts_1)
+                            compile_server_1().then(function () { return restart_server_1(); }).catch(function (e) { });
+                    };
+                    timer_1 = "wait";
+                    Promise.resolve().then(function () { return __importStar(require('chokidar')); }).then(function (chokidar) {
+                        chokidar.watch('.', {
+                            followSymlinks: true,
+                            ignored: /dist.*|.log/,
+                            // ignored: /(^|[\/\\])\../,
+                            awaitWriteFinish: {
+                                stabilityThreshold: 500,
+                                pollInterval: 100
+                            },
+                        })
+                            .on('ready', function () { timer_1 = undefined; console.log(chalk_1.default.green("chokidar setup")); })
+                            .on('all', function () {
+                            var args = [];
+                            for (var _i = 0; _i < arguments.length; _i++) {
+                                args[_i] = arguments[_i];
+                            }
+                            if (timer_1 == "wait")
+                                return;
+                            if (timer_1)
+                                clearTimeout(timer_1);
+                            timer_1 = setTimeout(function () {
+                                for (var _i = 0, args_1 = args; _i < args_1.length; _i++) {
+                                    var arg = args_1[_i];
+                                    console.log("recompiling cause ", JSON.stringify(args), 'changed');
+                                }
+                                recompileAndStart_1();
+                            }, 50);
+                        });
+                    });
+                    recompileAndStart_1();
+                }
+                return [2 /*return*/];
         }
     });
 }); };

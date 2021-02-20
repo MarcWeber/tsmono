@@ -52,6 +52,12 @@ or export TSMONO_CONFIG_JSON
 ROADMAP / TODO:
 ===============
 
+  [ ] xxhashjs requires webpack.ProvidePlugin({"buffer": ["buffer","Buffer"]})
+      find a way to collect all of this shimming so that it can be used by
+      webpack or other tools automatically.
+
+      Eg wirte shim.json or such merging all shimmings from all packages
+
   [ ] completion for vscode & vim to find libraries nearby ?
 
   [ ] propagated dependencies
@@ -319,7 +325,7 @@ command line options
   tsmono reinstall-with-dependencies [--link-to-links]
   Maybe --preserve-symlinks not required. Maybe update is enough
 
-
+  tsmono esbuild-server-client-dev --server-ts-file src/server.ts --web-ts-file src/web.ts
 ```
 
 Think about this:
@@ -408,22 +414,8 @@ tsc --build .
 Making VSCODE run tsmono update on tsmono.json save:
 ====================================================
 
-Config:
-	- go to settings of VS Code, User, Extensions, Save and Run, on save --->settings.json and 
-	paste this code inside opened file.
-
-```
-"saveAndRun": {
-  "commands": [
-    {
-      "match": "tsmono.json",
-      "cmd": "cd ${fileDirname}; node tsmono update --force",
-      "useShortcut": false,
-      "silent": false
-    }
-  ]
-}
-```
+There is an extension now also providing completion:
+https://mawercer.de/tmp/webkos-0.0.1.vsix
 
 
 # TODO
@@ -451,3 +443,25 @@ https://classic.yarnpkg.com/en/docs/workspaces/
 TROUBLE SHOOTING
 =================
 drop baseUrl (should be "./")
+
+
+NEEDS GLOBAL shimming
+==========================
+TODO
+
+{
+  "needs_globals": {
+      "Buffer": ["buffer", "Buffer"]
+  },
+
+  "dependencies": [
+    "buffer"
+  ]
+
+}
+
+
+related work
+============
+https://rushstack.io/
+lerna

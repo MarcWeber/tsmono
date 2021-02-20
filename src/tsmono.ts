@@ -6,7 +6,7 @@ import * as JSON5 from "json5";
 import * as path from "path";
 const debug = debug_("tsmono")
 import btoa from "btoa"
-import { spawn, SpawnOptions } from "child_process";
+import { spawn, SpawnOptions, ChildProcessWithoutNullStreams, ChildProcess } from "child_process";
 import {fetch} from "cross-fetch"
 // import deepequal from "deep-equal"
 import deepequal from "deep-equal"
@@ -14,9 +14,17 @@ import deepmerge from "deepmerge"
 import {homedir} from "os"
 import { basename, dirname, normalize } from "path";
 import { presets } from "./presets"
-import addTypes from "./add-types"
 import {createLock} from "./lock"
 import ln from "./library-notes"
+import jsonFile from "json-file-plus"
+import { patches } from "./patches"
+
+
+const readJsonFile = async (path: string): Promise<any> => {
+    console.log("reading", path);
+    const jf = await jsonFile(path)
+    return jf.data
+}
 
 // TODO: use path.join everywhere
 
@@ -180,7 +188,9 @@ const parse_dependency = (s: string, origin?: string): Dependency => {
     r.name = path.basename(r.name).replace(/\.git$/, "")
   }
 
-  if (r.name in addTypes){ r.types = true; } // TODO: add versions constraints
+  if (patches[r.name]?.npm_also_types){
+      r.types = true;
+  } // TODO: add versions constraints
   for (const v of l.slice(1)) {
     let x = v.split("=")
     if (x.length >= 2) {
@@ -237,6 +247,7 @@ const backup_file = (path: string)  => {
     }
 }
 
+// use object-path instead ?
 const get_path = (...args: any[]): any => {
   // get_path(obj, path)
   let r = args[0]
@@ -552,8 +563,8 @@ class Repository {
       return
     }
 
-    const this_tsmono = `${this.path}/tsmono`
-    const link_dir: string = `${this_tsmono}/links`;
+    const this_tsmono = `${this.path}/src/tsmono`
+    const link_dir: string = `${this_tsmono}`; // /links
 
     if (opts.link_to_links) {
       (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach((x: string) => {
@@ -588,10 +599,13 @@ class Repository {
           if ( v[0].repository) {
             // path.absolute path.relative(from,to) ?
 
-            const src =
-              !v[0].ignore_src && fs.existsSync(`${v[0].repository.path}/src`)
-              ? "/src"
-              : ""
+            const local_subdirectory = patches[v[0].name]?.local_subdirectory
+            let src =
+              local_subdirectory 
+              ? local_subdirectory
+              :   !v[0].ignore_src && fs.existsSync(`${v[0].repository.path}/src`)
+                  ? "/src"
+                  : "";
 
             const resolved = path.resolve(cwd,
               (!!opts.link_to_links)
@@ -633,6 +647,22 @@ class Repository {
 
     const fix_ts_config = (x: any) => {
       ensure_path(x, "compilerOptions", {})
+
+      // some sane defaults uer can overwrite which make most code just work
+      // If you're not happy with these defaults you can always set the keys to overwrite these
+      ensure_path(x, "compilerOptions", "esModuleInterop", true) // eg to import m from "mithril"
+      ensure_path(x, "compilerOptions", "module", "commonjs") // eg to import m from "mithril"
+      ensure_path(x, "compilerOptions", "target", "esnext") // eg to import m from "mithril"
+      ensure_path(x, "compilerOptions", "strict", true) // eg to import m from "mithril"
+      ensure_path(x, "compilerOptions", "lib", [
+            "es5",
+            "dom",
+            "es2015.promise",
+            "es2015.collection",
+            "es2015.iterable",
+            "es2019", // [].flat()
+      ]) // eg to import m from "mithril"
+
       if ("paths" in x.compilerOptions){
           if (!("baseUrl" in x.compilerOptions)){
               x.compilerOptions.baseUrl = "."
@@ -741,8 +771,6 @@ class Repository {
 
     if (opts.install_npm_packages) {
       debug("install_npm_packages");
-
-      // 2²
 
       const to_be_installed = fs.readFileSync(this.packagejson_path, "utf8")
       const p_installed = `${this.packagejson_path}.installed`
@@ -866,6 +894,11 @@ const reinstall = sp.addParser("reinstall-with-dependencies", {addHelp: true, de
 reinstall.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
 
 const watch  = sp.addParser("watch", {addHelp: true})
+
+
+const esbuild_server_client_dev = sp.addParser("esbuild-server-client-dev", {addHelp: true, description: "check whether git repositories on local/ remote side are clean"})
+esbuild_server_client_dev.addArgument("--server-ts-file", { help: "server.ts"})
+esbuild_server_client_dev.addArgument("--web-ts-file", { help: "web client .ts files"})
 
 const args = parser.parseArgs();
 
@@ -1071,8 +1104,9 @@ const main = async () => {
 
       console.log("pwd", process.cwd())
       const pwd = process.cwd()
-      const package_contents = fs.existsSync("package.json") ? require(path.join(pwd, "./package.json"))  : undefined;
-      let tsconfig_contents = fs.existsSync("tsconfig.json") ? require(path.join(pwd, "./tsconfig.json")) : undefined;
+
+      const package_contents = fs.existsSync("package.json") ? (await readJsonFile(path.join(pwd, "./package.json")))  : undefined;
+      let tsconfig_contents = fs.existsSync("tsconfig.json") ? (await readJsonFile(path.join(pwd, "./tsconfig.json"))) : undefined;
 
       if (package_contents === undefined && tsconfig_contents === undefined) {
           console.log("Neither package.json nor tsconfig.json found");
@@ -1348,6 +1382,73 @@ const main = async () => {
         // , update_cmd: {executable: "npm", args: ["i"]}
     })
   }
+
+
+    if (args.main_action == "esbuild-server-client-dev"){
+        const server_ts = args.server_ts_file
+        const web_ts = args.web_ts_file
+
+
+        const processes: {[key:string]: ChildProcess} = {}
+        process.on('SIGINT', function() { for (let v of Object.values(processes)) v.kill(); process.exit(); });
+
+        const spawn_ = (x: "server_ts"| "web_ts"|"server", cmd: string, args: string[], echo?:true) =>  new Promise((r,j) => {
+            let out = ""
+            if (processes[x])  { console.log('killing'); processes[x].kill() }
+            const y =spawn(cmd, args, { stdio: [ undefined, 'pipe', 1] })
+            console.log(`== ${x} spawned`);
+            processes[x] = y
+
+            y.stdout?.on("data", (s) => { out += s; if (echo) console.log(""+s);})
+            y.stderr?.on("data", (s) => { out += s; if (echo) console.log(""+s);})
+
+            processes[x].on("close", (code, signal) => {
+                  if (code == 0) r();
+                  fs.writeFileSync(`${x}.log`, out)
+                  console.log(`== ${x} exited with : ${code} `);
+                  if (!echo) console.log(out);
+                  if (code == 0)
+                    console.log(chalk.green(`${x} exited gracefully`));
+                   else
+                    console.log(chalk.red(`${x} exited with code ${code}`));
+                  j(`code ${code}`)
+            })
+        })
+
+        const compile_server = () => spawn_("server_ts", 'esbuild', [ "--outdir=./dist", "--bundle", `--platform=node`, server_ts])
+        const compile_web = () => spawn_("web_ts", 'esbuild', [ "--outdir=./dist", "--bundle", `--sourcemap`, web_ts])
+        const restart_server = () => spawn_("server", 'node', [path.join('dist/', path.basename(server_ts).replace(/\.ts/,'.js') )], true)
+
+        const recompileAndStart = () => {
+            compile_web().catch(e => {})
+            if (server_ts) compile_server().then(() => restart_server()).catch(e => {});
+        }
+
+        let timer: any = "wait"
+
+        import('chokidar').then((chokidar) => {
+        chokidar.watch('.', {
+            followSymlinks: true,
+            ignored: /dist.*|.log/,
+            // ignored: /(^|[\/\\])\../,
+            awaitWriteFinish: {
+                stabilityThreshold: 500,
+                pollInterval: 100
+            },
+        })
+        .on('ready', () => { timer = undefined; console.log(chalk.green(`chokidar setup`)); })
+        .on('all', (...args) => {
+            if (timer == "wait") return;
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+            for (let arg of args) {
+                console.log("recompiling cause ", JSON.stringify(args), 'changed');
+            }
+                recompileAndStart();
+            }, 50)
+        }); })
+        recompileAndStart()
+    }
 
   // default action is update - does not work due to argparse (TOOD, there is no reqired: false for addSubparsers)
   // await update()
