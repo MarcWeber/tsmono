@@ -105,7 +105,6 @@ var deepmerge_1 = __importDefault(require("deepmerge"));
 var os_1 = require("os");
 var path_1 = require("path");
 var lock_1 = require("./lock");
-var library_notes_1 = __importDefault(require("./library-notes"));
 var json_file_plus_1 = __importDefault(require("json-file-plus"));
 var patches_1 = require("./patches");
 var readJsonFile = function (path) { return __awaiter(void 0, void 0, void 0, function () {
@@ -469,9 +468,11 @@ var DependencyCollection = /** @class */ (function () {
         this.recursed = [];
     }
     DependencyCollection.prototype.print_warnings = function () {
+        var _a;
         var _loop_1 = function (k, v) {
-            if (k in library_notes_1.default) {
-                console.log(chalk_1.default.magenta("HINT: " + k + " repo: " + v[0].origin + " " + library_notes_1.default[k]));
+            var notes = (_a = patches_1.patches[k]) === null || _a === void 0 ? void 0 : _a.notes;
+            if (notes) {
+                console.log(chalk_1.default.magenta("HINT: " + k + " repo: " + v[0].origin + " " + notes.join("\n")));
             }
             // TODO: check that all v's are same constraints ..
             var npms = v.filter(function (x) { return x.npm; });
@@ -515,8 +516,8 @@ var DependencyCollection = /** @class */ (function () {
             }
         };
         var this_1 = this;
-        for (var _i = 0, _a = Object.entries(this.dependency_locactions); _i < _a.length; _i++) {
-            var _b = _a[_i], k = _b[0], v = _b[1];
+        for (var _i = 0, _b = Object.entries(this.dependency_locactions); _i < _b.length; _i++) {
+            var _c = _b[_i], k = _c[0], v = _c[1];
             _loop_1(k, v);
         }
     };

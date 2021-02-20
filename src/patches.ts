@@ -1,6 +1,7 @@
 export type Patch = {
     local_subdirectory?: string, // use this subdirectory when referencing
-    npm_also_types?: true // also insall types
+    npm_also_types?: true, // also insall types
+    notes?: string[]
 }
 
 export const patches: {[key:string]: Patch} = {
@@ -14,6 +15,7 @@ export const patches: {[key:string]: Patch} = {
     "react-router-dom": {npm_also_types:true},
 
     "moment": {npm_also_types:true},
+    "momentjs": {notes: [`I'ts recommended to switch to alternatives for new projects only because it is not COW. https://momentjs.com/docs/#/-project-status/future/ - if in doubt try day.js for size reasons`]},
     "bluebird": {npm_also_types:true},
     "express": {npm_also_types:true},
     "deep-equal": {npm_also_types:true},

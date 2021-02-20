@@ -15,7 +15,6 @@ import {homedir} from "os"
 import { basename, dirname, normalize } from "path";
 import { presets } from "./presets"
 import {createLock} from "./lock"
-import ln from "./library-notes"
 import jsonFile from "json-file-plus"
 import { patches } from "./patches"
 
@@ -372,8 +371,9 @@ class DependencyCollection {
 
   public print_warnings(): any {
     for (const [k, v] of Object.entries(this.dependency_locactions)) {
-        if (k in ln){
-            console.log(chalk.magenta(`HINT: ${k} repo: ${v[0].origin} ${ln[k]}`));
+        const notes = patches[k]?.notes
+        if (notes){
+            console.log(chalk.magenta(`HINT: ${k} repo: ${v[0].origin} ${notes.join("\n")}`));
         }
 
       // TODO: check that all v's are same constraints ..
