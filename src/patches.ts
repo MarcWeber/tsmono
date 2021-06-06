@@ -28,5 +28,7 @@ export const patches: {[key:string]: Patch} = {
     "webpack-dev-middleware": {npm_also_types:true},
     "webpack-merge": {npm_also_types:true},
     "mithril": {npm_also_types:true},
-    "puppeteer": {npm_also_types: true}
+    "puppeteer": {npm_also_types: true},
+
+    "fs-extra": {npm_also_types: true}
 }
