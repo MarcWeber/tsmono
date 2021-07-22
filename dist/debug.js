@@ -1,10 +1,8 @@
 "use strict";
-var __spreadArrays = (this && this.__spreadArrays) || function () {
-    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-    for (var r = Array(s), k = 0, i = 0; i < il; i++)
-        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
-            r[k] = a[j];
-    return r;
+var __spreadArray = (this && this.__spreadArray) || function (to, from) {
+    for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
+        to[j] = from[i];
+    return to;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.debug_help = exports.debug = void 0;
@@ -12,8 +10,9 @@ exports.debug_help = exports.debug = void 0;
 // @ts-ignore
 exports.debug = (process.env['DEBUG'] || "").split(':');
 var do_debug_help = exports.debug.length > 0 && !exports.debug.includes('hide-help');
-exports.debug_help = function (msg) { if (do_debug_help)
+var debug_help = function (msg) { if (do_debug_help)
     console.log(msg); };
+exports.debug_help = debug_help;
 exports.debug_help("env DEBUG found");
 exports.debug_help("export DEBUG='no-help' to avoid this message");
 exports.debug_help("export DEBUG='moduleA:moduleB' to show debug messages of moduleA and moduleB");
@@ -30,7 +29,7 @@ exports.default = (function (module) {
                 args[_i] = arguments[_i];
             }
             // TODO: use stderr
-            console.log.apply(console, __spreadArrays(["DEBUG:", module], args));
+            console.log.apply(console, __spreadArray(["DEBUG:", module], args));
         }
         : function () { };
     // @ts-ignore

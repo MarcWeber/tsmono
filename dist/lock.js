@@ -3,7 +3,7 @@
 // const bathroom_lock = something_to_be_locked({preventExit:true})
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createLock = void 0;
-exports.createLock = function (_a) {
+var createLock = function (_a) {
     var preventExit = _a.preventExit;
     var locked = false;
     var waiting_list = [];
@@ -43,3 +43,4 @@ exports.createLock = function (_a) {
         }
     };
 };
+exports.createLock = createLock;

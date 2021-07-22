@@ -7,6 +7,8 @@ var __extends = (this && this.__extends) || (function () {
         return extendStatics(d, b);
     };
     return function (d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
         extendStatics(d, b);
         function __() { this.constructor = d; }
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
@@ -78,12 +80,10 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __spreadArrays = (this && this.__spreadArrays) || function () {
-    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-    for (var r = Array(s), k = 0, i = 0; i < il; i++)
-        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
-            r[k] = a[j];
-    return r;
+var __spreadArray = (this && this.__spreadArray) || function (to, from) {
+    for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
+        to[j] = from[i];
+    return to;
 };
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -185,7 +185,7 @@ var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, functi
                             child.stderr.on("data", function (s) { return stderr += s; });
                         child.on("close", function (code, signal) {
                             if ((opts.expected_exitcodes || [0]).includes(code))
-                                a();
+                                a(undefined);
                             else
                                 b(cmd.toString() + " " + args.join(" ").toString() + " failed with code " + code + "\nstdout:\n" + stdout + "\nstderr:\n" + stderr);
                         });
@@ -400,7 +400,7 @@ var JSONFile = /** @class */ (function () {
         if (fs.existsSync(this.path)) {
             var s = fs.readFileSync(this.path, "utf8");
             try {
-                this.json_on_disc = JSON5.parse(s);
+                // this.json_on_disc  = JSON5.parse(s);
             }
             catch (e) {
                 throw new Error("syntax error " + e + " in " + this.path + ", contents " + s);
@@ -504,13 +504,13 @@ var DependencyCollection = /** @class */ (function () {
                         versions.push(f(dep.version));
                     }
                 }
-                all_versions = __spreadArrays(all_versions, versions);
+                all_versions = __spreadArray(__spreadArray([], all_versions), versions);
                 return { dep: dep, versions: versions };
             }).filter(function (x) { return x.versions.length > 0; });
             if (unique(all_versions).length > 1) {
                 warning("WARNING: " + this_1.origin + " transient dependencies " + k + " with competing versions found:");
-                for (var _i = 0, with_version_1 = with_version; _i < with_version_1.length; _i++) {
-                    var v_1 = with_version_1[_i];
+                for (var _d = 0, with_version_1 = with_version; _d < with_version_1.length; _d++) {
+                    var v_1 = with_version_1[_d];
                     warning(v_1.dep.origin, v_1.versions);
                 }
             }
@@ -527,8 +527,8 @@ var DependencyCollection = /** @class */ (function () {
         var deps = r.dependencies();
         var add = function (key, filter) {
             if (filter === void 0) { filter = function (x) { return true; }; }
-            _this.todo = __spreadArrays(_this.todo, deps[key]);
-            _this[key] = __spreadArrays(_this[key], deps[key].map(function (x) { return x.name; }).filter(filter));
+            _this.todo = __spreadArray(__spreadArray([], _this.todo), deps[key]);
+            _this[key] = __spreadArray(__spreadArray([], _this[key]), deps[key].map(function (x) { return x.name; }).filter(filter));
         };
         add("dependencies");
         if (dev === true || dev === "dev-types")
@@ -617,8 +617,8 @@ var Repository = /** @class */ (function () {
         // package.json otherwise
         if (fs.existsSync(this.path + "/tsmono.json")) {
             return {
-                dependencies: unique(__spreadArrays(["tslib"], presets("dependencies"), clone(get_path(this.tsmonojson.json, "dependencies", [])))).map(to_dependency),
-                devDependencies: unique(__spreadArrays(presets("devDependencies"), clone(get_path(this.tsmonojson.json, "devDependencies", [])))).map(to_dependency),
+                dependencies: unique(__spreadArray(__spreadArray(["tslib"], presets("dependencies")), clone(get_path(this.tsmonojson.json, "dependencies", [])))).map(to_dependency),
+                devDependencies: unique(__spreadArray(__spreadArray([], presets("devDependencies")), clone(get_path(this.tsmonojson.json, "devDependencies", [])))).map(to_dependency),
             };
         }
         return {
@@ -733,7 +733,7 @@ var Repository = /** @class */ (function () {
                                 "es2015.promise",
                                 "es2015.collection",
                                 "es2015.iterable",
-                                "es2019",
+                                "es2019", // [].flat()
                             ]); // eg to import m from "mithril"
                             if ("paths" in x.compilerOptions) {
                                 if (!("baseUrl" in x.compilerOptions)) {
@@ -941,8 +941,8 @@ var Repository = /** @class */ (function () {
                         // TODO: check prefix "auto" etc to keep unique or overwrite
                         this.init();
                         j = this.tsmonojson.json;
-                        j.dependencies = __spreadArrays(j.dependencies, dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
-                        j.devDependencies = __spreadArrays(j.devDependencies, devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
+                        j.dependencies = __spreadArray(__spreadArray([], j.dependencies), dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
+                        j.devDependencies = __spreadArray(__spreadArray([], j.devDependencies), devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
                         return [4 /*yield*/, this.update(cfg, { link_to_links: true, install_npm_packages: true })];
                     case 1:
                         _a.sent();
@@ -1028,10 +1028,10 @@ var dot_git_ignore_hack = function () { return __awaiter(void 0, void 0, void 0,
             "/package.json.installed",
             "/package.json.protect",
             "/package.json",
-            "/tsconfig.json",
+            "/tsconfig.json", // derived by tsmono, contains local setup paths
         ].filter(function (a) { return !lines.find(function (x) { return x.startsWith(a); }); });
         if (to_be_added.length > 0) {
-            fs.writeFileSync(f, __spreadArrays(lines, to_be_added).join("\n"), "utf8");
+            fs.writeFileSync(f, __spreadArray(__spreadArray([], lines), to_be_added).join("\n"), "utf8");
         }
         return [2 /*return*/];
     });
@@ -1345,6 +1345,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 p_2 = new Repository(cfg, p_);
                 return [4 /*yield*/, p_2.update(cfg, {
                         link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
+                        // , update_cmd: {executable: "npm", args: ["i"]}
                     })];
             case 28:
                 _0.sent();
@@ -1443,9 +1444,9 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         }
                     });
                 }); }; };
-                tasks = __spreadArrays(((!args.no_local)
+                tasks = __spreadArray(__spreadArray([], ((!args.no_local)
                     ? repositories.map(function (x) { return ({ task: "local clean? " + x.path, start: check_local_1(x) }); })
-                    : []), ((!args.no_remote)
+                    : [])), ((!args.no_remote)
                     ? repositories.map(function (x) { return ({ task: "remote clean? " + x.path, start: check_remote_1(x) }); })
                     : []));
                 return [4 /*yield*/, run_tasks(tasks)];
@@ -1636,6 +1637,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         fs.removeSync(package_json_installed);
                 }
                 return [4 /*yield*/, p_5.update(cfg, { link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
+                        // , update_cmd: {executable: "npm", args: ["i"]}
                     })];
             case 44:
                 _0.sent();
@@ -1665,7 +1667,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                             console.log("" + s); });
                         processes_1[x].on("close", function (code, signal) {
                             if (code == 0)
-                                r();
+                                r(undefined);
                             fs.writeFileSync(x + ".log", out);
                             console.log("== " + x + " exited with : " + code + " ");
                             if (!echo)

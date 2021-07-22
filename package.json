@@ -2,7 +2,8 @@
   "name": "tsmono",
   "version": "0.0.1",
   "scripts": {
-    "build": "rimraf dist && tsc"
+    "build": "rimraf dist && tsc",
+    "build_esbuild": "esbuild --outdir=dist --platform=node --bundle --target=node14 src/tsmono.ts"
   },
   "keywords": [
     "monorepo",
@@ -29,7 +30,7 @@
     "debug": "^4.1.1",
     "fs-extra": "^7.0.1",
     "json-file-plus": "^3.3.1",
-    "json5": "^2.1.0",
+    "json5": "^2.2.0",
     "ts-node": "^8.0.3",
     "typescript": "^3.3.4000"
   },

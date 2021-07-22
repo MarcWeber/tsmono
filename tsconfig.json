@@ -2,14 +2,11 @@
   "compilerOptions": {
     "target": "es5",
     "module": "commonjs",
-    "lib": ["es2018", "dom", "es2017", "es2015"],
     "strict": true,
     "allowSyntheticDefaultImports": true,
     "outDir": "dist",
     "esModuleInterop": true,
-    "lib": [
-      "es2019"
-    ]
+    "lib": ["es2018", "dom", "es2017", "es2015", "es2019" ]
   },
   "include": ["src/tsmono.ts"]
 }

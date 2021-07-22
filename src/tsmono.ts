@@ -91,7 +91,7 @@ const run = async (cmd: string, opts: {
         child.stderr.on("data", (s) => stderr += s)
 
       child.on("close", (code, signal) => {
-          if ((opts.expected_exitcodes || [ 0 ]).includes(code)) a()
+          if ((opts.expected_exitcodes || [ 0 ]).includes(code)) a(undefined)
           else b(`${cmd.toString()} ${args.join(" ").toString()} failed with code ${code}\nstdout:\n${stdout}\nstderr:\n${stderr}`)
       })
   })
@@ -295,7 +295,7 @@ class JSONFile {
     if (fs.existsSync(this.path)) {
       const s = fs.readFileSync(this.path, "utf8")
       try {
-        this.json_on_disc  = JSON5.parse(s);
+        // this.json_on_disc  = JSON5.parse(s);
       } catch (e) {
         throw new Error(`syntax error ${e} in ${this.path}, contents ${s}`)
       }
@@ -1403,7 +1403,7 @@ const main = async () => {
             y.stderr?.on("data", (s) => { out += s; if (echo) console.log(""+s);})
 
             processes[x].on("close", (code, signal) => {
-                  if (code == 0) r();
+                  if (code == 0) r(undefined);
                   fs.writeFileSync(`${x}.log`, out)
                   console.log(`== ${x} exited with : ${code} `);
                   if (!echo) console.log(out);
