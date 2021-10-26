@@ -250,9 +250,10 @@ dep:
   "git+https//.....:name=bar" -> name is optional, fetch from github
 
   flags:
+  ;npm -> force from npm even if there is local repository
   ;types -> when installing from npm try to fetch types also
   ;version=^1.3 - npm version
-
+  ;package.json=src/sub/package.json;package.json=src/sub2/package.json; -> get dependencies from multiplpe package.json files eg vite
 
   TODO:
   ;reference_by_references -> add to "references" section so that it gets recomplied by TS

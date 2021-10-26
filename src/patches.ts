@@ -1,13 +1,15 @@
 export type Patch = {
-    local_subdirectory?: string, // use this subdirectory when referencing
+    srcdir?: string, // use this subdirectory when referencing
+    package_jsons?: string[],
     npm_also_types?: true, // also insall types
-    notes?: string[]
+    notes?: string[],
+    allDevDependencies?: true
 }
 
 export const patches: {[key:string]: Patch} = {
     // ts-tream from npm didn't know how to import the transformer batcher thus using source
     "ts-stream": {
-        "local_subdirectory": "src/lib"
+        srcdir: "src/lib"
     },
 
     "react": {npm_also_types:true},
@@ -17,7 +19,6 @@ export const patches: {[key:string]: Patch} = {
     "moment": {npm_also_types:true},
     "momentjs": {notes: [`I'ts recommended to switch to alternatives for new projects only because it is not COW. https://momentjs.com/docs/#/-project-status/future/ - if in doubt try day.js for size reasons`]},
     "bluebird": {npm_also_types:true},
-    "express": {npm_also_types:true},
     "deep-equal": {npm_also_types:true},
     "chalk": {npm_also_types:true},
     "axios": {npm_also_types:true},
@@ -30,5 +31,28 @@ export const patches: {[key:string]: Patch} = {
     "mithril": {npm_also_types:true},
     "puppeteer": {npm_also_types: true},
 
-    "fs-extra": {npm_also_types: true}
+    "fs-extra": {npm_also_types: true},
+
+    "express": {npm_also_types:true},
+    "express-promise-router": { npm_also_types: true },
+    "express-session": { npm_also_types: true },
+    "express-rate-limit": { npm_also_types: true },
+
+    "hyper": { npm_also_types: true },
+
+    "common-tags": { npm_also_types: true },
+    "cors": { npm_also_types: true },
+    "morgan": { npm_also_types: true },
+    "imagemin-webp": { npm_also_types: true },
+    "image-size": { npm_also_types: true },
+    "send": { npm_also_types: true },
+
+    "pg": { npm_also_types: true },
+
+    "vite": {
+        srcdir: 'packages/vite/src/node',
+        // package_jsons: ['package.json', 'packages/vite/package.json', 'packages/playground/ssr-react/package.json'],
+        allDevDependencies: true
+    },
+
 }

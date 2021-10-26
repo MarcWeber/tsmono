@@ -80,10 +80,14 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __spreadArray = (this && this.__spreadArray) || function (to, from) {
-    for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
-        to[j] = from[i];
-    return to;
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
 };
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -95,7 +99,7 @@ var debug_1 = __importDefault(require("./debug"));
 var fs = __importStar(require("fs-extra"));
 var JSON5 = __importStar(require("json5"));
 var path = __importStar(require("path"));
-var debug = debug_1.default("tsmono");
+var debug = (0, debug_1.default)("tsmono");
 var btoa_1 = __importDefault(require("btoa"));
 var child_process_1 = require("child_process");
 var cross_fetch_1 = require("cross-fetch");
@@ -113,7 +117,7 @@ var readJsonFile = function (path) { return __awaiter(void 0, void 0, void 0, fu
         switch (_a.label) {
             case 0:
                 console.log("reading", path);
-                return [4 /*yield*/, json_file_plus_1.default(path)];
+                return [4 /*yield*/, (0, json_file_plus_1.default)(path)];
             case 1:
                 jf = _a.sent();
                 return [2 /*return*/, jf.data];
@@ -166,7 +170,7 @@ var run = function (cmd, opts) { return __awaiter(void 0, void 0, void 0, functi
                 stderr = "";
                 // duplicate code
                 return [4 /*yield*/, new Promise(function (a, b) {
-                        var child = child_process_1.spawn(cmd, args, Object.assign(opts, {
+                        var child = (0, child_process_1.spawn)(cmd, args, Object.assign(opts, {
                             stdio: ["stdin" in opts ? "pipe" : 0, opts.stdout1 ? 1 : "pipe", "pipe"],
                         }));
                         if (child.stdin) {
@@ -233,7 +237,7 @@ var DirectoryCache = /** @class */ (function () {
         return new Date().getTime();
     };
     DirectoryCache.prototype.path_ = function (key) {
-        return path.join(this.path, btoa_1.default(key));
+        return path.join(this.path, (0, btoa_1.default)(key));
     };
     DirectoryCache.prototype.get_ = function (key, ttl) {
         var p = this.path_(key);
@@ -274,6 +278,12 @@ var parse_dependency = function (s, origin) {
                 r.version = x[1];
             else if (x[0] === "name")
                 r.name = x[1];
+            else if (x[0] === "srcdir")
+                r.srcdir = x[1];
+            else if (x[0] === "allDevDependencies")
+                r.allDevDependencies = true;
+            else if (x[0] === "package.json")
+                r.package_jsons = __spreadArray(__spreadArray([], (r.package_jsons || []), true), [x[1]], false);
             else
                 throw new Error("bad key=name pair: " + v);
         }
@@ -300,7 +310,7 @@ var cfg_api = function (cfg) {
                 switch (_a.label) {
                     case 0:
                         url = "https://registry.npmjs.org/" + encodeURIComponent(name);
-                        return [4 /*yield*/, cross_fetch_1.fetch(url)];
+                        return [4 /*yield*/, (0, cross_fetch_1.fetch)(url)];
                     case 1:
                         res = _a.sent();
                         if (res.status !== 200)
@@ -417,7 +427,7 @@ var JSONFile = /** @class */ (function () {
     };
     JSONFile.prototype.flush = function () {
         var s = JSON.stringify(this.json, undefined, 2);
-        if (!deep_equal_1.default(this.json_on_disc, this.json)) {
+        if (!(0, deep_equal_1.default)(this.json_on_disc, this.json)) {
             fs.writeFileSync(this.path, s, "utf8");
         }
     };
@@ -483,28 +493,35 @@ var DependencyCollection = /** @class */ (function () {
             var package_json_cache = {};
             var all_versions = [];
             var with_version = v.map(function (dep) {
+                var _a;
                 // hack just removing leading ^ - should look at lock files (fyn, node, ..) instead - but this probably is good enough
                 var f = function (x) { return x.replace("^", ""); };
                 var versions = [];
                 if (dep.version)
                     versions.push(f(dep.version));
                 if (dep.origin) {
-                    var p = dep.origin + "/package.json";
-                    if (!(dep.origin in package_json_cache) && fs.existsSync(p)) {
-                        package_json_cache[dep.origin] = JSON5.parse(fs.readFileSync(p, "utf8"));
-                        ["dependencies", "devDependencies"].forEach(function (d) {
-                            var x = (dep.origin === undefined)
-                                ? undefined
-                                : get_path(package_json_cache[dep.origin], d, k, undefined);
-                            if (x !== undefined)
-                                versions.push(f(x));
-                        });
-                    }
-                    else if (dep.version) {
-                        versions.push(f(dep.version));
+                    var ps = (_a = dep.package_jsons) !== null && _a !== void 0 ? _a : [dep.origin + "/package.json"];
+                    var _loop_2 = function (p) {
+                        if (!(dep.origin in package_json_cache) && fs.existsSync(p)) {
+                            package_json_cache[p] = JSON5.parse(fs.readFileSync(p, "utf8"));
+                            ["dependencies", "devDependencies"].forEach(function (d) {
+                                var x = (dep.origin === undefined)
+                                    ? undefined
+                                    : get_path(package_json_cache[p], d, k, undefined);
+                                if (x !== undefined)
+                                    versions.push(f(x));
+                            });
+                        }
+                        else if (dep.version) {
+                            versions.push(f(dep.version));
+                        }
+                    };
+                    for (var _i = 0, ps_1 = ps; _i < ps_1.length; _i++) {
+                        var p = ps_1[_i];
+                        _loop_2(p);
                     }
                 }
-                all_versions = __spreadArray(__spreadArray([], all_versions), versions);
+                all_versions = __spreadArray(__spreadArray([], all_versions, true), versions, true);
                 return { dep: dep, versions: versions };
             }).filter(function (x) { return x.versions.length > 0; });
             if (unique(all_versions).length > 1) {
@@ -527,8 +544,8 @@ var DependencyCollection = /** @class */ (function () {
         var deps = r.dependencies();
         var add = function (key, filter) {
             if (filter === void 0) { filter = function (x) { return true; }; }
-            _this.todo = __spreadArray(__spreadArray([], _this.todo), deps[key]);
-            _this[key] = __spreadArray(__spreadArray([], _this[key]), deps[key].map(function (x) { return x.name; }).filter(filter));
+            _this.todo = __spreadArray(__spreadArray([], _this.todo, true), deps[key], true);
+            _this[key] = __spreadArray(__spreadArray([], _this[key], true), deps[key].map(function (x) { return x.name; }).filter(filter), true);
         };
         add("dependencies");
         if (dev === true || dev === "dev-types")
@@ -542,6 +559,7 @@ var DependencyCollection = /** @class */ (function () {
         }
     };
     DependencyCollection.prototype.find_and_recurse_dependency = function (dep) {
+        var _a;
         var locations = ensure_path(this.dependency_locactions, dep.name, []);
         locations.push(dep);
         if (this.recursed.includes(dep.name))
@@ -557,24 +575,27 @@ var DependencyCollection = /** @class */ (function () {
             dep.npm = true;
             return;
         }
-        var r = new Repository(this.cfg, d);
+        console.log("dep=", dep);
+        var r = new Repository(this.cfg, d, { dependency: dep });
         dep.repository = r;
         // devDependencies are likely to contain @types thus pull them, too ?
         // TODO: only pull @types/*?
-        this.dependencies_of_repository(r, "dev-types");
+        this.dependencies_of_repository(r, ((_a = patches_1.patches[dep.name]) === null || _a === void 0 ? void 0 : _a.allDevDependencies) ? true : "dev-types");
     };
     return DependencyCollection;
 }());
 var Repository = /** @class */ (function () {
-    function Repository(cfg, path) {
+    function Repository(cfg, path, o) {
+        var _a, _b;
         this.cfg = cfg;
         this.path = path;
-        this.basename = path_1.basename(path);
+        this.basename = (0, path_1.basename)(path);
         if (/\/\//.test(path))
             throw new Error("bad path " + path);
         this.tsmonojson = new TSMONOJSONFile(path + "/tsmono.json");
-        this.packagejson_path = path + "/package.json";
-        this.packagejson = new JSONFile(this.packagejson_path);
+        var p = ((_a = o.dependency) === null || _a === void 0 ? void 0 : _a.package_jsons) || ((_b = patches_1.patches[this.basename]) === null || _b === void 0 ? void 0 : _b.package_jsons) || ['package.json'];
+        this.packagejson_paths = p.map(function (x) { return path + "/" + x; });
+        this.packagejsons = this.packagejson_paths.map(function (x) { return new JSONFile(x); });
     }
     Repository.prototype.repositories = function (opts) {
         var dep_collection = new DependencyCollection(this.cfg, this.path, this.tsmonojson.dirs());
@@ -599,7 +620,10 @@ var Repository = /** @class */ (function () {
     };
     Repository.prototype.flush = function () {
         this.tsmonojson.flush();
-        this.packagejson.flush();
+        for (var _i = 0, _a = this.packagejsons; _i < _a.length; _i++) {
+            var v = _a[_i];
+            v.flush();
+        }
     };
     Repository.prototype.init = function () {
         var tsconfig = path.join(this.path, "tsconfig.json");
@@ -607,6 +631,7 @@ var Repository = /** @class */ (function () {
     };
     Repository.prototype.dependencies = function () {
         var _this = this;
+        console.log("XX");
         var to_dependency = function (dep) { return parse_dependency(dep, _this.path); };
         var presets = function (key) {
             var c_presets = get_path(_this.tsmonojson.json, "presets", {});
@@ -617,14 +642,24 @@ var Repository = /** @class */ (function () {
         // package.json otherwise
         if (fs.existsSync(this.path + "/tsmono.json")) {
             return {
-                dependencies: unique(__spreadArray(__spreadArray(["tslib"], presets("dependencies")), clone(get_path(this.tsmonojson.json, "dependencies", [])))).map(to_dependency),
-                devDependencies: unique(__spreadArray(__spreadArray([], presets("devDependencies")), clone(get_path(this.tsmonojson.json, "devDependencies", [])))).map(to_dependency),
+                dependencies: unique(__spreadArray(__spreadArray(["tslib"], presets("dependencies"), true), clone(get_path(this.tsmonojson.json, "dependencies", [])), true)).map(to_dependency),
+                devDependencies: unique(__spreadArray(__spreadArray([], presets("devDependencies"), true), clone(get_path(this.tsmonojson.json, "devDependencies", [])), true)).map(to_dependency),
             };
         }
-        return {
-            dependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "dependencies", {})).map(to_dependency),
-            devDependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
+        var f = function (x) { return !/version=(workspace:\*|link:.\/types)$/.test(x); };
+        var x = {
+            // dependencies:    map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "dependencies", {})).map(to_dependency),
+            // devDependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
+            dependencies: 
+            // @ts-ignore
+            ([].concat.apply([], this.packagejsons.map(function (ps) { return map_package_dependencies_to_tsmono_dependencies(get_path(ps.json, "dependencies", {})); }))).filter(f).map(to_dependency),
+            devDependencies: 
+            // @ts-ignore
+            ([].concat.apply([], this.packagejsons.map(function (ps) { return map_package_dependencies_to_tsmono_dependencies(get_path(ps.json, "devDependencies", {})); }))).filter(f).map(to_dependency),
+            // map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
         };
+        var paths = console.log("ZZZ", this.basename, this.packagejsons.map(function (x) { return [x.path, fs.existsSync(x.path)]; }), x, this.packagejsons);
+        return x;
     };
     Repository.prototype.update = function (cfg, opts) {
         if (opts === void 0) { opts = {}; }
@@ -680,9 +715,9 @@ var Repository = /** @class */ (function () {
                                     var _c = _b[_i], k = _c[0], v = _c[1];
                                     if (v[0].repository) {
                                         // path.absolute path.relative(from,to) ?
-                                        var local_subdirectory = (_a = patches_1.patches[v[0].name]) === null || _a === void 0 ? void 0 : _a.local_subdirectory;
-                                        var src = local_subdirectory
-                                            ? local_subdirectory
+                                        var srcdir = (_a = patches_1.patches[v[0].name]) === null || _a === void 0 ? void 0 : _a.srcdir;
+                                        var src = srcdir
+                                            ? srcdir
                                             : !v[0].ignore_src && fs.existsSync(v[0].repository.path + "/src")
                                                 ? "/src"
                                                 : "";
@@ -723,12 +758,14 @@ var Repository = /** @class */ (function () {
                             ensure_path(x, "compilerOptions", {});
                             // some sane defaults uer can overwrite which make most code just work
                             // If you're not happy with these defaults you can always set the keys to overwrite these
+                            ensure_path(x, "compilerOptions", "preserveSymlinks", true); // so that stuff get's loaded from current directory and not multiple versions from dependencies
                             ensure_path(x, "compilerOptions", "esModuleInterop", true); // eg to import m from "mithril"
                             ensure_path(x, "compilerOptions", "module", "commonjs"); // eg to import m from "mithril"
                             ensure_path(x, "compilerOptions", "target", "esnext"); // eg to import m from "mithril"
                             ensure_path(x, "compilerOptions", "strict", true); // eg to import m from "mithril"
                             ensure_path(x, "compilerOptions", "lib", [
                                 "es5",
+                                "es6",
                                 "dom",
                                 "es2015.promise",
                                 "es2015.collection",
@@ -767,7 +804,7 @@ var Repository = /** @class */ (function () {
                         }
                         else if ("tsconfig" in tsmonojson || Object.keys(path_for_tsconfig("")).length > 0) {
                             tsconfig_path_1 = path.join(this.path, "tsconfig.json");
-                            json_1 = JSON.stringify(fix_ts_config(deepmerge_1.default(tsmonojson.tsconfig || {}, path_for_tsconfig(this.path), tsconfig)), undefined, 2);
+                            json_1 = JSON.stringify(fix_ts_config((0, deepmerge_1.default)(tsmonojson.tsconfig || {}, path_for_tsconfig(this.path), tsconfig)), undefined, 2);
                             protect(tsconfig_path_1, function () { fs.writeFileSync(tsconfig_path_1, json_1, "utf8"); }, opts.force);
                         }
                         // clone(tsmonojson.tsconfig) || {}
@@ -791,7 +828,7 @@ var Repository = /** @class */ (function () {
                         for (_j = 0, _k = Object.entries(expected_symlinks); _j < _k.length; _j++) {
                             _l = _k[_j], k = _l[0], v = _l[1];
                             del_if_exists(k);
-                            fs.mkdirpSync(path_1.dirname(k));
+                            fs.mkdirpSync((0, path_1.dirname)(k));
                             info("symlinking " + k + " -> " + v);
                             fs.symlinkSync(v, k);
                         }
@@ -880,14 +917,14 @@ var Repository = /** @class */ (function () {
                     case 6:
                         _s.sent();
                         backup_file(package_json.path);
-                        this.packagejson.json = package_json;
-                        this.packagejson.flush_protect_user_changes(opts.force);
+                        this.packagejsons[0].json = package_json;
+                        this.packagejsons[0].flush_protect_user_changes(opts.force);
                         if (!opts.install_npm_packages) return [3 /*break*/, 9];
                         debug("install_npm_packages");
-                        to_be_installed = fs.readFileSync(this.packagejson_path, "utf8");
-                        p_installed = this.packagejson_path + ".installed";
+                        to_be_installed = fs.readFileSync(this.packagejson_paths[0], "utf8");
+                        p_installed = this.packagejson_paths[0] + ".installed";
                         installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined;
-                        info("deciding to run npm_install_cmd in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
+                        info("deciding to run npm_install_cmd in", this.path, this.packagejson_paths[0], p_installed, installed === to_be_installed);
                         if (!(installed !== to_be_installed || !fs.existsSync(path.join(this.path, "node_modules")))) return [3 /*break*/, 8];
                         return [4 /*yield*/, run(cfg.npm_install_cmd[0], { args: cfg.npm_install_cmd.slice(1), cwd: this.path })];
                     case 7:
@@ -941,8 +978,8 @@ var Repository = /** @class */ (function () {
                         // TODO: check prefix "auto" etc to keep unique or overwrite
                         this.init();
                         j = this.tsmonojson.json;
-                        j.dependencies = __spreadArray(__spreadArray([], j.dependencies), dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }));
-                        j.devDependencies = __spreadArray(__spreadArray([], j.devDependencies), devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }));
+                        j.dependencies = __spreadArray(__spreadArray([], j.dependencies, true), dependencies.filter(function (x) { return !(j.dependencies || []).includes(x); }), true);
+                        j.devDependencies = __spreadArray(__spreadArray([], j.devDependencies, true), devDependencies.filter(function (x) { return !(j.devDependencies || []).includes(x); }), true);
                         return [4 /*yield*/, this.update(cfg, { link_to_links: true, install_npm_packages: true })];
                     case 1:
                         _a.sent();
@@ -1031,7 +1068,7 @@ var dot_git_ignore_hack = function () { return __awaiter(void 0, void 0, void 0,
             "/tsconfig.json", // derived by tsmono, contains local setup paths
         ].filter(function (a) { return !lines.find(function (x) { return x.startsWith(a); }); });
         if (to_be_added.length > 0) {
-            fs.writeFileSync(f, __spreadArray(__spreadArray([], lines), to_be_added).join("\n"), "utf8");
+            fs.writeFileSync(f, __spreadArray(__spreadArray([], lines, true), to_be_added, true).join("\n"), "utf8");
         }
         return [2 /*return*/];
     });
@@ -1056,7 +1093,7 @@ var run_tasks = function (tasks) { return __awaiter(void 0, void 0, void 0, func
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                lock = lock_1.createLock({ preventExit: true });
+                lock = (0, lock_1.createLock)({ preventExit: true });
                 with_user = function (run) { return __awaiter(void 0, void 0, void 0, function () {
                     var release;
                     return __generator(this, function (_a) {
@@ -1114,7 +1151,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
     return __generator(this, function (_0) {
         switch (_0.label) {
             case 0:
-                hd = os_1.homedir();
+                hd = (0, os_1.homedir)();
                 cache = new DirectoryCache(hd + "/.tsmono/cache");
                 config = {
                     cache: cache,
@@ -1135,7 +1172,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                         return [2 /*return*/, run("ssh", __assign({ args: [server], stdin: stdin }, args))];
                     });
                 }); }; };
-                p = new Repository(cfg, process.cwd());
+                p = new Repository(cfg, process.cwd(), {});
                 ensure_is_git = function (r) { return __awaiter(void 0, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
@@ -1222,7 +1259,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 }
                 if (args.main_action === "list-local-dependencies") {
                     silent = true;
-                    p_1 = new Repository(cfg, process.cwd());
+                    p_1 = new Repository(cfg, process.cwd(), {});
                     for (_b = 0, _c = p_1.repositories(); _b < _c.length; _b++) {
                         r = _c[_b];
                         console.log("rel-path: ", r.path);
@@ -1321,7 +1358,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 path_ = _p[_o];
                 info("pulling " + path_);
                 p_ = path.join(cwd, path_);
-                repo = path_1.basename(p_);
+                repo = (0, path_1.basename)(p_);
                 if ((config_1.ignoreWhenPulling || []).includes(repo))
                     return [3 /*break*/, 29];
                 if (!fs.existsSync(p_)) {
@@ -1342,7 +1379,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
             case 27:
                 _0.sent();
                 if (!(args.update && fs.existsSync(path.join(p_, "tsmono.json")))) return [3 /*break*/, 29];
-                p_2 = new Repository(cfg, p_);
+                p_2 = new Repository(cfg, p_, {});
                 return [4 /*yield*/, p_2.update(cfg, {
                         link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
                         // , update_cmd: {executable: "npm", args: ["i"]}
@@ -1446,9 +1483,9 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 }); }; };
                 tasks = __spreadArray(__spreadArray([], ((!args.no_local)
                     ? repositories.map(function (x) { return ({ task: "local clean? " + x.path, start: check_local_1(x) }); })
-                    : [])), ((!args.no_remote)
+                    : []), true), ((!args.no_remote)
                     ? repositories.map(function (x) { return ({ task: "remote clean? " + x.path, start: check_remote_1(x) }); })
-                    : []));
+                    : []), true);
                 return [4 /*yield*/, run_tasks(tasks)];
             case 31:
                 _0.sent();
@@ -1460,7 +1497,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 _0.label = 32;
             case 32:
                 if (!(args.main_action === "push-with-dependencies")) return [3 /*break*/, 36];
-                p_3 = new Repository(cfg, process.cwd());
+                p_3 = new Repository(cfg, process.cwd(), {});
                 config_3 = JSON.parse(args.git_remote_config_json);
                 basenames_to_pull = [];
                 seen = [] // TODO: why aret there duplicates ?
@@ -1585,7 +1622,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
             case 36:
                 if (!(args.main_action === "commit-all")) return [3 /*break*/, 43];
                 force = args.force;
-                p_4 = new Repository(cfg, process.cwd());
+                p_4 = new Repository(cfg, process.cwd(), {});
                 _t = 0, _u = p_4.repositories();
                 _0.label = 37;
             case 37:
@@ -1613,7 +1650,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                 return [3 /*break*/, 37];
             case 43:
                 if (!(args.main_action === "reinstall-with-dependencies")) return [3 /*break*/, 45];
-                p_5 = new Repository(cfg, process.cwd());
+                p_5 = new Repository(cfg, process.cwd(), {});
                 dep_collection = new DependencyCollection(cfg, p_5.path, p_5.tsmonojson.dirs());
                 dep_collection.dependencies_of_repository(p_5, true);
                 dep_collection.do();
@@ -1658,7 +1695,7 @@ var main = function () { return __awaiter(void 0, void 0, void 0, function () {
                             console.log('killing');
                             processes_1[x].kill();
                         }
-                        var y = child_process_1.spawn(cmd, args, { stdio: [undefined, 'pipe', 1] });
+                        var y = (0, child_process_1.spawn)(cmd, args, { stdio: [undefined, 'pipe', 1] });
                         console.log("== " + x + " spawned");
                         processes_1[x] = y;
                         (_a = y.stdout) === null || _a === void 0 ? void 0 : _a.on("data", function (s) { out += s; if (echo)

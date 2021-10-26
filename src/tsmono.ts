@@ -171,6 +171,9 @@ interface Dependency {
   name: string,
   url?: string,
   npm?: boolean,    // force installing from npm
+  srcdir?: string,
+  allDevDependencies?: true,
+  package_jsons?: string[]
   version?: string, // check or verify version constraints
   node_modules?: boolean, // requires TS -> .js .d.ts steps
   types?: boolean,
@@ -196,6 +199,9 @@ const parse_dependency = (s: string, origin?: string): Dependency => {
       x = [ x[0], x.slice(1).join("=") ];
       if (x[0] === "version") r.version = x[1]
       else if (x[0] === "name") r.name = x[1]
+      else if (x[0] === "srcdir") r.srcdir = x[1]
+      else if (x[0] === "allDevDependencies") r.allDevDependencies = true
+      else if (x[0] === "package.json") r.package_jsons = [...(r.package_jsons || []), x[1]]
       else throw new Error(`bad key=name pair: ${v}`)
     }
     if (v === "node_modules") r[v] = true;
@@ -383,7 +389,7 @@ class DependencyCollection {
         warning(`WARNING: ${this.origin} dependency ${k} requested as npm and from disk, choosing first ${v.map(dependency_to_str).join("\n")}`)
       // check version match etc
 
-      const package_json_cache: {[key: string]: any} = {}
+      const package_json_cache: Record<string, any>= {}
 
       let all_versions: string[] = []
       const with_version = v.map((dep) => {
@@ -394,21 +400,23 @@ class DependencyCollection {
         if (dep.version) versions.push(f(dep.version));
 
         if (dep.origin) {
-          const p = `${dep.origin}/package.json`
-          if (!(dep.origin in package_json_cache) && fs.existsSync(p)) {
-            package_json_cache[dep.origin] = JSON5.parse(fs.readFileSync(p, "utf8"));
+          const ps = dep.package_jsons ?? [`${dep.origin}/package.json`]
+            for (let p of ps) {
 
-            ["dependencies", "devDependencies"].forEach((d) => {
-              const x =
-                (dep.origin === undefined)
-                  ? undefined
-                  : get_path(package_json_cache[dep.origin], d, k, undefined);
-              if (x !== undefined)
-                versions.push(f(x))
-            })
-          } else if (dep.version) {
-            versions.push(f(dep.version))
-          }
+                if (!(dep.origin in package_json_cache) && fs.existsSync(p)) {
+                    package_json_cache[p] = JSON5.parse(fs.readFileSync(p, "utf8"));
+                    ["dependencies", "devDependencies"].forEach((d) => {
+                        const x =
+                            (dep.origin === undefined)
+                            ? undefined
+                            : get_path(package_json_cache[p], d, k, undefined);
+                        if (x !== undefined)
+                            versions.push(f(x))
+                    })
+                } else if (dep.version) {
+                    versions.push(f(dep.version))
+                }
+            }
         }
         all_versions = [...all_versions, ...versions]
         return {dep, versions}
@@ -458,11 +466,13 @@ class DependencyCollection {
         info(`dependency ${dependency_to_str(dep)} not found, forcing npm`);
         dep.npm = true; return
       }
-      const r = new Repository(this.cfg, d)
+      console.log("dep=", dep);
+      const r = new Repository(this.cfg, d, {dependency: dep})
       dep.repository = r
       // devDependencies are likely to contain @types thus pull them, too ?
       // TODO: only pull @types/*?
-      this.dependencies_of_repository(r, "dev-types")
+      this.dependencies_of_repository(r, patches[dep.name]?.allDevDependencies ? true : "dev-types")
+
   }
 
 }
@@ -470,16 +480,17 @@ class DependencyCollection {
 class Repository {
 
   public tsmonojson: TSMONOJSONFile;
-  public packagejson: JSONFile;
-  public packagejson_path: string;
+  public packagejsons: JSONFile[];
+  public packagejson_paths: string[];
   public basename: string;
 
-  constructor(public cfg: Config, public path: string) {
+  constructor(public cfg: Config, public path: string, o: {dependency?: Dependency}) {
       this.basename = basename(path)
       if (/\/\//.test(path)) throw new Error(`bad path ${path}`)
       this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
-      this.packagejson_path = `${path}/package.json`
-      this.packagejson = new JSONFile(this.packagejson_path)
+      const p = o.dependency?.package_jsons || patches[this.basename]?.package_jsons || ['package.json']
+      this.packagejson_paths = p.map((x) => `${path}/${x}`)
+      this.packagejsons = this.packagejson_paths.map((x) => new JSONFile(x))
   }
 
   public repositories(opts?: {includeThis?: boolean}): Repository[] {
@@ -506,7 +517,9 @@ class Repository {
 
   public flush() {
     this.tsmonojson.flush()
-    this.packagejson.flush()
+      for (let v of this.packagejsons) {
+          v.flush()
+      }
   }
 
   public init() {
@@ -518,27 +531,42 @@ class Repository {
     "dependencies": Dependency[],
     "devDependencies": Dependency[],
   } {
-    const to_dependency = (dep: string) => parse_dependency(dep, this.path)
+      console.log("XX");
+      const to_dependency = (dep: string) => parse_dependency(dep, this.path)
 
-    const presets = (key: "dependencies" | "devDependencies") => {
-        const c_presets = get_path(this.tsmonojson.json, "presets", {})
-        return Object.keys(c_presets).map(p => get_path(presets, p, key, []) as any[] ).flat(1)
-    }
-
-    // get dependencies from
-    // tsmono.json
-    // package.json otherwise
-    if (fs.existsSync(`${this.path}/tsmono.json`)) {
-      return {
-        dependencies:    unique(["tslib", ...presets("dependencies"),    ...clone(get_path(this.tsmonojson.json,    "dependencies", []))]).map(to_dependency),
-        devDependencies: unique([ ...presets("devDependencies"), ...clone(get_path(this.tsmonojson.json, "devDependencies", []))]).map(to_dependency),
+      const presets = (key: "dependencies" | "devDependencies") => {
+          const c_presets = get_path(this.tsmonojson.json, "presets", {})
+          return Object.keys(c_presets).map(p => get_path(presets, p, key, []) as any[] ).flat(1)
       }
-    }
 
-    return {
-      dependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "dependencies", {})).map(to_dependency),
-      devDependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
-    }
+      // get dependencies from
+      // tsmono.json
+      // package.json otherwise
+      if (fs.existsSync(`${this.path}/tsmono.json`)) {
+          return {
+              dependencies:    unique(["tslib", ...presets("dependencies"),    ...clone(get_path(this.tsmonojson.json,    "dependencies", []))]).map(to_dependency),
+              devDependencies: unique([ ...presets("devDependencies"), ...clone(get_path(this.tsmonojson.json, "devDependencies", []))]).map(to_dependency),
+          }
+      }
+
+      const f = (x: string) => !/version=(workspace:\*|link:.\/types)$/.test(x)
+
+      const x = {
+          // dependencies:    map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "dependencies", {})).map(to_dependency),
+          // devDependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
+          dependencies:
+          // @ts-ignore
+          ([].concat(...this.packagejsons.map((ps) => map_package_dependencies_to_tsmono_dependencies(get_path(ps.json, "dependencies", {})) ))).filter(f).map(to_dependency),
+          devDependencies:
+          // @ts-ignore
+          ([].concat(...this.packagejsons.map((ps) => map_package_dependencies_to_tsmono_dependencies(get_path(ps.json, "devDependencies", {})) ))).filter(f).map(to_dependency),
+          // map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
+      }
+
+      const paths = 
+          console.log("ZZZ", this.basename, this.packagejsons.map((x) => [x.path, fs.existsSync(x.path)]), x, this.packagejsons);
+
+      return x
 
   }
 
@@ -550,7 +578,7 @@ class Repository {
     *            also see reinstall-with-dependencies
     */
     // assert(!!opts.link_to_links, 'link_to_links should be true')
-    // otherwise node_modules relative to the .ts files location will be used arnd chaos will hapen
+    
     // So we must link to local directory
 
     if (!fs.existsSync(`${this.path}/tsmono.json`)) {
@@ -599,10 +627,10 @@ class Repository {
           if ( v[0].repository) {
             // path.absolute path.relative(from,to) ?
 
-            const local_subdirectory = patches[v[0].name]?.local_subdirectory
+            const srcdir = patches[v[0].name]?.srcdir
             let src =
-              local_subdirectory 
-              ? local_subdirectory
+              srcdir
+              ? srcdir
               :   !v[0].ignore_src && fs.existsSync(`${v[0].repository.path}/src`)
                   ? "/src"
                   : "";
@@ -650,12 +678,14 @@ class Repository {
 
       // some sane defaults uer can overwrite which make most code just work
       // If you're not happy with these defaults you can always set the keys to overwrite these
+      ensure_path(x, "compilerOptions", "preserveSymlinks", true) // so that stuff get's loaded from current directory and not multiple versions from dependencies
       ensure_path(x, "compilerOptions", "esModuleInterop", true) // eg to import m from "mithril"
       ensure_path(x, "compilerOptions", "module", "commonjs") // eg to import m from "mithril"
       ensure_path(x, "compilerOptions", "target", "esnext") // eg to import m from "mithril"
       ensure_path(x, "compilerOptions", "strict", true) // eg to import m from "mithril"
       ensure_path(x, "compilerOptions", "lib", [
             "es5",
+            "es6", // array.find
             "dom",
             "es2015.promise",
             "es2015.collection",
@@ -766,16 +796,16 @@ class Repository {
     await add_npm_packages("devDependencies")
 
     backup_file(package_json.path)
-    this.packagejson.json = package_json;
-    this.packagejson.flush_protect_user_changes(opts.force)
+    this.packagejsons[0].json = package_json;
+    this.packagejsons[0].flush_protect_user_changes(opts.force)
 
     if (opts.install_npm_packages) {
       debug("install_npm_packages");
 
-      const to_be_installed = fs.readFileSync(this.packagejson_path, "utf8")
-      const p_installed = `${this.packagejson_path}.installed`
+      const to_be_installed = fs.readFileSync(this.packagejson_paths[0], "utf8")
+      const p_installed = `${this.packagejson_paths[0]}.installed`
       const installed = fs.existsSync(p_installed) ? fs.readFileSync(p_installed, "utf8") : undefined
-      info("deciding to run npm_install_cmd in", this.path, this.packagejson_path, p_installed, installed === to_be_installed);
+      info("deciding to run npm_install_cmd in", this.path, this.packagejson_paths[0], p_installed, installed === to_be_installed);
       if (installed !== to_be_installed || !fs.existsSync(path.join(this.path, "node_modules")))  {
         await run(cfg.npm_install_cmd[0], {args: cfg.npm_install_cmd.slice(1), cwd: this.path})
       }
@@ -1023,7 +1053,7 @@ const main = async () => {
       return run("ssh", {args: [server], stdin, ...args})
   }
 
-  const p = new Repository(cfg, process.cwd())
+  const p = new Repository(cfg, process.cwd(), {})
 
   const ensure_is_git = async (r: Repository) => {
     if (!fs.existsSync(path.join(r.path, ".git"))) {
@@ -1087,7 +1117,7 @@ const main = async () => {
 
   if (args.main_action === "list-local-dependencies") {
     silent = true;
-    const p = new Repository(cfg, process.cwd())
+    const p = new Repository(cfg, process.cwd(), {})
     for (const r of p.repositories()) {
         console.log("rel-path: ", r.path);
     }
@@ -1196,7 +1226,8 @@ const main = async () => {
 
       if (args.update && fs.existsSync(path.join(p_, "tsmono.json"))) {
           // run tsmono update
-          const p = new Repository(cfg, p_)
+          const p = new Repository(cfg, p_, {})
+
           await p.update(cfg, {
             link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
             // , update_cmd: {executable: "npm", args: ["i"]}
@@ -1262,7 +1293,7 @@ const main = async () => {
   }
 
   if (args.main_action === "push-with-dependencies") {
-    const p = new Repository(cfg, process.cwd())
+    const p = new Repository(cfg, process.cwd(), {})
     const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
 
     const basenames_to_pull: string[] = []
@@ -1339,7 +1370,7 @@ const main = async () => {
   if (args.main_action === "commit-all") {
     const force = args.force
 
-    const p = new Repository(cfg, process.cwd())
+    const p = new Repository(cfg, process.cwd(), {})
     for (const r of p.repositories()) {
       if (fs.existsSync(path.join(r.path, ".git"))) {
         const stdout = await run("git", {args: ["diff"], cwd: r.path})
@@ -1357,7 +1388,7 @@ const main = async () => {
   }
 
   if (args.main_action === "reinstall-with-dependencies") {
-    const p = new Repository(cfg, process.cwd())
+    const p = new Repository(cfg, process.cwd(), {})
     const dep_collection = new DependencyCollection(cfg, p.path, p.tsmonojson.dirs())
     dep_collection.dependencies_of_repository(p, true)
     dep_collection.do()
