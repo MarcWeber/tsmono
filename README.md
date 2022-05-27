@@ -15,7 +15,7 @@ WHY?
 * get code of target platform automatically
 
 Without tsmono, what is next best option?
-========================================
+=========================================
 
 "references" in tsconfig.json -> comes close, but you still need multiple
 actions to use a library: adding it to "references" and linking it.
@@ -235,6 +235,23 @@ tsmono.json example file:
     }
 
   }
+
+
+  "js_like_source": {
+
+      "links": [
+        {
+          "from": to
+        }
+      ],
+
+      # like tsconfig path:
+      "paths": {
+      },
+
+      "dependencies_from_package_jsons": []
+  }
+
 
 }
 

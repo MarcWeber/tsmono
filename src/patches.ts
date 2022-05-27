@@ -1,15 +1,33 @@
+import {Links, Paths} from "./types";
+
 export type Patch = {
-    srcdir?: string, // use this subdirectory when referencing
-    package_jsons?: string[],
+    // srcdir?: string, // use this subdirectory when referencing
     npm_also_types?: true, // also insall types
     notes?: string[],
-    allDevDependencies?: true
+    allDevDependencies?: true,
+
+    provides?: string[],
+
+    tsmono?: {
+        js_like_source?: {
+            links?: Links,
+            paths?: Paths,
+            dependencies_from_package_jsons?: string[]
+        }
+    }
 }
 
 export const patches: {[key:string]: Patch} = {
     // ts-tream from npm didn't know how to import the transformer batcher thus using source
     "ts-stream": {
-        srcdir: "src/lib"
+        // srcdir: "src/lib"
+        tsmono: {
+            js_like_source: {
+                links: {
+                    'src/lib': 'ts-stream',
+                },
+            }
+        }
     },
 
     "react": {npm_also_types:true},
@@ -49,10 +67,90 @@ export const patches: {[key:string]: Patch} = {
 
     "pg": { npm_also_types: true },
 
-    "vite": {
-        srcdir: 'packages/vite/src/node',
-        // package_jsons: ['package.json', 'packages/vite/package.json', 'packages/playground/ssr-react/package.json'],
-        allDevDependencies: true
+    "tmp": { npm_also_types: true },
+
+    "prefresh": {
+        provides: [
+            "@prefresh/vite",
+            "@prefresh/core",
+            "@prefresh/utils"
+        ],
+
+        tsmono: {
+            js_like_source: {
+                links: {
+                    'packages/core': '@prefresh/core',
+                    'packages/utils': '@prefresh/utils',
+
+                    'packages/vite': '@prefresh/vite',
+
+                    'packages/babel/src/index.mjs': '@prefresh/babel-plugin/index.js',
+
+                    // 'packages/vite/src/index.js': '@prefresh/vite/index.js',
+                    // 'packages/vite/index.d.ts': '@prefresh/vite/index.d.ts',
+                },
+
+                paths: {
+                    "@prefresh/babel-plugin":  ["@prefresh/babel-plugin"],
+                    "@prefresh/babel-plugin/*":  ["@prefresh/babel-plugin/*"],
+                }
+            }
+        }
     },
 
+    "preact-preset-vite": {
+        provides: [
+            "@preact/preset-vite"
+        ],
+
+        tsmono: {
+            js_like_source: {
+
+                links: {
+                    'src': '@preact/preset-vite',
+                },
+
+            }
+        }
+    },
+
+    "vite": {
+        // srcdir: 'packages/vite/src/node',
+
+        // srcdir: "src/lib"
+
+        // use dependencies_from_package_jsons
+        // package_jsons: ['package.json', 'packages/vite/package.json', 'packages/playground/ssr-react/package.json'],
+        allDevDependencies: true,
+
+        tsmono: {
+            js_like_source: {
+                links: {
+                    'packages/vite/src/node': 'vite',
+                    'packages/vite/src/client': 'vite-client',
+                },
+
+
+                paths: {
+                    "vite/dist/client/*":  ["vite-client/*"],
+                },
+
+                dependencies_from_package_jsons: [ 'packages/vite/package.json', 'package.json' ],
+
+                // paths: {
+                //     "@prefresh/babel-plugin":  ["@prefresh/babel-plugin"],
+                //     "@prefresh/babel-plugin/*":  ["@prefresh/babel-plugin/*"],
+                // }
+            }
+        }
+    },
+
+}
+
+// eg @prefresh/vite provided by prefresh
+export const provided_by: Record< string, string> = {}
+for (let [k, v] of Object.entries(patches)) {
+    for (let p of v.provides ?? []) {
+        provided_by[p] = k
+    }
 }

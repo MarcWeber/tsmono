@@ -1,3 +1,4 @@
+import {Links, Paths} from "./types";
 import { ArgumentParser } from "argparse";
 import chalk from "chalk";
 import debug_ from "./debug";
@@ -16,13 +17,21 @@ import { basename, dirname, normalize } from "path";
 import { presets } from "./presets"
 import {createLock} from "./lock"
 import jsonFile from "json-file-plus"
-import { patches } from "./patches"
-
+import { patches, provided_by } from "./patches"
+import ln from "./library-notes"
 
 const readJsonFile = async (path: string): Promise<any> => {
     console.log("reading", path);
     const jf = await jsonFile(path)
     return jf.data
+}
+
+const parse_json_file = (path: string) => {
+    try {
+        return JSON5.parse(fs.readFileSync(path, 'utf8'))
+    } catch (e){
+        throw `bad JSON at file ${path}, error: ${e}`
+    }
 }
 
 // TODO: use path.join everywhere
@@ -40,9 +49,7 @@ const clone = (x: any) => {
   return x === undefined ? undefined : JSON.parse(JSON.stringify(x))
 }
 
-const unique = <T>(x: T[]): T[] => {
-  return x.filter((v, i) => x.indexOf(v) === i)
-}
+const unique = <T>(x: T[]): T[] => { return x.filter((v, i) => x.indexOf(v) === i) }
 
 const del_if_exists = (path: string) => {
   // fs.existsSync doesn't work on symlinks
@@ -182,6 +189,7 @@ interface Dependency {
   ignore_src?: boolean,
 }
 
+
 const parse_dependency = (s: string, origin?: string): Dependency => {
   const l = s.split(";")
   const r: Dependency = {name: l[0]}
@@ -300,12 +308,7 @@ class JSONFile {
   constructor(public path: string, default_: () => object = () => ({})) {
     if (fs.existsSync(this.path)) {
       const s = fs.readFileSync(this.path, "utf8")
-      try {
-        // this.json_on_disc  = JSON5.parse(s);
-      } catch (e) {
-        throw new Error(`syntax error ${e} in ${this.path}, contents ${s}`)
-      }
-      this.json          = JSON5.parse(s)
+      this.json          = parse_json_file(this.path)
     } else {
       this.json_on_disc  = undefined
       this.json = default_()
@@ -373,6 +376,12 @@ class DependencyCollection {
   public todo: Dependency[] = []
   public recursed: string[] = []
 
+  public links: Links = {}
+
+  public paths: Paths = {}
+
+  public warnings: string[] = []
+
   constructor(public cfg: Config, public origin: string, public dirs: string[]) { }
 
   public print_warnings(): any {
@@ -404,7 +413,7 @@ class DependencyCollection {
             for (let p of ps) {
 
                 if (!(dep.origin in package_json_cache) && fs.existsSync(p)) {
-                    package_json_cache[p] = JSON5.parse(fs.readFileSync(p, "utf8"));
+                    package_json_cache[p] = parse_json_file(p);
                     ["dependencies", "devDependencies"].forEach((d) => {
                         const x =
                             (dep.origin === undefined)
@@ -429,28 +438,56 @@ class DependencyCollection {
         }
       }
     }
+
+
+      for (let w of unique(this.warnings)) {
+          console.log('!!!! > '+w);
+      }
   }
 
-  public dependencies_of_repository(r: Repository, dev: boolean|"dev-types") {
-    // add dependencies r to todo list to be looked at
-    const deps = r.dependencies()
-    const add = (key: "devDependencies"|"dependencies", filter: (x: string) => boolean = (x: string) => true ) => {
-      this.todo = [...this.todo, ...deps[key]]
-      this[key] = [...this[key], ...deps[key].map((x) => x.name).filter(filter)]
-    }
-    add("dependencies")
-    if (dev === true || dev === "dev-types") add("devDependencies", (x: string) => dev !== "dev-types" || /^@types/.test(x))
+  public dependencies_of_repository(r: Repository, dev: boolean|"dev-types", o: {addLinks: boolean}) {
+      // add dependencies r to todo list to be looked at
+      const deps = r.dependencies(o)
+
+      // paths
+      for (let [k, v] of Object.entries(deps.paths)) {
+          this.paths[k] = [...this.paths[k] ?? [], ...v]
+      }
+
+      // links
+      if (o.addLinks){
+          for (let [k,v] of Object.entries(deps.links)) {
+              const from = path.join(r.path, k)
+              const o = this.links[from]
+              if (o && o != v) debug(`warning, overwriting link ${o} ${v}`)
+              this.links[from] = v
+          }
+      }
+
+      const add = (key: "devDependencies"|"dependencies", filter: (x: string) => boolean = (x: string) => true ) => {
+          this.todo = [...this.todo, ...deps[key]]
+          this[key] = [...this[key], ...deps[key].map((x) => x.name).filter(filter)]
+      }
+
+      add("dependencies")
+
+      if (dev === true || dev === "dev-types") add("devDependencies", (x: string) => dev !== "dev-types" || /^@types/.test(x))
   }
 
   public do() {
     let next: Dependency|undefined
     // tslint:disable-next-line: no-conditional-assignment
     while (next = this.todo.shift()) {
+
+      if (next.name in ln)
+        this.warnings.push(`WARNING for using library ${next.name}: ${ln[next.name]}`);
+
       this.find_and_recurse_dependency(next)
     }
   }
 
   public find_and_recurse_dependency(dep: DependencyWithRepository) {
+
       const locations = ensure_path(this.dependency_locactions, dep.name, [])
       locations.push(dep)
       if (this.recursed.includes(dep.name)) return;
@@ -458,7 +495,9 @@ class DependencyCollection {
 
       if (dep.npm) return; // nothing to do
 
-      const dirs_lookup = this.dirs.map((x) => path.join(x, dep.name))
+      console.log("searching", dep);
+      const dirs_lookup = this.dirs.map((x) => path.join(x, provided_by[dep.name] ?? dep.name))
+
       verbose("dirs_lookup", dirs_lookup);
 
       const d = dirs_lookup.find((dir) => fs.existsSync(dir) )
@@ -471,7 +510,7 @@ class DependencyCollection {
       dep.repository = r
       // devDependencies are likely to contain @types thus pull them, too ?
       // TODO: only pull @types/*?
-      this.dependencies_of_repository(r, patches[dep.name]?.allDevDependencies ? true : "dev-types")
+      this.dependencies_of_repository(r, patches[dep.name]?.allDevDependencies ? true : "dev-types", {addLinks: true})
 
   }
 
@@ -488,14 +527,18 @@ class Repository {
       this.basename = basename(path)
       if (/\/\//.test(path)) throw new Error(`bad path ${path}`)
       this.tsmonojson = new TSMONOJSONFile(`${path}/tsmono.json`)
-      const p = o.dependency?.package_jsons || patches[this.basename]?.package_jsons || ['package.json']
+      const p = o.dependency?.package_jsons || ['package.json']
       this.packagejson_paths = p.map((x) => `${path}/${x}`)
       this.packagejsons = this.packagejson_paths.map((x) => new JSONFile(x))
   }
 
+    public tsmono_json_with_patches(){
+        return deepmerge.all([{}, this.tsmonojson, patches[this.basename]?.tsmono ??  {}]);
+    }
+
   public repositories(opts?: {includeThis?: boolean}): Repository[] {
     const dep_collection = new DependencyCollection(this.cfg, this.path, this.tsmonojson.dirs())
-    dep_collection.dependencies_of_repository(this, true)
+    dep_collection.dependencies_of_repository(this, true, {addLinks: false})
     dep_collection.do()
     dep_collection.print_warnings()
 
@@ -524,14 +567,20 @@ class Repository {
 
   public init() {
     const tsconfig = path.join(this.path, "tsconfig.json")
-    this.tsmonojson.init(this.cfg, fs.existsSync(tsconfig) ? JSON5.parse(fs.readFileSync(tsconfig, "utf8")) : {})
+    this.tsmonojson.init(this.cfg, fs.existsSync(tsconfig) ? parse_json_file(tsconfig) : {})
   }
 
-  public dependencies(): {
-    "dependencies": Dependency[],
-    "devDependencies": Dependency[],
+  public tsmono_json_contents(){
+      const p = path.join(this.path, 'tsmono.json')
+      return (fs.existsSync(p)) ? parse_json_file(p) : {}
+  }
+
+  public dependencies(o: {addLinks: boolean}): {
+          links: Links,
+          paths: Paths,
+          dependencies: Dependency[],
+          devDependencies: Dependency[],
   } {
-      console.log("XX");
       const to_dependency = (dep: string) => parse_dependency(dep, this.path)
 
       const presets = (key: "dependencies" | "devDependencies") => {
@@ -539,35 +588,36 @@ class Repository {
           return Object.keys(c_presets).map(p => get_path(presets, p, key, []) as any[] ).flat(1)
       }
 
-      // get dependencies from
-      // tsmono.json
-      // package.json otherwise
-      if (fs.existsSync(`${this.path}/tsmono.json`)) {
-          return {
-              dependencies:    unique(["tslib", ...presets("dependencies"),    ...clone(get_path(this.tsmonojson.json,    "dependencies", []))]).map(to_dependency),
-              devDependencies: unique([ ...presets("devDependencies"), ...clone(get_path(this.tsmonojson.json, "devDependencies", []))]).map(to_dependency),
-          }
+      const tsmono_json: any = deepmerge.all([{}, this.tsmono_json_contents(), patches[this.basename]?.tsmono ?? {}])
+
+      const package_jsons_paths =
+         ( tsmono_json?.js_like_source?.dependencies_from_package_jsons ?? ['package.json'] ).map((x:string) => path.join(this.path, x))
+
+
+      const package_jsons = package_jsons_paths.filter((x: string) => fs.existsSync(x) )
+          .map(parse_json_file)
+      // console.log('package jsons', package_jsons_paths, package_jsons)
+
+      const links = () => {
+          const src = path.join(this.path, "src");
+          const k = fs.existsSync(src) ? "src" : ""
+          return { [k] : this.basename }
       }
+
+      const package_json_dependencies    = (package_jsons.map((x: any) => map_package_dependencies_to_tsmono_dependencies(x.dependencies ?? []) ).flat())
+      const package_json_devDependencies = (package_jsons.map((x: any) => map_package_dependencies_to_tsmono_dependencies(x.devDependencies ?? []) ).flat())
+
 
       const f = (x: string) => !/version=(workspace:\*|link:.\/types)$/.test(x)
 
-      const x = {
-          // dependencies:    map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "dependencies", {})).map(to_dependency),
-          // devDependencies: map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
-          dependencies:
-          // @ts-ignore
-          ([].concat(...this.packagejsons.map((ps) => map_package_dependencies_to_tsmono_dependencies(get_path(ps.json, "dependencies", {})) ))).filter(f).map(to_dependency),
-          devDependencies:
-          // @ts-ignore
-          ([].concat(...this.packagejsons.map((ps) => map_package_dependencies_to_tsmono_dependencies(get_path(ps.json, "devDependencies", {})) ))).filter(f).map(to_dependency),
-          // map_package_dependencies_to_tsmono_dependencies(get_path(this.packagejson.json, "devDependencies", {})).map(to_dependency),
+      const deps = {
+          dependencies:    ([...package_json_dependencies, ...(tsmono_json.dependencies ?? [])]).filter(f).map(to_dependency),
+          devDependencies: ([...package_json_devDependencies, ...(tsmono_json.devDependencies ?? [])]).filter(f).map(to_dependency),
+          links: tsmono_json?.js_like_source?.links ?? links(),
+          paths: tsmono_json?.js_like_source?.paths ?? {},
       }
-
-      const paths = 
-          console.log("ZZZ", this.basename, this.packagejsons.map((x) => [x.path, fs.existsSync(x.path)]), x, this.packagejsons);
-
-      return x
-
+      console.log("deps of ", this.path, deps);
+      return deps
   }
 
   public async update(cfg: Config, opts: {link_to_links?: boolean, install_npm_packages?: boolean, symlink_node_modules_hack?: boolean, recurse?: boolean, force?: boolean,
@@ -578,7 +628,7 @@ class Repository {
     *            also see reinstall-with-dependencies
     */
     // assert(!!opts.link_to_links, 'link_to_links should be true')
-    
+
     // So we must link to local directory
 
     if (!fs.existsSync(`${this.path}/tsmono.json`)) {
@@ -595,9 +645,10 @@ class Repository {
     const link_dir: string = `${this_tsmono}`; // /links
 
     if (opts.link_to_links) {
-      (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach((x: string) => {
-        fs.unlinkSync(path.join(link_dir, x))
-      })
+      // (fs.existsSync(link_dir) ? fs.readdirSync(link_dir) : []).forEach((x: string) => {
+      //   fs.unlinkSync(path.join(link_dir, x))
+      // })
+      if (fs.existsSync(this_tsmono)) fs.removeSync(this_tsmono)
     } else {
       if (fs.existsSync(this_tsmono)) fs.removeSync(this_tsmono)
     }
@@ -613,55 +664,83 @@ class Repository {
     delete package_json.tsconfig
     const tsconfig: any = {}
     const dep_collection = new DependencyCollection(cfg, this.path, this.tsmonojson.dirs())
-    dep_collection.dependencies_of_repository(this, true)
+    dep_collection.dependencies_of_repository(this, true, {addLinks: false})
     dep_collection.do()
     dep_collection.print_warnings()
 
     const expected_symlinks: {[key: string]: string} = {}
     const expected_tools: {[key: string]: string} = {}
 
-    const path_for_tsconfig = (tsconfig_dir: string) => {
-      const r: any = {}
-      { // always set path
-        for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
-          if ( v[0].repository) {
-            // path.absolute path.relative(from,to) ?
+    // const path_for_tsconfig = (tsconfig_dir: string) => {
+    //   const r: any = {}
+    //   { // always set path
+    //     for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
+    //       if ( v[0].repository) {
+    //         // path.absolute path.relative(from,to) ?
 
-            const srcdir = patches[v[0].name]?.srcdir
-            let src =
-              srcdir
-              ? srcdir
-              :   !v[0].ignore_src && fs.existsSync(`${v[0].repository.path}/src`)
-                  ? "/src"
-                  : "";
+    //         const srcdir = patches[v[0].name]?.srcdir
+    //         let src =
+    //           srcdir
+    //           ? srcdir
+    //           :   !v[0].ignore_src && fs.existsSync(`${v[0].repository.path}/src`)
+    //               ? "/src"
+    //               : "";
 
-            const resolved = path.resolve(cwd,
-              (!!opts.link_to_links)
-              ? path.join(link_dir, v[0].name, src)
-              : path.join(v[0].repository.path, src))
+    //         const resolved = path.resolve(cwd,
+    //           (!!opts.link_to_links)
+    //           ? path.join(link_dir, v[0].name, src)
+    //           : path.join(v[0].repository.path, src))
 
-            const rhs = path.relative(tsconfig_dir, resolved)
-            info("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
+    //         const rhs = path.relative(tsconfig_dir, resolved)
+    //         info("tsconfig path", tsconfig_dir, "resolved", resolved, "result", rhs);
 
-            const a = (lhs: string, rhs: string) => {
-              ensure_path(r, "compilerOptions", "paths", lhs, [])
-              if (!r.compilerOptions.paths[lhs].includes(rhs)) {
-                r.compilerOptions.paths[lhs].push(rhs)
-              }
-            }
-            a(k, rhs) // without * for index.ts
-            a(`${k}/*`, `${rhs}/*`) // for pkg/foo.ts or pkg/foo/sth.ts
+    //         const a = (lhs: string, rhs: string) => {
+    //           const lhs_a = ensure_path(r, "compilerOptions", "paths", lhs, [])
+    //           if (!lhs_a.includes(rhs)) {
+    //             lhs_a.push(rhs)
+    //           }
+    //         }
+    //         a(k, rhs) // without * for index.ts
+    //         a(`${k}/*`, `${rhs}/*`) // for pkg/foo.ts or pkg/foo/sth.ts
+    //       }
+    //     }
+    //   }
+    //   return r;
+    // };
+      //
+      const paths = {}
+
+      const paths_add = (lhs: string, rhs: string) => {
+          const lhs_a = ensure_path(paths, lhs, [])
+          if (!lhs_a.includes(rhs)) {
+              lhs_a.push(rhs)
           }
-        }
       }
-      return r;
-    };
+
+      // link
+      for (let [k, v] of Object.entries(dep_collection.links)) {
+            if (opts.link_to_links) {
+              expected_symlinks[`${link_dir}/${v}`] = path.relative(path.join(link_dir, path.dirname(v) ), path.resolve(cwd, k))
+              paths_add(`${v}/*`, `src/tsmono/${v}/*`) // without * for index.ts
+              paths_add(v, `src/tsmono/${v}`) // without * for index.ts
+            }
+      }
+
+      // paths
+      for (let [k, v] of Object.entries(dep_collection.paths)) {
+          for (let v2 of v) {
+              paths_add(k, `src/tsmono/${v2}`)
+          }
+      }
+
+
 
     for (const [k, v] of Object.entries(dep_collection.dependency_locactions)) {
       if (v[0].repository) {
-        if (opts.link_to_links) {
-          expected_symlinks[`${link_dir}/${k}`] = `../../${v[0].repository.path}`
-        }
+
+        // if (opts.link_to_links) {
+        //   expected_symlinks[`${link_dir}/${k}`] = `../../${v[0].repository.path}`
+        // }
 
         const src_tool = `${v[0].repository.path}/src/tool`;
         (fs.existsSync(src_tool) ? fs.readdirSync(src_tool) : []).forEach((x) => {
@@ -674,12 +753,15 @@ class Repository {
     }
 
     const fix_ts_config = (x: any) => {
-      ensure_path(x, "compilerOptions", {})
+        ensure_path(x, "compilerOptions", {})
+        if (x?.compilerOptions?.moduleResolution == 'node')
+            console.log(chalk.red(`don't use moduleResolution node cause symlinks aren't found in a stable way`));
 
       // some sane defaults uer can overwrite which make most code just work
       // If you're not happy with these defaults you can always set the keys to overwrite these
       ensure_path(x, "compilerOptions", "preserveSymlinks", true) // so that stuff get's loaded from current directory and not multiple versions from dependencies
       ensure_path(x, "compilerOptions", "esModuleInterop", true) // eg to import m from "mithril"
+      ensure_path(x, "compilerOptions", "moduleResolution", 'node')
       ensure_path(x, "compilerOptions", "module", "commonjs") // eg to import m from "mithril"
       ensure_path(x, "compilerOptions", "target", "esnext") // eg to import m from "mithril"
       ensure_path(x, "compilerOptions", "strict", true) // eg to import m from "mithril"
@@ -691,6 +773,9 @@ class Repository {
             "es2015.collection",
             "es2015.iterable",
             "es2019", // [].flat()
+
+            "dom", "dom.iterable" // for (const x in el.children)
+
       ]) // eg to import m from "mithril"
 
       if ("paths" in x.compilerOptions){
@@ -701,6 +786,10 @@ class Repository {
               throw "please drop baseUrl from your config. cause we have paths e.g. due to referenced dependencies it should be '.'"
           }
       }
+
+      // for test/test.ts so that it can import {..} from "<lib-name>"
+      // when using classic module resolution, node causes some errors
+      ensure_path(x, 'compilerOptions', 'paths', this.basename, ["src/*"])
 
       // otherwise a lot of imports will not work
       x.compilerOptions.allowSyntheticDefaultImports = true
@@ -716,6 +805,10 @@ class Repository {
       }
       return x;
     }
+
+  const path_for_tsconfig = (x: string) => {
+      return {compilerOptions: {paths}};
+  }
 
     if ("tsconfigs" in tsmonojson) {
       for (const [path_, merge] of Object.entries(tsmonojson.tsconfigs)) {
@@ -870,6 +963,8 @@ update.addArgument("--link-to-links", {action: "storeTrue", help: "link ts depen
 update.addArgument("--recurse", {action: "storeTrue"})
 update.addArgument("--force", {action: "storeTrue"})
 
+const zip = sp.addParser("zip", {addHelp: true, description: "This also is default action"})
+
 const print_config_path = sp.addParser("print-config-path", {addHelp: true, description: "print tsmon.json path location"})
 
 const write_config_path = sp.addParser("write-sample-config", {addHelp: true, description: "write sample configuration file"})
@@ -974,7 +1069,7 @@ const tslint_hack = async () => {
     `, "utf8")
 
   } else {
-    const j = JSON5.parse(fs.readFileSync("tslint.json", "utf8"))
+    const j = parse_json_file("tslint.json")
     if (!j.rules["no-floating-promises"] && !j.rules["await-promise"])
       throw new Error(`please add
 
@@ -1083,6 +1178,11 @@ const main = async () => {
     await p.add(cfg, d, dd)
     return;
   }
+
+  if (args.main_action === "zip") {
+      console.log("TODO : zip target.zip $( echo tsconfig.json; echo package.json; find -L  src | grep -ve 'tsmono.*tsmono|\\.git'")
+  }
+
   if (args.main_action === "update") {
     await update();
     await tslint_hack();
@@ -1390,7 +1490,7 @@ const main = async () => {
   if (args.main_action === "reinstall-with-dependencies") {
     const p = new Repository(cfg, process.cwd(), {})
     const dep_collection = new DependencyCollection(cfg, p.path, p.tsmonojson.dirs())
-    dep_collection.dependencies_of_repository(p, true)
+    dep_collection.dependencies_of_repository(p, true, {addLinks: false})
     dep_collection.do()
     dep_collection.print_warnings()
     const seen: string[] = [] // TODO: why aret there duplicates ?

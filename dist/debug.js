@@ -25,7 +25,7 @@ exports.debug_help = debug_help;
 exports.default = (function (module) {
     if (do_debug_help)
         console.log("debug-list:", module);
-    var log = exports.debug.includes(module) || (exports.debug.includes('true') && !exports.debug.includes("-" + module));
+    var log = exports.debug.includes(module) || (exports.debug.includes('true') && !exports.debug.includes("-".concat(module)));
     var fun = log
         ? function () {
             var args = [];
