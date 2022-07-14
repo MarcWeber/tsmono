@@ -31,6 +31,7 @@ export const patches: {[key:string]: Patch} = {
     },
 
     "react": {npm_also_types:true},
+    "argparse": {npm_also_types:true},
     "react-dom": {npm_also_types:true},
     "react-router-dom": {npm_also_types:true},
 

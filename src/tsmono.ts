@@ -19,6 +19,7 @@ import {createLock} from "./lock"
 import jsonFile from "json-file-plus"
 import { patches, provided_by } from "./patches"
 import ln from "./library-notes"
+import {restartable_processes} from "./utils-restartable-processes"
 
 const readJsonFile = async (path: string): Promise<any> => {
     console.log("reading", path);
@@ -847,8 +848,14 @@ class Repository {
     for (const [k, v] of Object.entries(expected_symlinks)) {
       del_if_exists(k)
       fs.mkdirpSync(dirname(k))
-      info(`symlinking ${k} -> ${v}`);
-      fs.symlinkSync(v, k)
+        info(`symlinking ${k} -> ${v}`);
+      if  (tsmonojson.rsync_instead_of_symlink) {
+        await run('rsync', {args: ['-ra', `${path.join('src/tsmono', v)}/`, `${k}/`]})
+        // rsync so that you can commit easily
+      } else {
+        // link
+        fs.symlinkSync(v, k)
+      }
     }
 
     ensure_path(package_json, "dependencies", {})
@@ -1021,9 +1028,13 @@ reinstall.addArgument("--link-to-links", {action: "storeTrue", help: "link ts de
 const watch  = sp.addParser("watch", {addHelp: true})
 
 
-const esbuild_server_client_dev = sp.addParser("esbuild-server-client-dev", {addHelp: true, description: "check whether git repositories on local/ remote side are clean"})
+const esbuild_server_client_dev = sp.addParser("esbuild-server-client-dev", {addHelp: true, description: "experimental"})
 esbuild_server_client_dev.addArgument("--server-ts-file", { help: "server.ts"})
 esbuild_server_client_dev.addArgument("--web-ts-file", { help: "web client .ts files"})
+
+const vite_server_and_api = sp.addParser("vite-server-and-api", {addHelp: true, description: "experimental"})
+vite_server_and_api.addArgument("--server-ts-file", { help: "server.ts"})
+vite_server_and_api.addArgument("--api-ts-file",   { help: "server.ts like file providing API"})
 
 const args = parser.parseArgs();
 
@@ -1043,6 +1054,7 @@ const dot_git_ignore_hack = async () =>  {
     "/package.json.protect",
     "/package.json",  // derived by tsmono, but could be comitted
     "/tsconfig.json", // derived by tsmono, contains local setup paths
+    "/src/tsmono"
   ].filter((a) => ! lines.find((x) => x.startsWith(a)))
 
   if (to_be_added.length > 0) {
@@ -1514,47 +1526,30 @@ const main = async () => {
     })
   }
 
+  const external_libarries = ["fsevents", "esbuild", "oracledb", "better-sqlite3", "sqlite3", "pg-native", "tedious", "mysql2"]
+  const esbuild_external_flags = external_libarries.map((x) => `--external:${x}`)
 
-    if (args.main_action == "esbuild-server-client-dev"){
-        const server_ts = args.server_ts_file
-        const web_ts = args.web_ts_file
+  type CompileOtions = {ts_file: string}
+  const restartable = () => {
+    const r = restartable_processes();
 
+    const dist_dir = (o: CompileOtions) => `./dist/${path.basename(o.ts_file)}`
 
-        const processes: {[key:string]: ChildProcess} = {}
-        process.on('SIGINT', function() { for (let v of Object.values(processes)) v.kill(); process.exit(); });
+    const compile_server = (o: CompileOtions) => r.spawn(`compile_${path.basename(o.ts_file)}`,  'esbuild', [ `--outdir=${dist_dir(o)}`, "--bundle", `--platform=node`, o.ts_file, ...esbuild_external_flags])
+    const compile_web = (o: CompileOtions)    => r.spawn(`compile_${path.basename(o.ts_file)}`,  'esbuild', [ `--outdir=${dist_dir(o)}`, "--bundle", `--sourcemap`, o.ts_file])
 
-        const spawn_ = (x: "server_ts"| "web_ts"|"server", cmd: string, args: string[], echo?:true) =>  new Promise((r,j) => {
-            let out = ""
-            if (processes[x])  { console.log('killing'); processes[x].kill() }
-            const y =spawn(cmd, args, { stdio: [ undefined, 'pipe', 1] })
-            console.log(`== ${x} spawned`);
-            processes[x] = y
+    const restart = (o: CompileOtions) => r.spawn(`run_${path.basename(o.ts_file)}`, 'node', [path.join(dist_dir(o), path.basename(o.ts_file).replace(/\.ts/,'.js') )], true)
 
-            y.stdout?.on("data", (s) => { out += s; if (echo) console.log(""+s);})
-            y.stderr?.on("data", (s) => { out += s; if (echo) console.log(""+s);})
+    return {
+        compile_server,
+        compile_web,
+        restart,
+        ...r,
 
-            processes[x].on("close", (code, signal) => {
-                  if (code == 0) r(undefined);
-                  fs.writeFileSync(`${x}.log`, out)
-                  console.log(`== ${x} exited with : ${code} `);
-                  if (!echo) console.log(out);
-                  if (code == 0)
-                    console.log(chalk.green(`${x} exited gracefully`));
-                   else
-                    console.log(chalk.red(`${x} exited with code ${code}`));
-                  j(`code ${code}`)
-            })
-        })
+    }
+  }
 
-        const compile_server = () => spawn_("server_ts", 'esbuild', [ "--outdir=./dist", "--bundle", `--platform=node`, server_ts])
-        const compile_web = () => spawn_("web_ts", 'esbuild', [ "--outdir=./dist", "--bundle", `--sourcemap`, web_ts])
-        const restart_server = () => spawn_("server", 'node', [path.join('dist/', path.basename(server_ts).replace(/\.ts/,'.js') )], true)
-
-        const recompileAndStart = () => {
-            compile_web().catch(e => {})
-            if (server_ts) compile_server().then(() => restart_server()).catch(e => {});
-        }
-
+  const watch = (f: () => void) => {
         let timer: any = "wait"
 
         import('chokidar').then((chokidar) => {
@@ -1575,10 +1570,57 @@ const main = async () => {
             for (let arg of args) {
                 console.log("recompiling cause ", JSON.stringify(args), 'changed');
             }
-                recompileAndStart();
+                f();
             }, 50)
         }); })
+
+  }
+
+    if (args.main_action == "esbuild-server-client-dev"){
+
+        const {compile_server, compile_web, restart, kill_all} = restartable()
+        process.on('exit', () => kill_all());
+        // process.on('SIGINT', )
+
+        const server_ts = args.server_ts_file
+        const o_server = { ts_file: server_ts }
+        const o_web = { ts_file: args.web_ts_file }
+
+        const recompileAndStart = () => {
+            compile_web(o_web).catch(e => {})
+            if (server_ts) compile_server(o_server).then(() => restart(o_server)).catch(e => {});
+        }
+
+        watch(() => recompileAndStart())
+
         recompileAndStart()
+    }
+
+
+    if (args.main_action == "vite-server-and-api"){
+        /* node like development is compilcated cause you cannot easily hot reload api
+         * but you can recompile and reload.
+         * You don't want to recompile and reload the server manging HRM of your web app.
+         *
+         * So for developming you want to restart the api and ssr, but not the
+         * dev server managing the the client updates
+         *
+         * vite comes close - this just implements resterting the parties ..
+         */
+
+        const {compile_server, compile_web, restart, kill_all, spawn} = restartable()
+        process.on('exit', () => kill_all());
+
+        // spawn("build_ssr", "fyn", ["run", "build:ssr"], true)
+
+        const o_server = { ts_file: args.server_ts_file }
+        const o_api = { ts_file: args.api_ts_file }
+
+        compile_server(o_server).then(() => restart(o_server)).catch(e => {});
+
+        // const recompileAndStartAPI = () => compile_server(o_api).then(() => restart(o_api)).catch((e) => "compiling / starting api failed")
+        // watch(() => recompileAndStartAPI())
+        // recompileAndStartAPI()
     }
 
   // default action is update - does not work due to argparse (TOOD, there is no reqired: false for addSubparsers)

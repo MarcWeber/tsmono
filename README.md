@@ -202,7 +202,9 @@ tsmono.json example file:
 
     "name": "..",
 
-  }
+  },
+
+  rsync_instead_of_symlink: true, // optional
 
   "directories": ["../"],
 
@@ -344,7 +346,8 @@ command line options
   Maybe --preserve-symlinks not required. Maybe update is enough
 
   tsmono esbuild-server-client-dev --server-ts-file src/server.ts --web-ts-file src/web.ts
-```
+
+  tsmono  vite-server-and-api --server-ts-file src/server.ts --api-ts-file src/web.ts
 
 Think about this:
 =================
