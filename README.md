@@ -143,6 +143,14 @@ See fix_tsconfig
 Example:
 ========
 
+.tsmmono.json
+TSMONO_CONFIG_JSON='{"remote-location": {"gitRemoteLocationName":"host", "server": "user@host", "repositories-path-bare": "bare-repositories", "repositories-path-checked-out": "repositories"}, "directories": [ ""] }'
+
+See src/tsmono.ts goto type ConfigData and 
+
+
+
+
 ```
   monorepo/lib
   monorepo/lib/tsmono.json {"devDependencies", "dependencies": h}
@@ -157,7 +165,7 @@ Example:
 
   {
     // more examples see below
-    "directories": ["../"]
+    "directories": ["../"] # can also be set by TSMONO_CONFIG_JSON {directories}
     "dependencies": ["lib", "tool", "git+https://github.com/bar/baz.git:name=baz", "bar:types"] // lib and tool will be made available if found in directories
   }
 ```
@@ -320,12 +328,12 @@ command line options
   tsmono add [--no-types] foo -d bar # add foo and devDependencies bar, then run update
   tsmono remove foo -bar # remove libraries again
 
-  tsmono push-with-dependencies --shell-on-change --git-remote-config-json='{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'
+  tsmono push-with-dependencies --shell-on-change --config-json="$TSMONO_CONFIG_JSON"
   # pushes multiple repositories to a remote location optionally pulilng them, too.
   # great for keeping a test or server inv up to date with your local changes
 
   mkdir repo-to-pull; cd repo-to-pull
-  tsmono pull-with-dependencies --shell-on-change --git-remote-config-json='{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'
+  tsmono pull-with-dependencies --shell-on-change --config-json-="$TSMONO_CONFIG_JSON"
   # pulls repository with dependencies
   # tsmono must be runnable by ssh on the remote site (eg add to .bashrc or .zprofile or such)
   # because tsmono list-local-dependencies is used to determine what repositories to fetch

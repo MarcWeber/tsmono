@@ -162,18 +162,19 @@ class DirectoryCache implements Cache {
   }
 }
 
-interface ConfigData {
+type ConfigData = {
   cache: DirectoryCache,
   fetch_ttl_seconds: number,
   npm_install_cmd: string[], // eg ['fyn'] or ['npm', 'i']
   bin_sh: string,
+
+  directories?: string[] // 
+
+  "remote-location": RemoteLocation
 }
 
 type Config = ConfigData & ReturnType<typeof cfg_api>
 
-const config = {
-  cacheDir: "~/.tsmono/cache",
-}
 
 interface Dependency {
   name: string,
@@ -342,8 +343,11 @@ class TSMONOJSONFile extends JSONFile {
     ensure_path(this.json, "tsconfig", tsconfig)
   }
 
-  public dirs() {
-    return get_path(this.json, "tsmono", "directories", ["../"])
+  public dirs(cfg: Config): string[] {
+    return unique([
+            ...(cfg.directories ?? []),
+            ...get_path(this.json, "tsmono", "directories", ["../"])
+        ])
   }
 
   // dependencies(){
@@ -538,7 +542,7 @@ class Repository {
     }
 
   public repositories(opts?: {includeThis?: boolean}): Repository[] {
-    const dep_collection = new DependencyCollection(this.cfg, this.path, this.tsmonojson.dirs())
+    const dep_collection = new DependencyCollection(this.cfg, this.path, this.tsmonojson.dirs(this.cfg))
     dep_collection.dependencies_of_repository(this, true, {addLinks: false})
     dep_collection.do()
     dep_collection.print_warnings()
@@ -664,7 +668,7 @@ class Repository {
     package_json.devDependencies = {}
     delete package_json.tsconfig
     const tsconfig: any = {}
-    const dep_collection = new DependencyCollection(cfg, this.path, this.tsmonojson.dirs())
+    const dep_collection = new DependencyCollection(cfg, this.path, this.tsmonojson.dirs(this.cfg))
     dep_collection.dependencies_of_repository(this, true, {addLinks: false})
     dep_collection.do()
     dep_collection.print_warnings()
@@ -913,7 +917,7 @@ class Repository {
     }
 
     if (opts.symlink_node_modules_hack) {
-      for (const dir of this.tsmonojson.dirs()) {
+      for (const dir of this.tsmonojson.dirs(this.cfg)) {
         const n = `${dir}/node_modules`
         if (fs.existsSync(n)) {
           fs.unlinkSync(n)
@@ -994,19 +998,25 @@ push.addArgument("--shell-on-changes", {action: "storeTrue", help: "open shell s
 push.addArgument("--git-push-remote-location-name", { help: "eg origin"})
 care_about_remote_checkout(push)
 
+type TsmonoConfig = {
+    directories: string
+}
+
 interface RemoteLocation {
     server: string,
-    bareRepositoriesPath: string,
-    repositoriesPath: string,
-    gitRemoteLocationName: string,
+    "repositories-path-bare": string,  // where to push to  (remote basename eg repos will be put into bare-repositories/<NAME>
+    "repositories-path-checked-out": string,      // where to keep checked out versiorn if you choose --care-about-remote-checkout)
+    gitRemoteLocationName: string, // .git/config
     ignoreWhenPulling?: string[]
     ignoreWhenPushing?: string[]
 }
-push.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
+
+
+push.addArgument("--config-json", { help: "See README.md"})
+
 push.addArgument("--run-remote-command", {help: "remote ssh location to run git pull in user@host:path:cmd"})
 
 const pull = sp.addParser("pull-with-dependencies", {addHelp: true, description: "pull current directory from remote location with dependencies"})
-pull.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
 pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono update"})
 pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details"})
 care_about_remote_checkout(pull)
@@ -1015,7 +1025,6 @@ const clean = sp.addParser("is-clean", {addHelp: true, description: "check wheth
 clean.addArgument("--no-local", { action: 'storeTrue', help: "don't look at local directories"})
 clean.addArgument("--no-remote", { action: 'storeTrue', help: "don't\t look at remote directories"})
 clean.addArgument("--shell", {action: "storeTrue", help: "if dirty start shell so that you can commit"})
-clean.addArgument("--git-remote-config-json", { help: '{"gitRemoteLocationName":"remote", "server": "user@host", "bareRepositoriesPath": "repos-bare", "repositoriesPath": "repository-path"}'})
 
 const list_dependencies = sp.addParser("list-local-dependencies", {addHelp: true, description: "list dependencies"})
 
@@ -1137,24 +1146,40 @@ const main = async () => {
   const hd = homedir()
   const cache = new DirectoryCache(`${hd}/.tsmono/cache`)
 
-  const config = {
+  const configDefaults = {
     cache,
     fetch_ttl_seconds : 60 * 24,
     bin_sh: "/bin/sh",
     npm_install_cmd: ["fyn"],
+    cacheDir: "~/.tsmono/cache",
+  }
+
+  const json_or_empty = (s: string|undefined) => {
+      if (s){
+          try {
+              return JSON.parse(s)
+          } catch (e){
+              throw `error parsing JSON ${s}`
+          }
+      } else return {}
   }
 
   const config_from_home_dir_path = path.join(hd, ".tsmmono.json")
-  const env_config =
-   process.env.TSMONO_CONFIG_JSON
-   ? JSON.parse(process.env.TSMONO_CONFIG_JSON)
-   : {}
 
-  const homedir_config = fs.existsSync(config_from_home_dir_path)
-     ? JSON.parse(fs.readFileSync(config_from_home_dir_path, "utf8"))
-     : {}
+  const env_config = json_or_empty( process.env.TSMONO_CONFIG_JSON )
+  const homedir_config = json_or_empty (fs.existsSync(config_from_home_dir_path) ? fs.readFileSync(config_from_home_dir_path, "utf8") : undefined)
+  const args_config = json_or_empty(args.config_json)
 
-  const cfg = Object.assign({ }, config, cfg_api(config), homedir_config, env_config )
+  const config: ConfigData = Object.assign({ }, configDefaults, homedir_config, args_config, env_config )
+  const cfg: Config = { ...cfg_api( config ), ...config  }
+
+  if (! ( cfg.directories == undefined ||  Array.isArray(cfg.directories) ))
+    throw `directories must be an array! Check your configs`
+
+  console.log(`configDefaults is ${JSON.stringify(configDefaults, undefined, 2)}`)
+  console.log(`env_config is ${JSON.stringify(env_config, undefined, 2)}`)
+  console.log(`homedir_config is ${JSON.stringify(homedir_config, undefined, 2)}`)
+  console.log(`args_config is ${JSON.stringify(args_config, undefined, 2)}`)
 
   const ssh_cmd = (server: string) =>  async (stdin: string, args?: {stdout1: true}): Promise<string> => {
       return run("ssh", {args: [server], stdin, ...args})
@@ -1281,57 +1306,69 @@ const main = async () => {
     // TODO: think about relative directories ..
     const cwd = process.cwd()
     const reponame: string = path.basename(cwd)
-    const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
-    const sc = ssh_cmd(config.server)
+    const rL = cfg["remote-location"]
+    const sc = ssh_cmd(rL.server)
 
     let remote_exists = true;
 
     // test remote is git repository
     try {
       await sc(`
-      [ -f ${config.repositoriesPath}/${reponame}/.git/config ]
+      [ -f ${rL["repositories-path-checked-out"]}}/${reponame}/.git/config ]
       `, {stdout1: true})
     } catch (e) {
-      info(`remote directory ${config.repositoriesPath}/${reponame}/.git/config does not exit, cannot determine dependencies`)
+      info(`remote directory ${rL["repositories-path-checked-out"]}/${reponame}/.git/config does not exit, cannot determine dependencies`)
       remote_exists = false
     }
 
-    const items =
-    remote_exists
-    ? (await sc(`
-            cd ${config.repositoriesPath}/${reponame} && tsmono list-local-dependencies
-      `)).split("\n").filter((x) => /rel-path: /.test( x) ).map((x) => x.slice(11) )
-    : []
+    const items = await ( async () =>  {
+    if (!remote_exists) return [];
+
+       // // use remote list-local-dependencies
+       try {
+           return ( await sc(`
+             cd ${rL["repositories-path-checked-out"]}/${reponame} && tsmono list-local-dependencies
+           `)).split("\n").filter((x) => /rel-path: /.test( x) ).map((x) => x.slice(11) )
+       } catch (e){
+           console.log(chalk.red(`error getting dependencies assuming empty list`));
+           console.log(e);
+           return []
+       }
+    })()
 
     info("pulling " + JSON.stringify(items))
 
-    for (const path_ of ([] as string[]).concat([`../${reponame}`]).concat(items)) {
+    for (const path_ of ([`../${reponame}`, ...items])) {
       info(`pulling ${path_}`)
       const p_ = path.join(cwd, path_)
       const repo = basename(p_)
 
-      if ((config.ignoreWhenPulling || []).includes(repo)) continue;
+      if ((rL.ignoreWhenPulling || []).includes(repo)) continue;
 
       if (!fs.existsSync(p_)) {
         info(`creating ${p_}`)
         fs.mkdirpSync(p_)
       }
+
+        if (remote_exists)
       await sc(`
         exec 2>&1
         set -x
-        bare=${config.bareRepositoriesPath}/${repo}
-        repo=${config.repositoriesPath}/${repo}
+        bare=${rL["repositories-path-bare"]}/${repo}
+        repo=${rL["repositories-path-checked-out"]}/${repo}
         [ -d $bare ] || {
           mkdir -p $bare; ( cd $bare; git init --bare )
           ( cd $repo;
-            git remote add origin ${path.relative(path.join(config.repositoriesPath, repo), config.bareRepositoriesPath)}/${repo}
+            git remote add origin ${path.relative(path.join(rL["repositories-path-checked-out"], repo), rL["repositories-path-bare"])}/${repo}
             git push --set-upstream origin master
           )
         }
         ${ args.care_about_remote_checkout ? `( cd $repo; git pull  )` : ""}
         `)
+
+
       if (!fs.existsSync(path.join(p_, ".git/config"))) {
-        await run("git", { args: ["clone", `${config.server}:${config.bareRepositoriesPath}/${repo}`, p_] })
+        await run("git", { args: ["clone", `${rL.server}:${rL["repositories-path-bare"]}/${repo}`, p_] })
       }
       info(`pulling ${p_} ..`)
       await run("git", { args: ["pull"], cwd: p_ })
@@ -1353,8 +1390,9 @@ const main = async () => {
       info("using local dependencies as reference")
       const repositories = p.repositories({includeThis: true})
 
-      const config: RemoteLocation  = args.git_remote_config_json ? JSON.parse(args.git_remote_config_json) : undefined
-      const sc = () => ssh_cmd(config.server)
+      const rL = cfg["remote-location"]
+
+      const sc = () => ssh_cmd(rL.server)
 
       const results: string[] = []
 
@@ -1371,12 +1409,12 @@ const main = async () => {
       }
 
       const check_remote =  (r: Repository): Task => async (o) => {
-       const is_clean = async () => ("" === await sc()(`cd ${config.repositoriesPath}/${r.basename}; git diff`) ? "clean" : "dirty")
+       const is_clean = async () => ("" === await sc()(`cd ${rL["repositories-path-bare"]}/${r.basename}; git diff`) ? "clean" : "dirty")
        const clean_before = await is_clean()
        if (clean_before === "dirty"  && args.shell) {
           await o.with_user(async () => {
             info(`${r.path} is not clean, starting shell`)
-            await run("ssh", {args: [config.server, `cd ${config.repositoriesPath}/${r.basename}; exec $SHELL -i`], stdout1: true })
+            await run("ssh", {args: [rL.server, `cd ${rL["repositories-path-checked-out"]}/${r.basename}; exec $SHELL -i`], stdout1: true })
           })
         }
        results.push(`remote ${r.basename}: ${clean_before} -> ${await is_clean()}`)
@@ -1406,7 +1444,7 @@ const main = async () => {
 
   if (args.main_action === "push-with-dependencies") {
     const p = new Repository(cfg, process.cwd(), {})
-    const config: RemoteLocation  = JSON.parse(args.git_remote_config_json)
+    const rL = cfg["remote-location"]
 
     const basenames_to_pull: string[] = []
     const seen: string[] = [] // TODO: why aret there duplicates ?
@@ -1424,29 +1462,29 @@ const main = async () => {
       info(r.path, "ensuring remote setup")
         // ensure remote location is there
       const reponame = r.basename
-      if ("" === await run(`git`, {expected_exitcodes: [0, 1], args: `config --get remote.${config.gitRemoteLocationName}.url`.split(" "), cwd: r.path})) {
+      if ("" === await run(`git`, {expected_exitcodes: [0, 1], args: `config --get remote.${rL.gitRemoteLocationName}.url`.split(" "), cwd: r.path})) {
           // local side
-          await run(`git`, {args: `remote add ${config.gitRemoteLocationName} ${config.server}:${config.bareRepositoriesPath}/${reponame}`.split(" "), cwd: r.path })
+          await run(`git`, {args: `remote add ${rL.gitRemoteLocationName} ${rL.server}:${rL["repositories-path-bare"]}/${reponame}`.split(" "), cwd: r.path })
 
           // remote side
-          await run(`ssh`, {args: [ config.server], cwd: r.path, stdin: `
-          bare=${config.bareRepositoriesPath}/${reponame}
-          target=${config.repositoriesPath}/${reponame}
+          await run(`ssh`, {args: [ rL.server], cwd: r.path, stdin: `
+          bare=${rL["repositories-path-bare"]}/${reponame}
+          target=${rL["repositories-path-checked-out"]}/${reponame}
           [ -d "$bare" ] || mkdir -p "$bare"; ( cd "$bare"; git init --bare; )
           ${ args.care_about_remote_checkout ? `[ -d "$target" ] || ( git clone $bare $target; cd $target; git config pull.rebase true; )` : ""}
           ` })
 
           // local side .git/config
-          await run(`git`, {args: `push --set-upstream ${config.gitRemoteLocationName} master`.split(" "), cwd: r.path })
+          await run(`git`, {args: `push --set-upstream ${rL.gitRemoteLocationName} master`.split(" "), cwd: r.path })
         }
     }
 
     const remote_update = async (r: Repository) => {
       if (!args.care_about_remote_checkout) return;
       const reponame = r.basename
-      await run(`ssh`, {args: [ config.server],
+      await run(`ssh`, {args: [ rL.server],
         cwd: r.path, stdin: `
-          target=${config.repositoriesPath}/${reponame}
+          target=${rL["repositories-path-checked-out"]}/${reponame}
           cd $target
           git pull
       `})
@@ -1459,9 +1497,9 @@ const main = async () => {
         await ensure_remote_location_setup(r)
 
         // 2 push
-        if (config.gitRemoteLocationName) {
+        if (rL.gitRemoteLocationName) {
           info(`... pushing in ${r.path} ...`)
-          await run("git", {args: ["push", config.gitRemoteLocationName], cwd: r.path})
+          await run("git", {args: ["push", rL.gitRemoteLocationName], cwd: r.path})
         }
         // 3 checkout
         await remote_update(r)
@@ -1501,7 +1539,7 @@ const main = async () => {
 
   if (args.main_action === "reinstall-with-dependencies") {
     const p = new Repository(cfg, process.cwd(), {})
-    const dep_collection = new DependencyCollection(cfg, p.path, p.tsmonojson.dirs())
+    const dep_collection = new DependencyCollection(cfg, p.path, p.tsmonojson.dirs(cfg))
     dep_collection.dependencies_of_repository(p, true, {addLinks: false})
     dep_collection.do()
     dep_collection.print_warnings()
