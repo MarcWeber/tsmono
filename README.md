@@ -47,7 +47,11 @@ CONFIG eg for MSYS2
 tsmono --print-config-path
 tsmono --write-sample-config
 
-or export TSMONO_CONFIG_JSON
+or export TSMONO_CONFIG_JSON or TSMONO_CONFIG_JSON2
+
+TSMONO_CONFIG_JSON2 exists because most shells are bad at JSON, so you can just
+define multiple and have tsmono merge them.
+
 
 ROADMAP / TODO:
 ===============

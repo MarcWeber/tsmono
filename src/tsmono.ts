@@ -1166,18 +1166,20 @@ const main = async () => {
 
   const config_from_home_dir_path = path.join(hd, ".tsmmono.json")
 
-  const env_config = json_or_empty( process.env.TSMONO_CONFIG_JSON )
+  const env_configs = ["", "1", "2", "3"].map((x) => json_or_empty( process.env[`TSMONO_CONFIG_JSON${x}`] ))
+  const env_config2 = json_or_empty( process.env.TSMONO_CONFIG_JSON2 )
   const homedir_config = json_or_empty (fs.existsSync(config_from_home_dir_path) ? fs.readFileSync(config_from_home_dir_path, "utf8") : undefined)
   const args_config = json_or_empty(args.config_json)
 
-  const config: ConfigData = Object.assign({ }, configDefaults, homedir_config, args_config, env_config )
+  const config: ConfigData = Object.assign({ }, configDefaults, homedir_config, args_config, ...env_configs, env_config2 )
   const cfg: Config = { ...cfg_api( config ), ...config  }
 
   if (! ( cfg.directories == undefined ||  Array.isArray(cfg.directories) ))
     throw `directories must be an array! Check your configs`
 
   console.log(`configDefaults is ${JSON.stringify(configDefaults, undefined, 2)}`)
-  console.log(`env_config is ${JSON.stringify(env_config, undefined, 2)}`)
+  console.log(`env_configs are ${JSON.stringify(env_configs, undefined, 2)}`)
+  console.log(`env_config2export is ${JSON.stringify(env_config2, undefined, 2)}`)
   console.log(`homedir_config is ${JSON.stringify(homedir_config, undefined, 2)}`)
   console.log(`args_config is ${JSON.stringify(args_config, undefined, 2)}`)
 
