@@ -52,6 +52,25 @@ or export TSMONO_CONFIG_JSON or TSMONO_CONFIG_JSON2
 TSMONO_CONFIG_JSON2 exists because most shells are bad at JSON, so you can just
 define multiple and have tsmono merge them.
 
+Example:
+
+{"remote-location":
+
+  {"gitRemoteLocationName":"vnc",
+     "server": "user@host",
+     "repositories-path-bare": "bare-directory",
+     "repositories-path-checked-out": "checked-out-reposiotry"
+  },
+ "directories": ["/pr/typescript/ts"]
+
+  # planned:
+  # for each have path mappnigs like ts- prefix to ts/ to have many
+  # directories or ts-foo to ts/foo/* if you have many surepositories belonging to
+  # typescriptone kind of project this is gonna help with grepping etc
+  #
+  # checkout remote location ..
+}
+
 
 ROADMAP / TODO:
 ===============

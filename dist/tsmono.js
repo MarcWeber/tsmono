@@ -15534,6 +15534,7 @@ var require_chokidar = __commonJS({
 });
 
 // src/tsmono.ts
+var import_os = __toESM(require("os"));
 var import_argparse = __toESM(require_argparse2());
 var import_chalk2 = __toESM(require_source());
 
@@ -15570,7 +15571,7 @@ var import_child_process2 = require("child_process");
 var import_cross_fetch = __toESM(require_node_ponyfill());
 var import_deep_equal = __toESM(require_deep_equal());
 var import_deepmerge = __toESM(require_umd());
-var import_os = require("os");
+var import_os2 = require("os");
 var import_path = require("path");
 
 // src/lock.ts
@@ -16599,7 +16600,7 @@ var run_tasks = async (tasks) => {
   }));
 };
 var main = async () => {
-  const hd = (0, import_os.homedir)();
+  const hd = (0, import_os2.homedir)();
   const cache = new DirectoryCache(`${hd}/.tsmono/cache`);
   const configDefaults = {
     cache,
@@ -16848,8 +16849,14 @@ var main = async () => {
     const ensure_repo_committed_and_clean = async (r) => {
       info(r.path, "checking for cleanness");
       if (args.shell_on_changes && await run("git", { args: ["diff"], cwd: r.path }) !== "") {
-        info(`${r.path} is dirty, please commit changes starting shell`);
-        await run(cfg.bin_sh, { cwd: r.path, stdout1: true });
+        info(`${r.path} is dirty, please commit changes`);
+        if (import_os.default.platform() === "win32") {
+          info(`starting shell on Windows not supported. Commit your changes and rerun. Quitting`);
+          process.exit();
+        } else {
+          info(`starting shell quit with ctrl-d or by typing exit return`);
+          await run(cfg.bin_sh, { cwd: r.path, stdout1: true });
+        }
       }
     };
     const ensure_remote_location_setup = async (r) => {
