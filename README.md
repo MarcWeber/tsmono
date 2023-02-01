@@ -56,7 +56,7 @@ Example:
 
 {"remote-location":
 
-  {"gitRemoteLocationName":"vnc",
+  {"gitRemoteLocationName":"origin",
      "server": "user@host",
      "repositories-path-bare": "bare-directory",
      "repositories-path-checked-out": "checked-out-reposiotry"
@@ -72,8 +72,21 @@ Example:
 }
 
 
+PREFIXES
+========
+  To stay sane once there are more repositories
+  you can put them into $MR_BASE/ts/ts-* for example
+  So if you reference abc it's gonna be looked up in ts-abc, too
+
 ROADMAP / TODO:
 ===============
+
+  [ ] rewrite from scratch allow multiple languages etc
+      see ../ts-monorepository
+
+  [ ] Env files are cool, but how to cope with vscode -> remote connection ? .. :-(
+      So must allow setting env per project or config or such for vscode to
+      know for completion where to lookup names
 
   [ ] xxhashjs requires webpack.ProvidePlugin({"buffer": ["buffer","Buffer"]})
       find a way to collect all of this shimming so that it can be used by
@@ -167,7 +180,7 @@ Example:
 ========
 
 .tsmmono.json
-TSMONO_CONFIG_JSON='{"remote-location": {"gitRemoteLocationName":"host", "server": "user@host", "repositories-path-bare": "bare-repositories", "repositories-path-checked-out": "repositories"}, "directories": [ ""] }'
+TSMONO_CONFIG_JSON='{"remote-location": {"gitRemoteLocationName":"origin", "server": "user@host", "repositories-path-bare": "bare-repositories", "repositories-path-checked-out": "repositories"}, "directories": [ ""] }'
 
 See src/tsmono.ts goto type ConfigData and 
 

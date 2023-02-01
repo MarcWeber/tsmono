@@ -502,7 +502,8 @@ class DependencyCollection {
       if (dep.npm) return; // nothing to do
 
       console.log("searching", dep);
-      const dirs_lookup = this.dirs.map((x) => path.join(x, provided_by[dep.name] ?? dep.name))
+      let dirs_lookup = this.dirs.map((x) => path.join(x, provided_by[dep.name] ?? dep.name))
+      dirs_lookup = [...dirs_lookup, ...dirs_lookup.map( (x) => `${dirname(x)}/ts-${basename(x)}`)]
 
       verbose("dirs_lookup", dirs_lookup);
 
@@ -760,8 +761,8 @@ class Repository {
 
     const fix_ts_config = (x: any) => {
         ensure_path(x, "compilerOptions", {})
-        if (x?.compilerOptions?.moduleResolution == 'node')
-            console.log(chalk.red(`don't use moduleResolution node cause symlinks aren't found in a stable way`));
+        // if (x?.compilerOptions?.moduleResolution == 'node')
+            // console.log(chalk.red(`don't use moduleResolution node cause symlinks aren't found in a stable way`));
 
       // some sane defaults uer can overwrite which make most code just work
       // If you're not happy with these defaults you can always set the keys to overwrite these
