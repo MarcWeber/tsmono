@@ -727,9 +727,9 @@ class Repository {
       // link
       for (let [k, v] of Object.entries(dep_collection.links)) {
             if (opts.link_to_links) {
-              expected_symlinks[`${link_dir}/${v}`] = path.relative(path.join(link_dir, path.dirname(v) ), path.resolve(cwd, k))
-              paths_add(`${v}/*`, `src/tsmono/${v}/*`) // without * for index.ts
-              paths_add(v, `src/tsmono/${v}`) // without * for index.ts
+              expected_symlinks[`${link_dir}/${v.replace(/^ts-/, '')}`] = path.relative(path.join(link_dir, path.dirname(v) ), path.resolve(cwd, k))
+              paths_add(`${v.replace(/^ts-/, '')}/*`, `src/tsmono/${v.replace(/^ts-/, '')}/*`) // without * for index.ts
+              paths_add(v.replace(/^ts-/, ''), `src/tsmono/${v.replace(/^ts-/, '')}`) // without * for index.ts
             }
       }
 

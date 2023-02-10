@@ -16412,9 +16412,9 @@ var Repository = class {
     };
     for (let [k, v] of Object.entries(dep_collection.links)) {
       if (opts.link_to_links) {
-        expected_symlinks[`${link_dir}/${v}`] = path.relative(path.join(link_dir, path.dirname(v)), path.resolve(cwd, k));
-        paths_add(`${v}/*`, `src/tsmono/${v}/*`);
-        paths_add(v, `src/tsmono/${v}`);
+        expected_symlinks[`${link_dir}/${v.replace(/^ts-/, "")}`] = path.relative(path.join(link_dir, path.dirname(v)), path.resolve(cwd, k));
+        paths_add(`${v.replace(/^ts-/, "")}/*`, `src/tsmono/${v.replace(/^ts-/, "")}/*`);
+        paths_add(v.replace(/^ts-/, ""), `src/tsmono/${v.replace(/^ts-/, "")}`);
       }
     }
     for (let [k, v] of Object.entries(dep_collection.paths)) {
