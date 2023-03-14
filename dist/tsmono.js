@@ -17,2334 +17,3220 @@ var __copyProps = (to, from, except, desc) => {
   return to;
 };
 var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
 
-// node_modules/.f/_/sprintf-js/1.0.3/sprintf-js/src/sprintf.js
-var require_sprintf = __commonJS({
-  "node_modules/.f/_/sprintf-js/1.0.3/sprintf-js/src/sprintf.js"(exports) {
-    (function(window2) {
-      var re = {
-        not_string: /[^s]/,
-        number: /[diefg]/,
-        json: /[j]/,
-        not_json: /[^j]/,
-        text: /^[^\x25]+/,
-        modulo: /^\x25{2}/,
-        placeholder: /^\x25(?:([1-9]\d*)\$|\(([^\)]+)\))?(\+)?(0|'[^$])?(-)?(\d+)?(?:\.(\d+))?([b-gijosuxX])/,
-        key: /^([a-z_][a-z_\d]*)/i,
-        key_access: /^\.([a-z_][a-z_\d]*)/i,
-        index_access: /^\[(\d+)\]/,
-        sign: /^[\+\-]/
-      };
-      function sprintf() {
-        var key = arguments[0], cache = sprintf.cache;
-        if (!(cache[key] && cache.hasOwnProperty(key))) {
-          cache[key] = sprintf.parse(key);
+// node_modules/argparse/lib/sub.js
+var require_sub = __commonJS({
+  "node_modules/argparse/lib/sub.js"(exports, module2) {
+    "use strict";
+    var { inspect } = require("util");
+    module2.exports = function sub(pattern, ...values) {
+      let regex = /%(?:(%)|(-)?(\*)?(?:\((\w+)\))?([A-Za-z]))/g;
+      let result = pattern.replace(regex, function(_, is_literal, is_left_align, is_padded, name, format) {
+        if (is_literal)
+          return "%";
+        let padded_count = 0;
+        if (is_padded) {
+          if (values.length === 0)
+            throw new TypeError("not enough arguments for format string");
+          padded_count = values.shift();
+          if (!Number.isInteger(padded_count))
+            throw new TypeError("* wants int");
         }
-        return sprintf.format.call(null, cache[key], arguments);
-      }
-      sprintf.format = function(parse_tree, argv) {
-        var cursor = 1, tree_length = parse_tree.length, node_type = "", arg, output = [], i, k, match, pad, pad_character, pad_length, is_positive = true, sign = "";
-        for (i = 0; i < tree_length; i++) {
-          node_type = get_type(parse_tree[i]);
-          if (node_type === "string") {
-            output[output.length] = parse_tree[i];
-          } else if (node_type === "array") {
-            match = parse_tree[i];
-            if (match[2]) {
-              arg = argv[cursor];
-              for (k = 0; k < match[2].length; k++) {
-                if (!arg.hasOwnProperty(match[2][k])) {
-                  throw new Error(sprintf("[sprintf] property '%s' does not exist", match[2][k]));
-                }
-                arg = arg[match[2][k]];
-              }
-            } else if (match[1]) {
-              arg = argv[match[1]];
-            } else {
-              arg = argv[cursor++];
-            }
-            if (get_type(arg) == "function") {
-              arg = arg();
-            }
-            if (re.not_string.test(match[8]) && re.not_json.test(match[8]) && (get_type(arg) != "number" && isNaN(arg))) {
-              throw new TypeError(sprintf("[sprintf] expecting number but found %s", get_type(arg)));
-            }
-            if (re.number.test(match[8])) {
-              is_positive = arg >= 0;
-            }
-            switch (match[8]) {
-              case "b":
-                arg = arg.toString(2);
-                break;
-              case "c":
-                arg = String.fromCharCode(arg);
-                break;
-              case "d":
-              case "i":
-                arg = parseInt(arg, 10);
-                break;
-              case "j":
-                arg = JSON.stringify(arg, null, match[6] ? parseInt(match[6]) : 0);
-                break;
-              case "e":
-                arg = match[7] ? arg.toExponential(match[7]) : arg.toExponential();
-                break;
-              case "f":
-                arg = match[7] ? parseFloat(arg).toFixed(match[7]) : parseFloat(arg);
-                break;
-              case "g":
-                arg = match[7] ? parseFloat(arg).toPrecision(match[7]) : parseFloat(arg);
-                break;
-              case "o":
-                arg = arg.toString(8);
-                break;
-              case "s":
-                arg = (arg = String(arg)) && match[7] ? arg.substring(0, match[7]) : arg;
-                break;
-              case "u":
-                arg = arg >>> 0;
-                break;
-              case "x":
-                arg = arg.toString(16);
-                break;
-              case "X":
-                arg = arg.toString(16).toUpperCase();
-                break;
-            }
-            if (re.json.test(match[8])) {
-              output[output.length] = arg;
-            } else {
-              if (re.number.test(match[8]) && (!is_positive || match[3])) {
-                sign = is_positive ? "+" : "-";
-                arg = arg.toString().replace(re.sign, "");
-              } else {
-                sign = "";
-              }
-              pad_character = match[4] ? match[4] === "0" ? "0" : match[4].charAt(1) : " ";
-              pad_length = match[6] - (sign + arg).length;
-              pad = match[6] ? pad_length > 0 ? str_repeat(pad_character, pad_length) : "" : "";
-              output[output.length] = match[5] ? sign + arg + pad : pad_character === "0" ? sign + pad + arg : pad + sign + arg;
-            }
-          }
-        }
-        return output.join("");
-      };
-      sprintf.cache = {};
-      sprintf.parse = function(fmt) {
-        var _fmt = fmt, match = [], parse_tree = [], arg_names = 0;
-        while (_fmt) {
-          if ((match = re.text.exec(_fmt)) !== null) {
-            parse_tree[parse_tree.length] = match[0];
-          } else if ((match = re.modulo.exec(_fmt)) !== null) {
-            parse_tree[parse_tree.length] = "%";
-          } else if ((match = re.placeholder.exec(_fmt)) !== null) {
-            if (match[2]) {
-              arg_names |= 1;
-              var field_list = [], replacement_field = match[2], field_match = [];
-              if ((field_match = re.key.exec(replacement_field)) !== null) {
-                field_list[field_list.length] = field_match[1];
-                while ((replacement_field = replacement_field.substring(field_match[0].length)) !== "") {
-                  if ((field_match = re.key_access.exec(replacement_field)) !== null) {
-                    field_list[field_list.length] = field_match[1];
-                  } else if ((field_match = re.index_access.exec(replacement_field)) !== null) {
-                    field_list[field_list.length] = field_match[1];
-                  } else {
-                    throw new SyntaxError("[sprintf] failed to parse named argument key");
-                  }
-                }
-              } else {
-                throw new SyntaxError("[sprintf] failed to parse named argument key");
-              }
-              match[2] = field_list;
-            } else {
-              arg_names |= 2;
-            }
-            if (arg_names === 3) {
-              throw new Error("[sprintf] mixing positional and named placeholders is not (yet) supported");
-            }
-            parse_tree[parse_tree.length] = match;
-          } else {
-            throw new SyntaxError("[sprintf] unexpected placeholder");
-          }
-          _fmt = _fmt.substring(match[0].length);
-        }
-        return parse_tree;
-      };
-      var vsprintf = function(fmt, argv, _argv) {
-        _argv = (argv || []).slice(0);
-        _argv.splice(0, 0, fmt);
-        return sprintf.apply(null, _argv);
-      };
-      function get_type(variable) {
-        return Object.prototype.toString.call(variable).slice(8, -1).toLowerCase();
-      }
-      function str_repeat(input, multiplier) {
-        return Array(multiplier + 1).join(input);
-      }
-      if (typeof exports !== "undefined") {
-        exports.sprintf = sprintf;
-        exports.vsprintf = vsprintf;
-      } else {
-        window2.sprintf = sprintf;
-        window2.vsprintf = vsprintf;
-        if (typeof define === "function" && define.amd) {
-          define(function() {
-            return {
-              sprintf,
-              vsprintf
-            };
-          });
-        }
-      }
-    })(typeof window === "undefined" ? exports : window);
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/const.js
-var require_const = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/const.js"(exports, module2) {
-    "use strict";
-    module2.exports.EOL = "\n";
-    module2.exports.SUPPRESS = "==SUPPRESS==";
-    module2.exports.OPTIONAL = "?";
-    module2.exports.ZERO_OR_MORE = "*";
-    module2.exports.ONE_OR_MORE = "+";
-    module2.exports.PARSER = "A...";
-    module2.exports.REMAINDER = "...";
-    module2.exports._UNRECOGNIZED_ARGS_ATTR = "_unrecognized_args";
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/utils.js
-var require_utils = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/utils.js"(exports) {
-    "use strict";
-    exports.repeat = function(str, num) {
-      var result = "";
-      for (var i = 0; i < num; i++) {
-        result += str;
-      }
-      return result;
-    };
-    exports.arrayEqual = function(a, b) {
-      if (a.length !== b.length) {
-        return false;
-      }
-      for (var i = 0; i < a.length; i++) {
-        if (a[i] !== b[i]) {
-          return false;
-        }
-      }
-      return true;
-    };
-    exports.trimChars = function(str, chars) {
-      var start = 0;
-      var end = str.length - 1;
-      while (chars.indexOf(str.charAt(start)) >= 0) {
-        start++;
-      }
-      while (chars.indexOf(str.charAt(end)) >= 0) {
-        end--;
-      }
-      return str.slice(start, end + 1);
-    };
-    exports.capitalize = function(str) {
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    };
-    exports.arrayUnion = function() {
-      var result = [];
-      for (var i = 0, values = {}; i < arguments.length; i++) {
-        var arr = arguments[i];
-        for (var j = 0; j < arr.length; j++) {
-          if (!values[arr[j]]) {
-            values[arr[j]] = true;
-            result.push(arr[j]);
-          }
-        }
-      }
-      return result;
-    };
-    function has(obj, key) {
-      return Object.prototype.hasOwnProperty.call(obj, key);
-    }
-    exports.has = has;
-    exports.extend = function(dest, src) {
-      for (var i in src) {
-        if (has(src, i)) {
-          dest[i] = src[i];
-        }
-      }
-    };
-    exports.trimEnd = function(str) {
-      return str.replace(/\s+$/g, "");
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action.js
-var require_action = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action.js"(exports, module2) {
-    "use strict";
-    var c = require_const();
-    var Action = module2.exports = function Action2(options) {
-      options = options || {};
-      this.optionStrings = options.optionStrings || [];
-      this.dest = options.dest;
-      this.nargs = typeof options.nargs !== "undefined" ? options.nargs : null;
-      this.constant = typeof options.constant !== "undefined" ? options.constant : null;
-      this.defaultValue = options.defaultValue;
-      this.type = typeof options.type !== "undefined" ? options.type : null;
-      this.choices = typeof options.choices !== "undefined" ? options.choices : null;
-      this.required = typeof options.required !== "undefined" ? options.required : false;
-      this.help = typeof options.help !== "undefined" ? options.help : null;
-      this.metavar = typeof options.metavar !== "undefined" ? options.metavar : null;
-      if (!(this.optionStrings instanceof Array)) {
-        throw new Error("optionStrings should be an array");
-      }
-      if (typeof this.required !== "undefined" && typeof this.required !== "boolean") {
-        throw new Error("required should be a boolean");
-      }
-    };
-    Action.prototype.getName = function() {
-      if (this.optionStrings.length > 0) {
-        return this.optionStrings.join("/");
-      } else if (this.metavar !== null && this.metavar !== c.SUPPRESS) {
-        return this.metavar;
-      } else if (typeof this.dest !== "undefined" && this.dest !== c.SUPPRESS) {
-        return this.dest;
-      }
-      return null;
-    };
-    Action.prototype.isOptional = function() {
-      return !this.isPositional();
-    };
-    Action.prototype.isPositional = function() {
-      return this.optionStrings.length === 0;
-    };
-    Action.prototype.call = function() {
-      throw new Error(".call() not defined");
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/help.js
-var require_help = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/help.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var Action = require_action();
-    var c = require_const();
-    var ActionHelp = module2.exports = function ActionHelp2(options) {
-      options = options || {};
-      if (options.defaultValue !== null) {
-        options.defaultValue = options.defaultValue;
-      } else {
-        options.defaultValue = c.SUPPRESS;
-      }
-      options.dest = options.dest !== null ? options.dest : c.SUPPRESS;
-      options.nargs = 0;
-      Action.call(this, options);
-    };
-    util.inherits(ActionHelp, Action);
-    ActionHelp.prototype.call = function(parser2) {
-      parser2.printHelp();
-      parser2.exit();
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/append.js
-var require_append = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/append.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var Action = require_action();
-    var c = require_const();
-    var ActionAppend = module2.exports = function ActionAppend2(options) {
-      options = options || {};
-      if (this.nargs <= 0) {
-        throw new Error("nargs for append actions must be > 0; if arg strings are not supplying the value to append, the append const action may be more appropriate");
-      }
-      if (!!this.constant && this.nargs !== c.OPTIONAL) {
-        throw new Error("nargs must be OPTIONAL to supply const");
-      }
-      Action.call(this, options);
-    };
-    util.inherits(ActionAppend, Action);
-    ActionAppend.prototype.call = function(parser2, namespace, values) {
-      var items = (namespace[this.dest] || []).slice();
-      items.push(values);
-      namespace.set(this.dest, items);
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/append/constant.js
-var require_constant = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/append/constant.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var Action = require_action();
-    var ActionAppendConstant = module2.exports = function ActionAppendConstant2(options) {
-      options = options || {};
-      options.nargs = 0;
-      if (typeof options.constant === "undefined") {
-        throw new Error("constant option is required for appendAction");
-      }
-      Action.call(this, options);
-    };
-    util.inherits(ActionAppendConstant, Action);
-    ActionAppendConstant.prototype.call = function(parser2, namespace) {
-      var items = [].concat(namespace[this.dest] || []);
-      items.push(this.constant);
-      namespace.set(this.dest, items);
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/count.js
-var require_count = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/count.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var Action = require_action();
-    var ActionCount = module2.exports = function ActionCount2(options) {
-      options = options || {};
-      options.nargs = 0;
-      Action.call(this, options);
-    };
-    util.inherits(ActionCount, Action);
-    ActionCount.prototype.call = function(parser2, namespace) {
-      namespace.set(this.dest, (namespace[this.dest] || 0) + 1);
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store.js
-var require_store = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var Action = require_action();
-    var c = require_const();
-    var ActionStore = module2.exports = function ActionStore2(options) {
-      options = options || {};
-      if (this.nargs <= 0) {
-        throw new Error("nargs for store actions must be > 0; if you have nothing to store, actions such as store true or store const may be more appropriate");
-      }
-      if (typeof this.constant !== "undefined" && this.nargs !== c.OPTIONAL) {
-        throw new Error("nargs must be OPTIONAL to supply const");
-      }
-      Action.call(this, options);
-    };
-    util.inherits(ActionStore, Action);
-    ActionStore.prototype.call = function(parser2, namespace, values) {
-      namespace.set(this.dest, values);
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store/constant.js
-var require_constant2 = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store/constant.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var Action = require_action();
-    var ActionStoreConstant = module2.exports = function ActionStoreConstant2(options) {
-      options = options || {};
-      options.nargs = 0;
-      if (typeof options.constant === "undefined") {
-        throw new Error("constant option is required for storeAction");
-      }
-      Action.call(this, options);
-    };
-    util.inherits(ActionStoreConstant, Action);
-    ActionStoreConstant.prototype.call = function(parser2, namespace) {
-      namespace.set(this.dest, this.constant);
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store/true.js
-var require_true = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store/true.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var ActionStoreConstant = require_constant2();
-    var ActionStoreTrue = module2.exports = function ActionStoreTrue2(options) {
-      options = options || {};
-      options.constant = true;
-      options.defaultValue = options.defaultValue !== null ? options.defaultValue : false;
-      ActionStoreConstant.call(this, options);
-    };
-    util.inherits(ActionStoreTrue, ActionStoreConstant);
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store/false.js
-var require_false = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/store/false.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var ActionStoreConstant = require_constant2();
-    var ActionStoreFalse = module2.exports = function ActionStoreFalse2(options) {
-      options = options || {};
-      options.constant = false;
-      options.defaultValue = options.defaultValue !== null ? options.defaultValue : true;
-      ActionStoreConstant.call(this, options);
-    };
-    util.inherits(ActionStoreFalse, ActionStoreConstant);
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/version.js
-var require_version = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/version.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var Action = require_action();
-    var c = require_const();
-    var ActionVersion = module2.exports = function ActionVersion2(options) {
-      options = options || {};
-      options.defaultValue = options.defaultValue ? options.defaultValue : c.SUPPRESS;
-      options.dest = options.dest || c.SUPPRESS;
-      options.nargs = 0;
-      this.version = options.version;
-      Action.call(this, options);
-    };
-    util.inherits(ActionVersion, Action);
-    ActionVersion.prototype.call = function(parser2) {
-      var version = this.version || parser2.version;
-      var formatter = parser2._getFormatter();
-      formatter.addText(version);
-      parser2.exit(0, formatter.formatHelp());
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/argument/error.js
-var require_error = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/argument/error.js"(exports, module2) {
-    "use strict";
-    var format = require("util").format;
-    var ERR_CODE = "ARGError";
-    module2.exports = function(argument, message) {
-      var argumentName = null;
-      var errMessage;
-      var err;
-      if (argument.getName) {
-        argumentName = argument.getName();
-      } else {
-        argumentName = "" + argument;
-      }
-      if (!argumentName) {
-        errMessage = message;
-      } else {
-        errMessage = format('argument "%s": %s', argumentName, message);
-      }
-      err = new TypeError(errMessage);
-      err.code = ERR_CODE;
-      return err;
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action/subparsers.js
-var require_subparsers = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action/subparsers.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var format = require("util").format;
-    var Action = require_action();
-    var c = require_const();
-    var argumentErrorHelper = require_error();
-    function ChoicesPseudoAction(name, help) {
-      var options = {
-        optionStrings: [],
-        dest: name,
-        help
-      };
-      Action.call(this, options);
-    }
-    util.inherits(ChoicesPseudoAction, Action);
-    function ActionSubparsers(options) {
-      options = options || {};
-      options.dest = options.dest || c.SUPPRESS;
-      options.nargs = c.PARSER;
-      this.debug = options.debug === true;
-      this._progPrefix = options.prog;
-      this._parserClass = options.parserClass;
-      this._nameParserMap = {};
-      this._choicesActions = [];
-      options.choices = this._nameParserMap;
-      Action.call(this, options);
-    }
-    util.inherits(ActionSubparsers, Action);
-    ActionSubparsers.prototype.addParser = function(name, options) {
-      var parser2;
-      var self2 = this;
-      options = options || {};
-      options.debug = this.debug === true;
-      if (!options.prog) {
-        options.prog = this._progPrefix + " " + name;
-      }
-      var aliases = options.aliases || [];
-      if (!!options.help || typeof options.help === "string") {
-        var help = options.help;
-        delete options.help;
-        var choiceAction = new ChoicesPseudoAction(name, help);
-        this._choicesActions.push(choiceAction);
-      }
-      parser2 = new this._parserClass(options);
-      this._nameParserMap[name] = parser2;
-      aliases.forEach(function(alias) {
-        self2._nameParserMap[alias] = parser2;
-      });
-      return parser2;
-    };
-    ActionSubparsers.prototype._getSubactions = function() {
-      return this._choicesActions;
-    };
-    ActionSubparsers.prototype.call = function(parser2, namespace, values) {
-      var parserName = values[0];
-      var argStrings = values.slice(1);
-      if (this.dest !== c.SUPPRESS) {
-        namespace[this.dest] = parserName;
-      }
-      if (this._nameParserMap[parserName]) {
-        parser2 = this._nameParserMap[parserName];
-      } else {
-        throw argumentErrorHelper(format(
-          'Unknown parser "%s" (choices: [%s]).',
-          parserName,
-          Object.keys(this._nameParserMap).join(", ")
-        ));
-      }
-      parser2.parseArgs(argStrings, namespace);
-    };
-    module2.exports = ActionSubparsers;
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/argument/group.js
-var require_group = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/argument/group.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var ActionContainer = require_action_container();
-    var ArgumentGroup = module2.exports = function ArgumentGroup2(container, options) {
-      options = options || {};
-      options.conflictHandler = options.conflictHandler || container.conflictHandler;
-      options.prefixChars = options.prefixChars || container.prefixChars;
-      options.argumentDefault = options.argumentDefault || container.argumentDefault;
-      ActionContainer.call(this, options);
-      this.title = options.title;
-      this._groupActions = [];
-      this._container = container;
-      this._registries = container._registries;
-      this._actions = container._actions;
-      this._optionStringActions = container._optionStringActions;
-      this._defaults = container._defaults;
-      this._hasNegativeNumberOptionals = container._hasNegativeNumberOptionals;
-      this._mutuallyExclusiveGroups = container._mutuallyExclusiveGroups;
-    };
-    util.inherits(ArgumentGroup, ActionContainer);
-    ArgumentGroup.prototype._addAction = function(action) {
-      action = ActionContainer.prototype._addAction.call(this, action);
-      this._groupActions.push(action);
-      return action;
-    };
-    ArgumentGroup.prototype._removeAction = function(action) {
-      ActionContainer.prototype._removeAction.call(this, action);
-      var actionIndex = this._groupActions.indexOf(action);
-      if (actionIndex >= 0) {
-        this._groupActions.splice(actionIndex, 1);
-      }
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/argument/exclusive.js
-var require_exclusive = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/argument/exclusive.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var ArgumentGroup = require_group();
-    var MutuallyExclusiveGroup = module2.exports = function MutuallyExclusiveGroup2(container, options) {
-      var required;
-      options = options || {};
-      required = options.required || false;
-      ArgumentGroup.call(this, container);
-      this.required = required;
-    };
-    util.inherits(MutuallyExclusiveGroup, ArgumentGroup);
-    MutuallyExclusiveGroup.prototype._addAction = function(action) {
-      var msg;
-      if (action.required) {
-        msg = "mutually exclusive arguments must be optional";
-        throw new Error(msg);
-      }
-      action = this._container._addAction(action);
-      this._groupActions.push(action);
-      return action;
-    };
-    MutuallyExclusiveGroup.prototype._removeAction = function(action) {
-      this._container._removeAction(action);
-      this._groupActions.remove(action);
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/action_container.js
-var require_action_container = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/action_container.js"(exports, module2) {
-    "use strict";
-    var format = require("util").format;
-    var c = require_const();
-    var $$ = require_utils();
-    var ActionHelp = require_help();
-    var ActionAppend = require_append();
-    var ActionAppendConstant = require_constant();
-    var ActionCount = require_count();
-    var ActionStore = require_store();
-    var ActionStoreConstant = require_constant2();
-    var ActionStoreTrue = require_true();
-    var ActionStoreFalse = require_false();
-    var ActionVersion = require_version();
-    var ActionSubparsers = require_subparsers();
-    var argumentErrorHelper = require_error();
-    var ActionContainer = module2.exports = function ActionContainer2(options) {
-      options = options || {};
-      this.description = options.description;
-      this.argumentDefault = options.argumentDefault;
-      this.prefixChars = options.prefixChars || "";
-      this.conflictHandler = options.conflictHandler;
-      this._registries = {};
-      this.register("action", null, ActionStore);
-      this.register("action", "store", ActionStore);
-      this.register("action", "storeConst", ActionStoreConstant);
-      this.register("action", "storeTrue", ActionStoreTrue);
-      this.register("action", "storeFalse", ActionStoreFalse);
-      this.register("action", "append", ActionAppend);
-      this.register("action", "appendConst", ActionAppendConstant);
-      this.register("action", "count", ActionCount);
-      this.register("action", "help", ActionHelp);
-      this.register("action", "version", ActionVersion);
-      this.register("action", "parsers", ActionSubparsers);
-      this._getHandler();
-      this._actions = [];
-      this._optionStringActions = {};
-      this._actionGroups = [];
-      this._mutuallyExclusiveGroups = [];
-      this._defaults = {};
-      this._regexpNegativeNumber = new RegExp("^[-]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?$");
-      this._hasNegativeNumberOptionals = [];
-    };
-    var ArgumentGroup = require_group();
-    var MutuallyExclusiveGroup = require_exclusive();
-    ActionContainer.prototype.register = function(registryName, value, object) {
-      this._registries[registryName] = this._registries[registryName] || {};
-      this._registries[registryName][value] = object;
-    };
-    ActionContainer.prototype._registryGet = function(registryName, value, defaultValue) {
-      if (arguments.length < 3) {
-        defaultValue = null;
-      }
-      return this._registries[registryName][value] || defaultValue;
-    };
-    ActionContainer.prototype.setDefaults = function(options) {
-      options = options || {};
-      for (var property in options) {
-        if ($$.has(options, property)) {
-          this._defaults[property] = options[property];
-        }
-      }
-      this._actions.forEach(function(action) {
-        if ($$.has(options, action.dest)) {
-          action.defaultValue = options[action.dest];
-        }
-      });
-    };
-    ActionContainer.prototype.getDefault = function(dest) {
-      var result = $$.has(this._defaults, dest) ? this._defaults[dest] : null;
-      this._actions.forEach(function(action) {
-        if (action.dest === dest && $$.has(action, "defaultValue")) {
-          result = action.defaultValue;
-        }
-      });
-      return result;
-    };
-    ActionContainer.prototype.addArgument = function(args2, options) {
-      args2 = args2;
-      options = options || {};
-      if (typeof args2 === "string") {
-        args2 = [args2];
-      }
-      if (!Array.isArray(args2)) {
-        throw new TypeError("addArgument first argument should be a string or an array");
-      }
-      if (typeof options !== "object" || Array.isArray(options)) {
-        throw new TypeError("addArgument second argument should be a hash");
-      }
-      if (!args2 || args2.length === 1 && this.prefixChars.indexOf(args2[0][0]) < 0) {
-        if (args2 && !!options.dest) {
-          throw new Error("dest supplied twice for positional argument");
-        }
-        options = this._getPositional(args2, options);
-      } else {
-        options = this._getOptional(args2, options);
-      }
-      if (typeof options.defaultValue === "undefined") {
-        var dest = options.dest;
-        if ($$.has(this._defaults, dest)) {
-          options.defaultValue = this._defaults[dest];
-        } else if (typeof this.argumentDefault !== "undefined") {
-          options.defaultValue = this.argumentDefault;
-        }
-      }
-      var ActionClass = this._popActionClass(options);
-      if (typeof ActionClass !== "function") {
-        throw new Error(format('Unknown action "%s".', ActionClass));
-      }
-      var action = new ActionClass(options);
-      var typeFunction = this._registryGet("type", action.type, action.type);
-      if (typeof typeFunction !== "function") {
-        throw new Error(format('"%s" is not callable', typeFunction));
-      }
-      return this._addAction(action);
-    };
-    ActionContainer.prototype.addArgumentGroup = function(options) {
-      var group = new ArgumentGroup(this, options);
-      this._actionGroups.push(group);
-      return group;
-    };
-    ActionContainer.prototype.addMutuallyExclusiveGroup = function(options) {
-      var group = new MutuallyExclusiveGroup(this, options);
-      this._mutuallyExclusiveGroups.push(group);
-      return group;
-    };
-    ActionContainer.prototype._addAction = function(action) {
-      var self2 = this;
-      this._checkConflict(action);
-      this._actions.push(action);
-      action.container = this;
-      action.optionStrings.forEach(function(optionString) {
-        self2._optionStringActions[optionString] = action;
-      });
-      action.optionStrings.forEach(function(optionString) {
-        if (optionString.match(self2._regexpNegativeNumber)) {
-          if (!self2._hasNegativeNumberOptionals.some(Boolean)) {
-            self2._hasNegativeNumberOptionals.push(true);
-          }
-        }
-      });
-      return action;
-    };
-    ActionContainer.prototype._removeAction = function(action) {
-      var actionIndex = this._actions.indexOf(action);
-      if (actionIndex >= 0) {
-        this._actions.splice(actionIndex, 1);
-      }
-    };
-    ActionContainer.prototype._addContainerActions = function(container) {
-      var titleGroupMap = {};
-      this._actionGroups.forEach(function(group) {
-        if (titleGroupMap[group.title]) {
-          throw new Error(format('Cannot merge actions - two groups are named "%s".', group.title));
-        }
-        titleGroupMap[group.title] = group;
-      });
-      var groupMap = {};
-      function actionHash(action) {
-        return action.getName();
-      }
-      container._actionGroups.forEach(function(group) {
-        if (!titleGroupMap[group.title]) {
-          titleGroupMap[group.title] = this.addArgumentGroup({
-            title: group.title,
-            description: group.description
-          });
-        }
-        group._groupActions.forEach(function(action) {
-          groupMap[actionHash(action)] = titleGroupMap[group.title];
-        });
-      }, this);
-      var mutexGroup;
-      container._mutuallyExclusiveGroups.forEach(function(group) {
-        mutexGroup = this.addMutuallyExclusiveGroup({
-          required: group.required
-        });
-        group._groupActions.forEach(function(action) {
-          groupMap[actionHash(action)] = mutexGroup;
-        });
-      }, this);
-      container._actions.forEach(function(action) {
-        var key = actionHash(action);
-        if (groupMap[key]) {
-          groupMap[key]._addAction(action);
+        let str;
+        if (name !== void 0) {
+          let dict = values[0];
+          if (typeof dict !== "object" || dict === null)
+            throw new TypeError("format requires a mapping");
+          if (!(name in dict))
+            throw new TypeError(`no such key: '${name}'`);
+          str = dict[name];
         } else {
-          this._addAction(action);
+          if (values.length === 0)
+            throw new TypeError("not enough arguments for format string");
+          str = values.shift();
         }
-      });
-    };
-    ActionContainer.prototype._getPositional = function(dest, options) {
-      if (Array.isArray(dest)) {
-        dest = dest[0];
-      }
-      if (options.required) {
-        throw new Error('"required" is an invalid argument for positionals.');
-      }
-      if (options.nargs !== c.OPTIONAL && options.nargs !== c.ZERO_OR_MORE) {
-        options.required = true;
-      }
-      if (options.nargs === c.ZERO_OR_MORE && typeof options.defaultValue === "undefined") {
-        options.required = true;
-      }
-      options.dest = dest;
-      options.optionStrings = [];
-      return options;
-    };
-    ActionContainer.prototype._getOptional = function(args2, options) {
-      var prefixChars = this.prefixChars;
-      var optionStrings = [];
-      var optionStringsLong = [];
-      args2.forEach(function(optionString) {
-        if (prefixChars.indexOf(optionString[0]) < 0) {
-          throw new Error(format(
-            'Invalid option string "%s": must start with a "%s".',
-            optionString,
-            prefixChars
-          ));
-        }
-        optionStrings.push(optionString);
-        if (optionString.length > 1 && prefixChars.indexOf(optionString[1]) >= 0) {
-          optionStringsLong.push(optionString);
-        }
-      });
-      var dest = options.dest || null;
-      delete options.dest;
-      if (!dest) {
-        var optionStringDest = optionStringsLong.length ? optionStringsLong[0] : optionStrings[0];
-        dest = $$.trimChars(optionStringDest, this.prefixChars);
-        if (dest.length === 0) {
-          throw new Error(
-            format('dest= is required for options like "%s"', optionStrings.join(", "))
-          );
-        }
-        dest = dest.replace(/-/g, "_");
-      }
-      options.dest = dest;
-      options.optionStrings = optionStrings;
-      return options;
-    };
-    ActionContainer.prototype._popActionClass = function(options, defaultValue) {
-      defaultValue = defaultValue || null;
-      var action = options.action || defaultValue;
-      delete options.action;
-      var actionClass = this._registryGet("action", action, action);
-      return actionClass;
-    };
-    ActionContainer.prototype._getHandler = function() {
-      var handlerString = this.conflictHandler;
-      var handlerFuncName = "_handleConflict" + $$.capitalize(handlerString);
-      var func = this[handlerFuncName];
-      if (typeof func === "undefined") {
-        var msg = "invalid conflict resolution value: " + handlerString;
-        throw new Error(msg);
-      } else {
-        return func;
-      }
-    };
-    ActionContainer.prototype._checkConflict = function(action) {
-      var optionStringActions = this._optionStringActions;
-      var conflictOptionals = [];
-      action.optionStrings.forEach(function(optionString) {
-        var conflOptional = optionStringActions[optionString];
-        if (typeof conflOptional !== "undefined") {
-          conflictOptionals.push([optionString, conflOptional]);
-        }
-      });
-      if (conflictOptionals.length > 0) {
-        var conflictHandler = this._getHandler();
-        conflictHandler.call(this, action, conflictOptionals);
-      }
-    };
-    ActionContainer.prototype._handleConflictError = function(action, conflOptionals) {
-      var conflicts = conflOptionals.map(function(pair) {
-        return pair[0];
-      });
-      conflicts = conflicts.join(", ");
-      throw argumentErrorHelper(
-        action,
-        format("Conflicting option string(s): %s", conflicts)
-      );
-    };
-    ActionContainer.prototype._handleConflictResolve = function(action, conflOptionals) {
-      var self2 = this;
-      conflOptionals.forEach(function(pair) {
-        var optionString = pair[0];
-        var conflictingAction = pair[1];
-        var i = conflictingAction.optionStrings.indexOf(optionString);
-        if (i >= 0) {
-          conflictingAction.optionStrings.splice(i, 1);
-        }
-        delete self2._optionStringActions[optionString];
-        if (conflictingAction.optionStrings.length === 0) {
-          conflictingAction.container._removeAction(conflictingAction);
-        }
-      });
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/help/formatter.js
-var require_formatter = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/help/formatter.js"(exports, module2) {
-    "use strict";
-    var sprintf = require_sprintf().sprintf;
-    var c = require_const();
-    var $$ = require_utils();
-    function Section(parent, heading) {
-      this._parent = parent;
-      this._heading = heading;
-      this._items = [];
-    }
-    Section.prototype.addItem = function(callback) {
-      this._items.push(callback);
-    };
-    Section.prototype.formatHelp = function(formatter) {
-      var itemHelp, heading;
-      if (this._parent) {
-        formatter._indent();
-      }
-      itemHelp = this._items.map(function(item) {
-        var obj, func, args2;
-        obj = formatter;
-        func = item[0];
-        args2 = item[1];
-        return func.apply(obj, args2);
-      });
-      itemHelp = formatter._joinParts(itemHelp);
-      if (this._parent) {
-        formatter._dedent();
-      }
-      if (!itemHelp) {
-        return "";
-      }
-      heading = "";
-      if (this._heading && this._heading !== c.SUPPRESS) {
-        var currentIndent = formatter.currentIndent;
-        heading = $$.repeat(" ", currentIndent) + this._heading + ":" + c.EOL;
-      }
-      return formatter._joinParts([c.EOL, heading, itemHelp, c.EOL]);
-    };
-    var HelpFormatter = module2.exports = function HelpFormatter2(options) {
-      options = options || {};
-      this._prog = options.prog;
-      this._maxHelpPosition = options.maxHelpPosition || 24;
-      this._width = options.width || (process.env.COLUMNS || 80) - 2;
-      this._currentIndent = 0;
-      this._indentIncriment = options.indentIncriment || 2;
-      this._level = 0;
-      this._actionMaxLength = 0;
-      this._rootSection = new Section(null);
-      this._currentSection = this._rootSection;
-      this._whitespaceMatcher = new RegExp("\\s+", "g");
-      this._longBreakMatcher = new RegExp(c.EOL + c.EOL + c.EOL + "+", "g");
-    };
-    HelpFormatter.prototype._indent = function() {
-      this._currentIndent += this._indentIncriment;
-      this._level += 1;
-    };
-    HelpFormatter.prototype._dedent = function() {
-      this._currentIndent -= this._indentIncriment;
-      this._level -= 1;
-      if (this._currentIndent < 0) {
-        throw new Error("Indent decreased below 0.");
-      }
-    };
-    HelpFormatter.prototype._addItem = function(func, args2) {
-      this._currentSection.addItem([func, args2]);
-    };
-    HelpFormatter.prototype.startSection = function(heading) {
-      this._indent();
-      var section = new Section(this._currentSection, heading);
-      var func = section.formatHelp.bind(section);
-      this._addItem(func, [this]);
-      this._currentSection = section;
-    };
-    HelpFormatter.prototype.endSection = function() {
-      this._currentSection = this._currentSection._parent;
-      this._dedent();
-    };
-    HelpFormatter.prototype.addText = function(text) {
-      if (text && text !== c.SUPPRESS) {
-        this._addItem(this._formatText, [text]);
-      }
-    };
-    HelpFormatter.prototype.addUsage = function(usage, actions, groups, prefix) {
-      if (usage !== c.SUPPRESS) {
-        this._addItem(this._formatUsage, [usage, actions, groups, prefix]);
-      }
-    };
-    HelpFormatter.prototype.addArgument = function(action) {
-      if (action.help !== c.SUPPRESS) {
-        var self2 = this;
-        var invocations = [this._formatActionInvocation(action)];
-        var invocationLength = invocations[0].length;
-        var actionLength;
-        if (action._getSubactions) {
-          this._indent();
-          action._getSubactions().forEach(function(subaction) {
-            var invocationNew = self2._formatActionInvocation(subaction);
-            invocations.push(invocationNew);
-            invocationLength = Math.max(invocationLength, invocationNew.length);
-          });
-          this._dedent();
-        }
-        actionLength = invocationLength + this._currentIndent;
-        this._actionMaxLength = Math.max(this._actionMaxLength, actionLength);
-        this._addItem(this._formatAction, [action]);
-      }
-    };
-    HelpFormatter.prototype.addArguments = function(actions) {
-      var self2 = this;
-      actions.forEach(function(action) {
-        self2.addArgument(action);
-      });
-    };
-    HelpFormatter.prototype.formatHelp = function() {
-      var help = this._rootSection.formatHelp(this);
-      if (help) {
-        help = help.replace(this._longBreakMatcher, c.EOL + c.EOL);
-        help = $$.trimChars(help, c.EOL) + c.EOL;
-      }
-      return help;
-    };
-    HelpFormatter.prototype._joinParts = function(partStrings) {
-      return partStrings.filter(function(part) {
-        return part && part !== c.SUPPRESS;
-      }).join("");
-    };
-    HelpFormatter.prototype._formatUsage = function(usage, actions, groups, prefix) {
-      if (!prefix && typeof prefix !== "string") {
-        prefix = "usage: ";
-      }
-      actions = actions || [];
-      groups = groups || [];
-      if (usage) {
-        usage = sprintf(usage, { prog: this._prog });
-      } else if (!usage && actions.length === 0) {
-        usage = this._prog;
-      } else if (!usage) {
-        var prog = this._prog;
-        var optionals = [];
-        var positionals = [];
-        var actionUsage;
-        var textWidth;
-        actions.forEach(function(action) {
-          if (action.isOptional()) {
-            optionals.push(action);
-          } else {
-            positionals.push(action);
-          }
-        });
-        actionUsage = this._formatActionsUsage([].concat(optionals, positionals), groups);
-        usage = [prog, actionUsage].join(" ");
-        textWidth = this._width - this._currentIndent;
-        if (prefix.length + usage.length > textWidth) {
-          var regexpPart = new RegExp("\\(.*?\\)+|\\[.*?\\]+|\\S+", "g");
-          var optionalUsage = this._formatActionsUsage(optionals, groups);
-          var positionalUsage = this._formatActionsUsage(positionals, groups);
-          var optionalParts = optionalUsage.match(regexpPart);
-          var positionalParts = positionalUsage.match(regexpPart) || [];
-          if (optionalParts.join(" ") !== optionalUsage) {
-            throw new Error(`assert "optionalParts.join(' ') === optionalUsage"`);
-          }
-          if (positionalParts.join(" ") !== positionalUsage) {
-            throw new Error(`assert "positionalParts.join(' ') === positionalUsage"`);
-          }
-          var _getLines = function(parts2, indent2, prefix2) {
-            var lines2 = [];
-            var line = [];
-            var lineLength = prefix2 ? prefix2.length - 1 : indent2.length - 1;
-            parts2.forEach(function(part) {
-              if (lineLength + 1 + part.length > textWidth) {
-                lines2.push(indent2 + line.join(" "));
-                line = [];
-                lineLength = indent2.length - 1;
-              }
-              line.push(part);
-              lineLength += part.length + 1;
-            });
-            if (line) {
-              lines2.push(indent2 + line.join(" "));
-            }
-            if (prefix2) {
-              lines2[0] = lines2[0].substr(indent2.length);
-            }
-            return lines2;
-          };
-          var lines, indent, parts;
-          if (prefix.length + prog.length <= 0.75 * textWidth) {
-            indent = $$.repeat(" ", prefix.length + prog.length + 1);
-            if (optionalParts) {
-              lines = [].concat(
-                _getLines([prog].concat(optionalParts), indent, prefix),
-                _getLines(positionalParts, indent)
-              );
-            } else if (positionalParts) {
-              lines = _getLines([prog].concat(positionalParts), indent, prefix);
-            } else {
-              lines = [prog];
-            }
-          } else {
-            indent = $$.repeat(" ", prefix.length);
-            parts = optionalParts.concat(positionalParts);
-            lines = _getLines(parts, indent);
-            if (lines.length > 1) {
-              lines = [].concat(
-                _getLines(optionalParts, indent),
-                _getLines(positionalParts, indent)
-              );
-            }
-            lines = [prog].concat(lines);
-          }
-          usage = lines.join(c.EOL);
-        }
-      }
-      return prefix + usage + c.EOL + c.EOL;
-    };
-    HelpFormatter.prototype._formatActionsUsage = function(actions, groups) {
-      var groupActions = [];
-      var inserts = [];
-      var self2 = this;
-      groups.forEach(function(group) {
-        var end;
-        var i2;
-        var start = actions.indexOf(group._groupActions[0]);
-        if (start >= 0) {
-          end = start + group._groupActions.length;
-          if ($$.arrayEqual(actions.slice(start, end), group._groupActions)) {
-            group._groupActions.forEach(function(action) {
-              groupActions.push(action);
-            });
-            if (!group.required) {
-              if (inserts[start]) {
-                inserts[start] += " [";
-              } else {
-                inserts[start] = "[";
-              }
-              inserts[end] = "]";
-            } else {
-              if (inserts[start]) {
-                inserts[start] += " (";
-              } else {
-                inserts[start] = "(";
-              }
-              inserts[end] = ")";
-            }
-            for (i2 = start + 1; i2 < end; i2 += 1) {
-              inserts[i2] = "|";
-            }
-          }
-        }
-      });
-      var parts = [];
-      actions.forEach(function(action, actionIndex) {
-        var part;
-        var optionString;
-        var argsDefault;
-        var argsString;
-        if (action.help === c.SUPPRESS) {
-          parts.push(null);
-          if (inserts[actionIndex] === "|") {
-            inserts.splice(actionIndex, actionIndex);
-          } else if (inserts[actionIndex + 1] === "|") {
-            inserts.splice(actionIndex + 1, actionIndex + 1);
-          }
-        } else if (!action.isOptional()) {
-          part = self2._formatArgs(action, action.dest);
-          if (groupActions.indexOf(action) >= 0) {
-            if (part[0] === "[" && part[part.length - 1] === "]") {
-              part = part.slice(1, -1);
-            }
-          }
-          parts.push(part);
-        } else {
-          optionString = action.optionStrings[0];
-          if (action.nargs === 0) {
-            part = "" + optionString;
-          } else {
-            argsDefault = action.dest.toUpperCase();
-            argsString = self2._formatArgs(action, argsDefault);
-            part = optionString + " " + argsString;
-          }
-          if (!action.required && groupActions.indexOf(action) < 0) {
-            part = "[" + part + "]";
-          }
-          parts.push(part);
-        }
-      });
-      for (var i = inserts.length - 1; i >= 0; --i) {
-        if (inserts[i] !== null) {
-          parts.splice(i, 0, inserts[i]);
-        }
-      }
-      var text = parts.filter(function(part) {
-        return !!part;
-      }).join(" ");
-      text = text.replace(/([\[(]) /g, "$1");
-      text = text.replace(/ ([\])])/g, "$1");
-      text = text.replace(/\[ *\]/g, "");
-      text = text.replace(/\( *\)/g, "");
-      text = text.replace(/\(([^|]*)\)/g, "$1");
-      text = text.trim();
-      return text;
-    };
-    HelpFormatter.prototype._formatText = function(text) {
-      text = sprintf(text, { prog: this._prog });
-      var textWidth = this._width - this._currentIndent;
-      var indentIncriment = $$.repeat(" ", this._currentIndent);
-      return this._fillText(text, textWidth, indentIncriment) + c.EOL + c.EOL;
-    };
-    HelpFormatter.prototype._formatAction = function(action) {
-      var self2 = this;
-      var helpText;
-      var helpLines;
-      var parts;
-      var indentFirst;
-      var helpPosition = Math.min(this._actionMaxLength + 2, this._maxHelpPosition);
-      var helpWidth = this._width - helpPosition;
-      var actionWidth = helpPosition - this._currentIndent - 2;
-      var actionHeader = this._formatActionInvocation(action);
-      if (!action.help) {
-        actionHeader = $$.repeat(" ", this._currentIndent) + actionHeader + c.EOL;
-      } else if (actionHeader.length <= actionWidth) {
-        actionHeader = $$.repeat(" ", this._currentIndent) + actionHeader + "  " + $$.repeat(" ", actionWidth - actionHeader.length);
-        indentFirst = 0;
-      } else {
-        actionHeader = $$.repeat(" ", this._currentIndent) + actionHeader + c.EOL;
-        indentFirst = helpPosition;
-      }
-      parts = [actionHeader];
-      if (action.help) {
-        helpText = this._expandHelp(action);
-        helpLines = this._splitLines(helpText, helpWidth);
-        parts.push($$.repeat(" ", indentFirst) + helpLines[0] + c.EOL);
-        helpLines.slice(1).forEach(function(line) {
-          parts.push($$.repeat(" ", helpPosition) + line + c.EOL);
-        });
-      } else if (actionHeader.charAt(actionHeader.length - 1) !== c.EOL) {
-        parts.push(c.EOL);
-      }
-      if (action._getSubactions) {
-        this._indent();
-        action._getSubactions().forEach(function(subaction) {
-          parts.push(self2._formatAction(subaction));
-        });
-        this._dedent();
-      }
-      return this._joinParts(parts);
-    };
-    HelpFormatter.prototype._formatActionInvocation = function(action) {
-      if (!action.isOptional()) {
-        var format_func = this._metavarFormatter(action, action.dest);
-        var metavars = format_func(1);
-        return metavars[0];
-      }
-      var parts = [];
-      var argsDefault;
-      var argsString;
-      if (action.nargs === 0) {
-        parts = parts.concat(action.optionStrings);
-      } else {
-        argsDefault = action.dest.toUpperCase();
-        argsString = this._formatArgs(action, argsDefault);
-        action.optionStrings.forEach(function(optionString) {
-          parts.push(optionString + " " + argsString);
-        });
-      }
-      return parts.join(", ");
-    };
-    HelpFormatter.prototype._metavarFormatter = function(action, metavarDefault) {
-      var result;
-      if (action.metavar || action.metavar === "") {
-        result = action.metavar;
-      } else if (action.choices) {
-        var choices = action.choices;
-        if (typeof choices === "string") {
-          choices = choices.split("").join(", ");
-        } else if (Array.isArray(choices)) {
-          choices = choices.join(",");
-        } else {
-          choices = Object.keys(choices).join(",");
-        }
-        result = "{" + choices + "}";
-      } else {
-        result = metavarDefault;
-      }
-      return function(size) {
-        if (Array.isArray(result)) {
-          return result;
-        }
-        var metavars = [];
-        for (var i = 0; i < size; i += 1) {
-          metavars.push(result);
-        }
-        return metavars;
-      };
-    };
-    HelpFormatter.prototype._formatArgs = function(action, metavarDefault) {
-      var result;
-      var metavars;
-      var buildMetavar = this._metavarFormatter(action, metavarDefault);
-      switch (action.nargs) {
-        case void 0:
-        case null:
-          metavars = buildMetavar(1);
-          result = "" + metavars[0];
-          break;
-        case c.OPTIONAL:
-          metavars = buildMetavar(1);
-          result = "[" + metavars[0] + "]";
-          break;
-        case c.ZERO_OR_MORE:
-          metavars = buildMetavar(2);
-          result = "[" + metavars[0] + " [" + metavars[1] + " ...]]";
-          break;
-        case c.ONE_OR_MORE:
-          metavars = buildMetavar(2);
-          result = "" + metavars[0] + " [" + metavars[1] + " ...]";
-          break;
-        case c.REMAINDER:
-          result = "...";
-          break;
-        case c.PARSER:
-          metavars = buildMetavar(1);
-          result = metavars[0] + " ...";
-          break;
-        default:
-          metavars = buildMetavar(action.nargs);
-          result = metavars.join(" ");
-      }
-      return result;
-    };
-    HelpFormatter.prototype._expandHelp = function(action) {
-      var params = { prog: this._prog };
-      Object.keys(action).forEach(function(actionProperty) {
-        var actionValue = action[actionProperty];
-        if (actionValue !== c.SUPPRESS) {
-          params[actionProperty] = actionValue;
-        }
-      });
-      if (params.choices) {
-        if (typeof params.choices === "string") {
-          params.choices = params.choices.split("").join(", ");
-        } else if (Array.isArray(params.choices)) {
-          params.choices = params.choices.join(", ");
-        } else {
-          params.choices = Object.keys(params.choices).join(", ");
-        }
-      }
-      return sprintf(this._getHelpString(action), params);
-    };
-    HelpFormatter.prototype._splitLines = function(text, width) {
-      var lines = [];
-      var delimiters = [" ", ".", ",", "!", "?"];
-      var re = new RegExp("[" + delimiters.join("") + "][^" + delimiters.join("") + "]*$");
-      text = text.replace(/[\n\|\t]/g, " ");
-      text = text.trim();
-      text = text.replace(this._whitespaceMatcher, " ");
-      text.split(c.EOL).forEach(function(line) {
-        if (width >= line.length) {
-          lines.push(line);
-          return;
-        }
-        var wrapStart = 0;
-        var wrapEnd = width;
-        var delimiterIndex = 0;
-        while (wrapEnd <= line.length) {
-          if (wrapEnd !== line.length && delimiters.indexOf(line[wrapEnd] < -1)) {
-            delimiterIndex = (re.exec(line.substring(wrapStart, wrapEnd)) || {}).index;
-            wrapEnd = wrapStart + delimiterIndex + 1;
-          }
-          lines.push(line.substring(wrapStart, wrapEnd));
-          wrapStart = wrapEnd;
-          wrapEnd += width;
-        }
-        if (wrapStart < line.length) {
-          lines.push(line.substring(wrapStart, wrapEnd));
-        }
-      });
-      return lines;
-    };
-    HelpFormatter.prototype._fillText = function(text, width, indent) {
-      var lines = this._splitLines(text, width);
-      lines = lines.map(function(line) {
-        return indent + line;
-      });
-      return lines.join(c.EOL);
-    };
-    HelpFormatter.prototype._getHelpString = function(action) {
-      return action.help;
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/namespace.js
-var require_namespace = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/namespace.js"(exports, module2) {
-    "use strict";
-    var $$ = require_utils();
-    var Namespace = module2.exports = function Namespace2(options) {
-      $$.extend(this, options);
-    };
-    Namespace.prototype.isset = function(key) {
-      return $$.has(this, key);
-    };
-    Namespace.prototype.set = function(key, value) {
-      if (typeof key === "object") {
-        $$.extend(this, key);
-      } else {
-        this[key] = value;
-      }
-      return this;
-    };
-    Namespace.prototype.get = function(key, defaultValue) {
-      return !this[key] ? defaultValue : this[key];
-    };
-    Namespace.prototype.unset = function(key, defaultValue) {
-      var value = this[key];
-      if (value !== null) {
-        delete this[key];
-        return value;
-      }
-      return defaultValue;
-    };
-  }
-});
-
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/argument_parser.js
-var require_argument_parser = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/argument_parser.js"(exports, module2) {
-    "use strict";
-    var util = require("util");
-    var format = require("util").format;
-    var Path = require("path");
-    var sprintf = require_sprintf().sprintf;
-    var c = require_const();
-    var $$ = require_utils();
-    var ActionContainer = require_action_container();
-    var argumentErrorHelper = require_error();
-    var HelpFormatter = require_formatter();
-    var Namespace = require_namespace();
-    function ArgumentParser2(options) {
-      if (!(this instanceof ArgumentParser2)) {
-        return new ArgumentParser2(options);
-      }
-      var self2 = this;
-      options = options || {};
-      options.description = options.description || null;
-      options.argumentDefault = options.argumentDefault || null;
-      options.prefixChars = options.prefixChars || "-";
-      options.conflictHandler = options.conflictHandler || "error";
-      ActionContainer.call(this, options);
-      options.addHelp = typeof options.addHelp === "undefined" || !!options.addHelp;
-      options.parents = options.parents || [];
-      options.prog = options.prog || Path.basename(process.argv[1]);
-      this.prog = options.prog;
-      this.usage = options.usage;
-      this.epilog = options.epilog;
-      this.version = options.version;
-      this.debug = options.debug === true;
-      this.formatterClass = options.formatterClass || HelpFormatter;
-      this.fromfilePrefixChars = options.fromfilePrefixChars || null;
-      this._positionals = this.addArgumentGroup({ title: "Positional arguments" });
-      this._optionals = this.addArgumentGroup({ title: "Optional arguments" });
-      this._subparsers = null;
-      function FUNCTION_IDENTITY(o) {
-        return o;
-      }
-      this.register("type", "auto", FUNCTION_IDENTITY);
-      this.register("type", null, FUNCTION_IDENTITY);
-      this.register("type", "int", function(x) {
-        var result = parseInt(x, 10);
-        if (isNaN(result)) {
-          throw new Error(x + " is not a valid integer.");
-        }
-        return result;
-      });
-      this.register("type", "float", function(x) {
-        var result = parseFloat(x);
-        if (isNaN(result)) {
-          throw new Error(x + " is not a valid float.");
-        }
-        return result;
-      });
-      this.register("type", "string", function(x) {
-        return "" + x;
-      });
-      var defaultPrefix = this.prefixChars.indexOf("-") > -1 ? "-" : this.prefixChars[0];
-      if (options.addHelp) {
-        this.addArgument(
-          [defaultPrefix + "h", defaultPrefix + defaultPrefix + "help"],
-          {
-            action: "help",
-            defaultValue: c.SUPPRESS,
-            help: "Show this help message and exit."
-          }
-        );
-      }
-      if (typeof this.version !== "undefined") {
-        this.addArgument(
-          [defaultPrefix + "v", defaultPrefix + defaultPrefix + "version"],
-          {
-            action: "version",
-            version: this.version,
-            defaultValue: c.SUPPRESS,
-            help: "Show program's version number and exit."
-          }
-        );
-      }
-      options.parents.forEach(function(parent) {
-        self2._addContainerActions(parent);
-        if (typeof parent._defaults !== "undefined") {
-          for (var defaultKey in parent._defaults) {
-            if (parent._defaults.hasOwnProperty(defaultKey)) {
-              self2._defaults[defaultKey] = parent._defaults[defaultKey];
-            }
-          }
-        }
-      });
-    }
-    util.inherits(ArgumentParser2, ActionContainer);
-    ArgumentParser2.prototype.addSubparsers = function(options) {
-      if (this._subparsers) {
-        this.error("Cannot have multiple subparser arguments.");
-      }
-      options = options || {};
-      options.debug = this.debug === true;
-      options.optionStrings = [];
-      options.parserClass = options.parserClass || ArgumentParser2;
-      if (!!options.title || !!options.description) {
-        this._subparsers = this.addArgumentGroup({
-          title: options.title || "subcommands",
-          description: options.description
-        });
-        delete options.title;
-        delete options.description;
-      } else {
-        this._subparsers = this._positionals;
-      }
-      if (!options.prog) {
-        var formatter = this._getFormatter();
-        var positionals = this._getPositionalActions();
-        var groups = this._mutuallyExclusiveGroups;
-        formatter.addUsage(this.usage, positionals, groups, "");
-        options.prog = formatter.formatHelp().trim();
-      }
-      var ParsersClass = this._popActionClass(options, "parsers");
-      var action = new ParsersClass(options);
-      this._subparsers._addAction(action);
-      return action;
-    };
-    ArgumentParser2.prototype._addAction = function(action) {
-      if (action.isOptional()) {
-        this._optionals._addAction(action);
-      } else {
-        this._positionals._addAction(action);
-      }
-      return action;
-    };
-    ArgumentParser2.prototype._getOptionalActions = function() {
-      return this._actions.filter(function(action) {
-        return action.isOptional();
-      });
-    };
-    ArgumentParser2.prototype._getPositionalActions = function() {
-      return this._actions.filter(function(action) {
-        return action.isPositional();
-      });
-    };
-    ArgumentParser2.prototype.parseArgs = function(args2, namespace) {
-      var argv;
-      var result = this.parseKnownArgs(args2, namespace);
-      args2 = result[0];
-      argv = result[1];
-      if (argv && argv.length > 0) {
-        this.error(
-          format("Unrecognized arguments: %s.", argv.join(" "))
-        );
-      }
-      return args2;
-    };
-    ArgumentParser2.prototype.parseKnownArgs = function(args2, namespace) {
-      var self2 = this;
-      args2 = args2 || process.argv.slice(2);
-      namespace = namespace || new Namespace();
-      self2._actions.forEach(function(action) {
-        if (action.dest !== c.SUPPRESS) {
-          if (!$$.has(namespace, action.dest)) {
-            if (action.defaultValue !== c.SUPPRESS) {
-              var defaultValue = action.defaultValue;
-              if (typeof action.defaultValue === "string") {
-                defaultValue = self2._getValue(action, defaultValue);
-              }
-              namespace[action.dest] = defaultValue;
-            }
-          }
-        }
-      });
-      Object.keys(self2._defaults).forEach(function(dest) {
-        namespace[dest] = self2._defaults[dest];
-      });
-      try {
-        var res = this._parseKnownArgs(args2, namespace);
-        namespace = res[0];
-        args2 = res[1];
-        if ($$.has(namespace, c._UNRECOGNIZED_ARGS_ATTR)) {
-          args2 = $$.arrayUnion(args2, namespace[c._UNRECOGNIZED_ARGS_ATTR]);
-          delete namespace[c._UNRECOGNIZED_ARGS_ATTR];
-        }
-        return [namespace, args2];
-      } catch (e) {
-        this.error(e);
-      }
-    };
-    ArgumentParser2.prototype._parseKnownArgs = function(argStrings, namespace) {
-      var self2 = this;
-      var extras = [];
-      if (this.fromfilePrefixChars !== null) {
-        argStrings = this._readArgsFromFiles(argStrings);
-      }
-      function actionHash(action) {
-        return action.getName();
-      }
-      var conflicts, key;
-      var actionConflicts = {};
-      this._mutuallyExclusiveGroups.forEach(function(mutexGroup) {
-        mutexGroup._groupActions.forEach(function(mutexAction, i, groupActions) {
-          key = actionHash(mutexAction);
-          if (!$$.has(actionConflicts, key)) {
-            actionConflicts[key] = [];
-          }
-          conflicts = actionConflicts[key];
-          conflicts.push.apply(conflicts, groupActions.slice(0, i));
-          conflicts.push.apply(conflicts, groupActions.slice(i + 1));
-        });
-      });
-      var optionStringIndices = {};
-      var argStringPatternParts = [];
-      argStrings.forEach(function(argString, argStringIndex) {
-        if (argString === "--") {
-          argStringPatternParts.push("-");
-          while (argStringIndex < argStrings.length) {
-            argStringPatternParts.push("A");
-            argStringIndex++;
-          }
-        } else {
-          var pattern;
-          var optionTuple = self2._parseOptional(argString);
-          if (!optionTuple) {
-            pattern = "A";
-          } else {
-            optionStringIndices[argStringIndex] = optionTuple;
-            pattern = "O";
-          }
-          argStringPatternParts.push(pattern);
-        }
-      });
-      var argStringsPattern = argStringPatternParts.join("");
-      var seenActions = [];
-      var seenNonDefaultActions = [];
-      function takeAction(action, argumentStrings, optionString) {
-        seenActions.push(action);
-        var argumentValues = self2._getValues(action, argumentStrings);
-        if (argumentValues !== action.defaultValue) {
-          seenNonDefaultActions.push(action);
-          if (actionConflicts[actionHash(action)]) {
-            actionConflicts[actionHash(action)].forEach(function(actionConflict) {
-              if (seenNonDefaultActions.indexOf(actionConflict) >= 0) {
-                throw argumentErrorHelper(
-                  action,
-                  format('Not allowed with argument "%s".', actionConflict.getName())
-                );
-              }
-            });
-          }
-        }
-        if (argumentValues !== c.SUPPRESS) {
-          action.call(self2, namespace, argumentValues, optionString);
-        }
-      }
-      function consumeOptional(startIndex2) {
-        var optionTuple = optionStringIndices[startIndex2];
-        var action = optionTuple[0];
-        var optionString = optionTuple[1];
-        var explicitArg = optionTuple[2];
-        var actionTuples = [];
-        var args2, argCount, start, stop;
-        for (; ; ) {
-          if (!action) {
-            extras.push(argStrings[startIndex2]);
-            return startIndex2 + 1;
-          }
-          if (explicitArg) {
-            argCount = self2._matchArgument(action, "A");
-            var chars = self2.prefixChars;
-            if (argCount === 0 && chars.indexOf(optionString[1]) < 0) {
-              actionTuples.push([action, [], optionString]);
-              optionString = optionString[0] + explicitArg[0];
-              var newExplicitArg = explicitArg.slice(1) || null;
-              var optionalsMap = self2._optionStringActions;
-              if (Object.keys(optionalsMap).indexOf(optionString) >= 0) {
-                action = optionalsMap[optionString];
-                explicitArg = newExplicitArg;
-              } else {
-                throw argumentErrorHelper(action, sprintf("ignored explicit argument %r", explicitArg));
-              }
-            } else if (argCount === 1) {
-              stop = startIndex2 + 1;
-              args2 = [explicitArg];
-              actionTuples.push([action, args2, optionString]);
-              break;
-            } else {
-              throw argumentErrorHelper(action, sprintf("ignored explicit argument %r", explicitArg));
-            }
-          } else {
-            start = startIndex2 + 1;
-            var selectedPatterns = argStringsPattern.substr(start);
-            argCount = self2._matchArgument(action, selectedPatterns);
-            stop = start + argCount;
-            args2 = argStrings.slice(start, stop);
-            actionTuples.push([action, args2, optionString]);
+        switch (format) {
+          case "s":
+            str = String(str);
             break;
-          }
-        }
-        if (actionTuples.length < 1) {
-          throw new Error("length should be > 0");
-        }
-        for (var i = 0; i < actionTuples.length; i++) {
-          takeAction.apply(self2, actionTuples[i]);
-        }
-        return stop;
-      }
-      var positionals = self2._getPositionalActions();
-      function consumePositionals(startIndex2) {
-        var selectedPattern = argStringsPattern.substr(startIndex2);
-        var argCounts = self2._matchArgumentsPartial(positionals, selectedPattern);
-        for (var i = 0; i < positionals.length; i++) {
-          var action = positionals[i];
-          var argCount = argCounts[i];
-          if (typeof argCount === "undefined") {
-            continue;
-          }
-          var args2 = argStrings.slice(startIndex2, startIndex2 + argCount);
-          startIndex2 += argCount;
-          takeAction(action, args2);
-        }
-        positionals = positionals.slice(argCounts.length);
-        return startIndex2;
-      }
-      var startIndex = 0;
-      var position;
-      var maxOptionStringIndex = -1;
-      Object.keys(optionStringIndices).forEach(function(position2) {
-        maxOptionStringIndex = Math.max(maxOptionStringIndex, parseInt(position2, 10));
-      });
-      var positionalsEndIndex, nextOptionStringIndex;
-      while (startIndex <= maxOptionStringIndex) {
-        nextOptionStringIndex = null;
-        for (position in optionStringIndices) {
-          if (!optionStringIndices.hasOwnProperty(position)) {
-            continue;
-          }
-          position = parseInt(position, 10);
-          if (position >= startIndex) {
-            if (nextOptionStringIndex !== null) {
-              nextOptionStringIndex = Math.min(nextOptionStringIndex, position);
-            } else {
-              nextOptionStringIndex = position;
+          case "r":
+            str = inspect(str);
+            break;
+          case "d":
+          case "i":
+            if (typeof str !== "number") {
+              throw new TypeError(`%${format} format: a number is required, not ${typeof str}`);
             }
-          }
-        }
-        if (startIndex !== nextOptionStringIndex) {
-          positionalsEndIndex = consumePositionals(startIndex);
-          if (positionalsEndIndex > startIndex) {
-            startIndex = positionalsEndIndex;
-            continue;
-          } else {
-            startIndex = positionalsEndIndex;
-          }
-        }
-        if (!optionStringIndices[startIndex]) {
-          var strings = argStrings.slice(startIndex, nextOptionStringIndex);
-          extras = extras.concat(strings);
-          startIndex = nextOptionStringIndex;
-        }
-        startIndex = consumeOptional(startIndex);
-      }
-      var stopIndex = consumePositionals(startIndex);
-      extras = extras.concat(argStrings.slice(stopIndex));
-      if (positionals.length > 0) {
-        self2.error("too few arguments");
-      }
-      self2._actions.forEach(function(action) {
-        if (action.required) {
-          if (seenActions.indexOf(action) < 0) {
-            self2.error(format('Argument "%s" is required', action.getName()));
-          }
-        }
-      });
-      var actionUsed = false;
-      self2._mutuallyExclusiveGroups.forEach(function(group) {
-        if (group.required) {
-          actionUsed = group._groupActions.some(function(action) {
-            return seenNonDefaultActions.indexOf(action) !== -1;
-          });
-          if (!actionUsed) {
-            var names = [];
-            group._groupActions.forEach(function(action) {
-              if (action.help !== c.SUPPRESS) {
-                names.push(action.getName());
-              }
-            });
-            names = names.join(" ");
-            var msg = "one of the arguments " + names + " is required";
-            self2.error(msg);
-          }
-        }
-      });
-      return [namespace, extras];
-    };
-    ArgumentParser2.prototype._readArgsFromFiles = function(argStrings) {
-      var self2 = this;
-      var fs3 = require("fs");
-      var newArgStrings = [];
-      argStrings.forEach(function(argString) {
-        if (self2.fromfilePrefixChars.indexOf(argString[0]) < 0) {
-          newArgStrings.push(argString);
-        } else {
-          try {
-            var argstrs = [];
-            var filename = argString.slice(1);
-            var content = fs3.readFileSync(filename, "utf8");
-            content = content.trim().split("\n");
-            content.forEach(function(argLine) {
-              self2.convertArgLineToArgs(argLine).forEach(function(arg) {
-                argstrs.push(arg);
-              });
-              argstrs = self2._readArgsFromFiles(argstrs);
-            });
-            newArgStrings.push.apply(newArgStrings, argstrs);
-          } catch (error) {
-            return self2.error(error.message);
-          }
-        }
-      });
-      return newArgStrings;
-    };
-    ArgumentParser2.prototype.convertArgLineToArgs = function(argLine) {
-      return [argLine];
-    };
-    ArgumentParser2.prototype._matchArgument = function(action, regexpArgStrings) {
-      var regexpNargs = new RegExp("^" + this._getNargsPattern(action));
-      var matches = regexpArgStrings.match(regexpNargs);
-      var message;
-      if (!matches) {
-        switch (action.nargs) {
-          case void 0:
-          case null:
-            message = "Expected one argument.";
-            break;
-          case c.OPTIONAL:
-            message = "Expected at most one argument.";
-            break;
-          case c.ONE_OR_MORE:
-            message = "Expected at least one argument.";
+            str = String(str.toFixed(0));
             break;
           default:
-            message = "Expected %s argument(s)";
+            throw new TypeError(`unsupported format character '${format}'`);
         }
-        throw argumentErrorHelper(
-          action,
-          format(message, action.nargs)
-        );
-      }
-      return matches[1].length;
-    };
-    ArgumentParser2.prototype._matchArgumentsPartial = function(actions, regexpArgStrings) {
-      var self2 = this;
-      var result = [];
-      var actionSlice, pattern, matches;
-      var i, j;
-      function getLength(string) {
-        return string.length;
-      }
-      for (i = actions.length; i > 0; i--) {
-        pattern = "";
-        actionSlice = actions.slice(0, i);
-        for (j = 0; j < actionSlice.length; j++) {
-          pattern += self2._getNargsPattern(actionSlice[j]);
-        }
-        pattern = new RegExp("^" + pattern);
-        matches = regexpArgStrings.match(pattern);
-        if (matches && matches.length > 0) {
-          matches = matches.splice(1);
-          result = result.concat(matches.map(getLength));
-          break;
-        }
-      }
-      return result;
-    };
-    ArgumentParser2.prototype._parseOptional = function(argString) {
-      var action, optionString, argExplicit, optionTuples;
-      if (!argString) {
-        return null;
-      }
-      if (this.prefixChars.indexOf(argString[0]) < 0) {
-        return null;
-      }
-      if (this._optionStringActions[argString]) {
-        return [this._optionStringActions[argString], argString, null];
-      }
-      if (argString.length === 1) {
-        return null;
-      }
-      if (argString.indexOf("=") >= 0) {
-        optionString = argString.split("=", 1)[0];
-        argExplicit = argString.slice(optionString.length + 1);
-        if (this._optionStringActions[optionString]) {
-          action = this._optionStringActions[optionString];
-          return [action, optionString, argExplicit];
-        }
-      }
-      optionTuples = this._getOptionTuples(argString);
-      if (optionTuples.length > 1) {
-        var optionStrings = optionTuples.map(function(optionTuple) {
-          return optionTuple[1];
-        });
-        this.error(format(
-          'Ambiguous option: "%s" could match %s.',
-          argString,
-          optionStrings.join(", ")
-        ));
-      } else if (optionTuples.length === 1) {
-        return optionTuples[0];
-      }
-      if (argString.match(this._regexpNegativeNumber)) {
-        if (!this._hasNegativeNumberOptionals.some(Boolean)) {
-          return null;
-        }
-      }
-      if (argString.search(" ") >= 0) {
-        return null;
-      }
-      return [null, argString, null];
-    };
-    ArgumentParser2.prototype._getOptionTuples = function(optionString) {
-      var result = [];
-      var chars = this.prefixChars;
-      var optionPrefix;
-      var argExplicit;
-      var action;
-      var actionOptionString;
-      if (chars.indexOf(optionString[0]) >= 0 && chars.indexOf(optionString[1]) >= 0) {
-        if (optionString.indexOf("=") >= 0) {
-          var optionStringSplit = optionString.split("=", 1);
-          optionPrefix = optionStringSplit[0];
-          argExplicit = optionStringSplit[1];
+        if (padded_count > 0) {
+          return is_left_align ? str.padEnd(padded_count) : str.padStart(padded_count);
         } else {
-          optionPrefix = optionString;
-          argExplicit = null;
+          return str;
         }
-        for (actionOptionString in this._optionStringActions) {
-          if (actionOptionString.substr(0, optionPrefix.length) === optionPrefix) {
-            action = this._optionStringActions[actionOptionString];
-            result.push([action, actionOptionString, argExplicit]);
-          }
-        }
-      } else if (chars.indexOf(optionString[0]) >= 0 && chars.indexOf(optionString[1]) < 0) {
-        optionPrefix = optionString;
-        argExplicit = null;
-        var optionPrefixShort = optionString.substr(0, 2);
-        var argExplicitShort = optionString.substr(2);
-        for (actionOptionString in this._optionStringActions) {
-          if (!$$.has(this._optionStringActions, actionOptionString))
-            continue;
-          action = this._optionStringActions[actionOptionString];
-          if (actionOptionString === optionPrefixShort) {
-            result.push([action, actionOptionString, argExplicitShort]);
-          } else if (actionOptionString.substr(0, optionPrefix.length) === optionPrefix) {
-            result.push([action, actionOptionString, argExplicit]);
-          }
-        }
-      } else {
-        throw new Error(format("Unexpected option string: %s.", optionString));
-      }
-      return result;
-    };
-    ArgumentParser2.prototype._getNargsPattern = function(action) {
-      var regexpNargs;
-      switch (action.nargs) {
-        case void 0:
-        case null:
-          regexpNargs = "(-*A-*)";
-          break;
-        case c.OPTIONAL:
-          regexpNargs = "(-*A?-*)";
-          break;
-        case c.ZERO_OR_MORE:
-          regexpNargs = "(-*[A-]*)";
-          break;
-        case c.ONE_OR_MORE:
-          regexpNargs = "(-*A[A-]*)";
-          break;
-        case c.REMAINDER:
-          regexpNargs = "([-AO]*)";
-          break;
-        case c.PARSER:
-          regexpNargs = "(-*A[-AO]*)";
-          break;
-        default:
-          regexpNargs = "(-*" + $$.repeat("-*A", action.nargs) + "-*)";
-      }
-      if (action.isOptional()) {
-        regexpNargs = regexpNargs.replace(/-\*/g, "");
-        regexpNargs = regexpNargs.replace(/-/g, "");
-      }
-      return regexpNargs;
-    };
-    ArgumentParser2.prototype._getValues = function(action, argStrings) {
-      var self2 = this;
-      if (action.nargs !== c.PARSER && action.nargs !== c.REMAINDER) {
-        argStrings = argStrings.filter(function(arrayElement) {
-          return arrayElement !== "--";
-        });
-      }
-      var value, argString;
-      if (argStrings.length === 0 && action.nargs === c.OPTIONAL) {
-        value = action.isOptional() ? action.constant : action.defaultValue;
-        if (typeof value === "string") {
-          value = this._getValue(action, value);
-          this._checkValue(action, value);
-        }
-      } else if (argStrings.length === 0 && action.nargs === c.ZERO_OR_MORE && action.optionStrings.length === 0) {
-        value = action.defaultValue || argStrings;
-        this._checkValue(action, value);
-      } else if (argStrings.length === 1 && (!action.nargs || action.nargs === c.OPTIONAL)) {
-        argString = argStrings[0];
-        value = this._getValue(action, argString);
-        this._checkValue(action, value);
-      } else if (action.nargs === c.REMAINDER) {
-        value = argStrings.map(function(v) {
-          return self2._getValue(action, v);
-        });
-      } else if (action.nargs === c.PARSER) {
-        value = argStrings.map(function(v) {
-          return self2._getValue(action, v);
-        });
-        this._checkValue(action, value[0]);
-      } else {
-        value = argStrings.map(function(v) {
-          return self2._getValue(action, v);
-        });
-        value.forEach(function(v) {
-          self2._checkValue(action, v);
-        });
-      }
-      return value;
-    };
-    ArgumentParser2.prototype._getValue = function(action, argString) {
-      var result;
-      var typeFunction = this._registryGet("type", action.type, action.type);
-      if (typeof typeFunction !== "function") {
-        var message = format("%s is not callable", typeFunction);
-        throw argumentErrorHelper(action, message);
-      }
-      try {
-        result = typeFunction(argString);
-      } catch (e) {
-        var name = null;
-        if (typeof action.type === "string") {
-          name = action.type;
-        } else {
-          name = action.type.name || action.type.displayName || "<function>";
-        }
-        var msg = format("Invalid %s value: %s", name, argString);
-        if (name === "<function>") {
-          msg += "\n" + e.message;
-        }
-        throw argumentErrorHelper(action, msg);
-      }
-      return result;
-    };
-    ArgumentParser2.prototype._checkValue = function(action, value) {
-      var choices = action.choices;
-      if (choices) {
-        if ((typeof choices === "string" || Array.isArray(choices)) && choices.indexOf(value) !== -1) {
-          return;
-        }
-        if (typeof choices === "object" && !Array.isArray(choices) && choices[value]) {
-          return;
-        }
-        if (typeof choices === "string") {
-          choices = choices.split("").join(", ");
-        } else if (Array.isArray(choices)) {
-          choices = choices.join(", ");
-        } else {
-          choices = Object.keys(choices).join(", ");
-        }
-        var message = format("Invalid choice: %s (choose from [%s])", value, choices);
-        throw argumentErrorHelper(action, message);
-      }
-    };
-    ArgumentParser2.prototype.formatUsage = function() {
-      var formatter = this._getFormatter();
-      formatter.addUsage(this.usage, this._actions, this._mutuallyExclusiveGroups);
-      return formatter.formatHelp();
-    };
-    ArgumentParser2.prototype.formatHelp = function() {
-      var formatter = this._getFormatter();
-      formatter.addUsage(this.usage, this._actions, this._mutuallyExclusiveGroups);
-      formatter.addText(this.description);
-      this._actionGroups.forEach(function(actionGroup) {
-        formatter.startSection(actionGroup.title);
-        formatter.addText(actionGroup.description);
-        formatter.addArguments(actionGroup._groupActions);
-        formatter.endSection();
       });
-      formatter.addText(this.epilog);
-      return formatter.formatHelp();
-    };
-    ArgumentParser2.prototype._getFormatter = function() {
-      var FormatterClass = this.formatterClass;
-      var formatter = new FormatterClass({ prog: this.prog });
-      return formatter;
-    };
-    ArgumentParser2.prototype.printUsage = function() {
-      this._printMessage(this.formatUsage());
-    };
-    ArgumentParser2.prototype.printHelp = function() {
-      this._printMessage(this.formatHelp());
-    };
-    ArgumentParser2.prototype._printMessage = function(message, stream) {
-      if (!stream) {
-        stream = process.stdout;
-      }
-      if (message) {
-        stream.write("" + message);
-      }
-    };
-    ArgumentParser2.prototype.exit = function(status, message) {
-      if (message) {
-        if (status === 0) {
-          this._printMessage(message);
+      if (values.length) {
+        if (values.length === 1 && typeof values[0] === "object" && values[0] !== null) {
         } else {
-          this._printMessage(message, process.stderr);
+          throw new TypeError("not all arguments converted during string formatting");
         }
       }
-      process.exit(status);
+      return result;
     };
-    ArgumentParser2.prototype.error = function(err) {
-      var message;
-      if (err instanceof Error) {
-        if (this.debug === true) {
-          throw err;
-        }
-        message = err.message;
-      } else {
-        message = err;
-      }
-      var msg = format("%s: error: %s", this.prog, message) + c.EOL;
-      if (this.debug === true) {
-        throw new Error(msg);
-      }
-      this.printUsage(process.stderr);
-      return this.exit(2, msg);
-    };
-    module2.exports = ArgumentParser2;
   }
 });
 
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/help/added_formatters.js
-var require_added_formatters = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/help/added_formatters.js"(exports, module2) {
+// node_modules/argparse/lib/textwrap.js
+var require_textwrap = __commonJS({
+  "node_modules/argparse/lib/textwrap.js"(exports, module2) {
     "use strict";
-    var util = require("util");
-    var c = require_const();
-    var $$ = require_utils();
-    var HelpFormatter = require_formatter();
-    function ArgumentDefaultsHelpFormatter(options) {
-      HelpFormatter.call(this, options);
+    var wordsep_simple_re = /([\t\n\x0b\x0c\r ]+)/;
+    var TextWrapper = class {
+      /*
+       *  Object for wrapping/filling text.  The public interface consists of
+       *  the wrap() and fill() methods; the other methods are just there for
+       *  subclasses to override in order to tweak the default behaviour.
+       *  If you want to completely replace the main wrapping algorithm,
+       *  you'll probably have to override _wrap_chunks().
+       *
+       *  Several instance attributes control various aspects of wrapping:
+       *    width (default: 70)
+       *      the maximum width of wrapped lines (unless break_long_words
+       *      is false)
+       *    initial_indent (default: "")
+       *      string that will be prepended to the first line of wrapped
+       *      output.  Counts towards the line's width.
+       *    subsequent_indent (default: "")
+       *      string that will be prepended to all lines save the first
+       *      of wrapped output; also counts towards each line's width.
+       *    expand_tabs (default: true)
+       *      Expand tabs in input text to spaces before further processing.
+       *      Each tab will become 0 .. 'tabsize' spaces, depending on its position
+       *      in its line.  If false, each tab is treated as a single character.
+       *    tabsize (default: 8)
+       *      Expand tabs in input text to 0 .. 'tabsize' spaces, unless
+       *      'expand_tabs' is false.
+       *    replace_whitespace (default: true)
+       *      Replace all whitespace characters in the input text by spaces
+       *      after tab expansion.  Note that if expand_tabs is false and
+       *      replace_whitespace is true, every tab will be converted to a
+       *      single space!
+       *    fix_sentence_endings (default: false)
+       *      Ensure that sentence-ending punctuation is always followed
+       *      by two spaces.  Off by default because the algorithm is
+       *      (unavoidably) imperfect.
+       *    break_long_words (default: true)
+       *      Break words longer than 'width'.  If false, those words will not
+       *      be broken, and some lines might be longer than 'width'.
+       *    break_on_hyphens (default: true)
+       *      Allow breaking hyphenated words. If true, wrapping will occur
+       *      preferably on whitespaces and right after hyphens part of
+       *      compound words.
+       *    drop_whitespace (default: true)
+       *      Drop leading and trailing whitespace from lines.
+       *    max_lines (default: None)
+       *      Truncate wrapped lines.
+       *    placeholder (default: ' [...]')
+       *      Append to the last line of truncated text.
+       */
+      constructor(options = {}) {
+        let {
+          width = 70,
+          initial_indent = "",
+          subsequent_indent = "",
+          expand_tabs = true,
+          replace_whitespace = true,
+          fix_sentence_endings = false,
+          break_long_words = true,
+          drop_whitespace = true,
+          break_on_hyphens = true,
+          tabsize = 8,
+          max_lines = void 0,
+          placeholder = " [...]"
+        } = options;
+        this.width = width;
+        this.initial_indent = initial_indent;
+        this.subsequent_indent = subsequent_indent;
+        this.expand_tabs = expand_tabs;
+        this.replace_whitespace = replace_whitespace;
+        this.fix_sentence_endings = fix_sentence_endings;
+        this.break_long_words = break_long_words;
+        this.drop_whitespace = drop_whitespace;
+        this.break_on_hyphens = break_on_hyphens;
+        this.tabsize = tabsize;
+        this.max_lines = max_lines;
+        this.placeholder = placeholder;
+      }
+      // -- Private methods -----------------------------------------------
+      // (possibly useful for subclasses to override)
+      _munge_whitespace(text) {
+        if (this.expand_tabs) {
+          text = text.replace(/\t/g, " ".repeat(this.tabsize));
+        }
+        if (this.replace_whitespace) {
+          text = text.replace(/[\t\n\x0b\x0c\r]/g, " ");
+        }
+        return text;
+      }
+      _split(text) {
+        let chunks = text.split(wordsep_simple_re);
+        chunks = chunks.filter(Boolean);
+        return chunks;
+      }
+      _handle_long_word(reversed_chunks, cur_line, cur_len, width) {
+        let space_left;
+        if (width < 1) {
+          space_left = 1;
+        } else {
+          space_left = width - cur_len;
+        }
+        if (this.break_long_words) {
+          cur_line.push(reversed_chunks[reversed_chunks.length - 1].slice(0, space_left));
+          reversed_chunks[reversed_chunks.length - 1] = reversed_chunks[reversed_chunks.length - 1].slice(space_left);
+        } else if (!cur_line) {
+          cur_line.push(...reversed_chunks.pop());
+        }
+      }
+      _wrap_chunks(chunks) {
+        let lines = [];
+        let indent;
+        if (this.width <= 0) {
+          throw Error(`invalid width ${this.width} (must be > 0)`);
+        }
+        if (this.max_lines !== void 0) {
+          if (this.max_lines > 1) {
+            indent = this.subsequent_indent;
+          } else {
+            indent = this.initial_indent;
+          }
+          if (indent.length + this.placeholder.trimStart().length > this.width) {
+            throw Error("placeholder too large for max width");
+          }
+        }
+        chunks = chunks.reverse();
+        while (chunks.length > 0) {
+          let cur_line = [];
+          let cur_len = 0;
+          let indent2;
+          if (lines) {
+            indent2 = this.subsequent_indent;
+          } else {
+            indent2 = this.initial_indent;
+          }
+          let width = this.width - indent2.length;
+          if (this.drop_whitespace && chunks[chunks.length - 1].trim() === "" && lines.length > 0) {
+            chunks.pop();
+          }
+          while (chunks.length > 0) {
+            let l = chunks[chunks.length - 1].length;
+            if (cur_len + l <= width) {
+              cur_line.push(chunks.pop());
+              cur_len += l;
+            } else {
+              break;
+            }
+          }
+          if (chunks.length && chunks[chunks.length - 1].length > width) {
+            this._handle_long_word(chunks, cur_line, cur_len, width);
+            cur_len = cur_line.map((l) => l.length).reduce((a, b) => a + b, 0);
+          }
+          if (this.drop_whitespace && cur_line.length > 0 && cur_line[cur_line.length - 1].trim() === "") {
+            cur_len -= cur_line[cur_line.length - 1].length;
+            cur_line.pop();
+          }
+          if (cur_line) {
+            if (this.max_lines === void 0 || lines.length + 1 < this.max_lines || (chunks.length === 0 || this.drop_whitespace && chunks.length === 1 && !chunks[0].trim()) && cur_len <= width) {
+              lines.push(indent2 + cur_line.join(""));
+            } else {
+              let had_break = false;
+              while (cur_line) {
+                if (cur_line[cur_line.length - 1].trim() && cur_len + this.placeholder.length <= width) {
+                  cur_line.push(this.placeholder);
+                  lines.push(indent2 + cur_line.join(""));
+                  had_break = true;
+                  break;
+                }
+                cur_len -= cur_line[-1].length;
+                cur_line.pop();
+              }
+              if (!had_break) {
+                if (lines) {
+                  let prev_line = lines[lines.length - 1].trimEnd();
+                  if (prev_line.length + this.placeholder.length <= this.width) {
+                    lines[lines.length - 1] = prev_line + this.placeholder;
+                    break;
+                  }
+                }
+                lines.push(indent2 + this.placeholder.lstrip());
+              }
+              break;
+            }
+          }
+        }
+        return lines;
+      }
+      _split_chunks(text) {
+        text = this._munge_whitespace(text);
+        return this._split(text);
+      }
+      // -- Public interface ----------------------------------------------
+      wrap(text) {
+        let chunks = this._split_chunks(text);
+        return this._wrap_chunks(chunks);
+      }
+      fill(text) {
+        return this.wrap(text).join("\n");
+      }
+    };
+    function wrap(text, options = {}) {
+      let { width = 70, ...kwargs } = options;
+      let w = new TextWrapper(Object.assign({ width }, kwargs));
+      return w.wrap(text);
     }
-    util.inherits(ArgumentDefaultsHelpFormatter, HelpFormatter);
-    ArgumentDefaultsHelpFormatter.prototype._getHelpString = function(action) {
-      var help = action.help;
-      if (action.help.indexOf("%(defaultValue)s") === -1) {
-        if (action.defaultValue !== c.SUPPRESS) {
-          var defaulting_nargs = [c.OPTIONAL, c.ZERO_OR_MORE];
-          if (action.isOptional() || defaulting_nargs.indexOf(action.nargs) >= 0) {
-            help += " (default: %(defaultValue)s)";
+    function fill(text, options = {}) {
+      let { width = 70, ...kwargs } = options;
+      let w = new TextWrapper(Object.assign({ width }, kwargs));
+      return w.fill(text);
+    }
+    var _whitespace_only_re = /^[ \t]+$/mg;
+    var _leading_whitespace_re = /(^[ \t]*)(?:[^ \t\n])/mg;
+    function dedent(text) {
+      let margin = void 0;
+      text = text.replace(_whitespace_only_re, "");
+      let indents = text.match(_leading_whitespace_re) || [];
+      for (let indent of indents) {
+        indent = indent.slice(0, -1);
+        if (margin === void 0) {
+          margin = indent;
+        } else if (indent.startsWith(margin)) {
+        } else if (margin.startsWith(indent)) {
+          margin = indent;
+        } else {
+          for (let i = 0; i < margin.length && i < indent.length; i++) {
+            if (margin[i] !== indent[i]) {
+              margin = margin.slice(0, i);
+              break;
+            }
           }
         }
       }
-      return help;
-    };
-    module2.exports.ArgumentDefaultsHelpFormatter = ArgumentDefaultsHelpFormatter;
-    function RawDescriptionHelpFormatter(options) {
-      HelpFormatter.call(this, options);
+      if (margin) {
+        text = text.replace(new RegExp("^" + margin, "mg"), "");
+      }
+      return text;
     }
-    util.inherits(RawDescriptionHelpFormatter, HelpFormatter);
-    RawDescriptionHelpFormatter.prototype._fillText = function(text, width, indent) {
-      var lines = text.split("\n");
-      lines = lines.map(function(line) {
-        return $$.trimEnd(indent + line);
-      });
-      return lines.join("\n");
-    };
-    module2.exports.RawDescriptionHelpFormatter = RawDescriptionHelpFormatter;
-    function RawTextHelpFormatter(options) {
-      RawDescriptionHelpFormatter.call(this, options);
-    }
-    util.inherits(RawTextHelpFormatter, RawDescriptionHelpFormatter);
-    RawTextHelpFormatter.prototype._splitLines = function(text) {
-      return text.split("\n");
-    };
-    module2.exports.RawTextHelpFormatter = RawTextHelpFormatter;
+    module2.exports = { wrap, fill, dedent };
   }
 });
 
-// node_modules/.f/_/argparse/1.0.10/argparse/lib/argparse.js
+// node_modules/argparse/argparse.js
 var require_argparse = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/lib/argparse.js"(exports, module2) {
+  "node_modules/argparse/argparse.js"(exports, module2) {
     "use strict";
-    module2.exports.ArgumentParser = require_argument_parser();
-    module2.exports.Namespace = require_namespace();
-    module2.exports.Action = require_action();
-    module2.exports.HelpFormatter = require_formatter();
-    module2.exports.Const = require_const();
-    module2.exports.ArgumentDefaultsHelpFormatter = require_added_formatters().ArgumentDefaultsHelpFormatter;
-    module2.exports.RawDescriptionHelpFormatter = require_added_formatters().RawDescriptionHelpFormatter;
-    module2.exports.RawTextHelpFormatter = require_added_formatters().RawTextHelpFormatter;
+    var SUPPRESS = "==SUPPRESS==";
+    var OPTIONAL = "?";
+    var ZERO_OR_MORE = "*";
+    var ONE_OR_MORE = "+";
+    var PARSER = "A...";
+    var REMAINDER = "...";
+    var _UNRECOGNIZED_ARGS_ATTR = "_unrecognized_args";
+    var assert = require("assert");
+    var util = require("util");
+    var fs3 = require("fs");
+    var sub = require_sub();
+    var path2 = require("path");
+    var repr = util.inspect;
+    function get_argv() {
+      return process.argv.slice(1);
+    }
+    function get_terminal_size() {
+      return {
+        columns: +process.env.COLUMNS || process.stdout.columns || 80
+      };
+    }
+    function hasattr(object, name) {
+      return Object.prototype.hasOwnProperty.call(object, name);
+    }
+    function getattr(object, name, value) {
+      return hasattr(object, name) ? object[name] : value;
+    }
+    function setattr(object, name, value) {
+      object[name] = value;
+    }
+    function setdefault(object, name, value) {
+      if (!hasattr(object, name))
+        object[name] = value;
+      return object[name];
+    }
+    function delattr(object, name) {
+      delete object[name];
+    }
+    function range(from, to, step = 1) {
+      if (arguments.length === 1)
+        [to, from] = [from, 0];
+      if (typeof from !== "number" || typeof to !== "number" || typeof step !== "number") {
+        throw new TypeError("argument cannot be interpreted as an integer");
+      }
+      if (step === 0)
+        throw new TypeError("range() arg 3 must not be zero");
+      let result = [];
+      if (step > 0) {
+        for (let i = from; i < to; i += step)
+          result.push(i);
+      } else {
+        for (let i = from; i > to; i += step)
+          result.push(i);
+      }
+      return result;
+    }
+    function splitlines(str, keepends = false) {
+      let result;
+      if (!keepends) {
+        result = str.split(/\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/);
+      } else {
+        result = [];
+        let parts = str.split(/(\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029])/);
+        for (let i = 0; i < parts.length; i += 2) {
+          result.push(parts[i] + (i + 1 < parts.length ? parts[i + 1] : ""));
+        }
+      }
+      if (!result[result.length - 1])
+        result.pop();
+      return result;
+    }
+    function _string_lstrip(string, prefix_chars) {
+      let idx = 0;
+      while (idx < string.length && prefix_chars.includes(string[idx]))
+        idx++;
+      return idx ? string.slice(idx) : string;
+    }
+    function _string_split(string, sep, maxsplit) {
+      let result = string.split(sep);
+      if (result.length > maxsplit) {
+        result = result.slice(0, maxsplit).concat([result.slice(maxsplit).join(sep)]);
+      }
+      return result;
+    }
+    function _array_equal(array1, array2) {
+      if (array1.length !== array2.length)
+        return false;
+      for (let i = 0; i < array1.length; i++) {
+        if (array1[i] !== array2[i])
+          return false;
+      }
+      return true;
+    }
+    function _array_remove(array, item) {
+      let idx = array.indexOf(item);
+      if (idx === -1)
+        throw new TypeError(sub("%r not in list", item));
+      array.splice(idx, 1);
+    }
+    function _choices_to_array(choices) {
+      if (choices === void 0) {
+        return [];
+      } else if (Array.isArray(choices)) {
+        return choices;
+      } else if (choices !== null && typeof choices[Symbol.iterator] === "function") {
+        return Array.from(choices);
+      } else if (typeof choices === "object" && choices !== null) {
+        return Object.keys(choices);
+      } else {
+        throw new Error(sub("invalid choices value: %r", choices));
+      }
+    }
+    function _callable(cls) {
+      let result = {
+        // object is needed for inferred class name
+        [cls.name]: function(...args2) {
+          let this_class = new.target === result || !new.target;
+          return Reflect.construct(cls, args2, this_class ? cls : new.target);
+        }
+      };
+      result[cls.name].prototype = cls.prototype;
+      cls.prototype[Symbol.toStringTag] = cls.name;
+      return result[cls.name];
+    }
+    function _alias(object, from, to) {
+      try {
+        let name = object.constructor.name;
+        Object.defineProperty(object, from, {
+          value: util.deprecate(object[to], sub(
+            "%s.%s() is renamed to %s.%s()",
+            name,
+            from,
+            name,
+            to
+          )),
+          enumerable: false
+        });
+      } catch {
+      }
+    }
+    function _camelcase_alias(_class) {
+      for (let name of Object.getOwnPropertyNames(_class.prototype)) {
+        let camelcase = name.replace(/\w_[a-z]/g, (s) => s[0] + s[2].toUpperCase());
+        if (camelcase !== name)
+          _alias(_class.prototype, camelcase, name);
+      }
+      return _class;
+    }
+    function _to_legacy_name(key) {
+      key = key.replace(/\w_[a-z]/g, (s) => s[0] + s[2].toUpperCase());
+      if (key === "default")
+        key = "defaultValue";
+      if (key === "const")
+        key = "constant";
+      return key;
+    }
+    function _to_new_name(key) {
+      if (key === "defaultValue")
+        key = "default";
+      if (key === "constant")
+        key = "const";
+      key = key.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
+      return key;
+    }
+    var no_default = Symbol("no_default_value");
+    function _parse_opts(args2, descriptor) {
+      function get_name() {
+        let stack = new Error().stack.split("\n").map((x) => x.match(/^    at (.*) \(.*\)$/)).filter(Boolean).map((m) => m[1]).map((fn) => fn.match(/[^ .]*$/)[0]);
+        if (stack.length && stack[0] === get_name.name)
+          stack.shift();
+        if (stack.length && stack[0] === _parse_opts.name)
+          stack.shift();
+        return stack.length ? stack[0] : "";
+      }
+      args2 = Array.from(args2);
+      let kwargs = {};
+      let result = [];
+      let last_opt = args2.length && args2[args2.length - 1];
+      if (typeof last_opt === "object" && last_opt !== null && !Array.isArray(last_opt) && (!last_opt.constructor || last_opt.constructor.name === "Object")) {
+        kwargs = Object.assign({}, args2.pop());
+      }
+      let renames = [];
+      for (let key of Object.keys(descriptor)) {
+        let old_name = _to_legacy_name(key);
+        if (old_name !== key && old_name in kwargs) {
+          if (key in kwargs) {
+          } else {
+            kwargs[key] = kwargs[old_name];
+          }
+          renames.push([old_name, key]);
+          delete kwargs[old_name];
+        }
+      }
+      if (renames.length) {
+        let name = get_name();
+        deprecate("camelcase_" + name, sub(
+          "%s(): following options are renamed: %s",
+          name,
+          renames.map(([a, b]) => sub("%r -> %r", a, b))
+        ));
+      }
+      let missing_positionals = [];
+      let positional_count = args2.length;
+      for (let [key, def] of Object.entries(descriptor)) {
+        if (key[0] === "*") {
+          if (key.length > 0 && key[1] === "*") {
+            let renames2 = [];
+            for (let key2 of Object.keys(kwargs)) {
+              let new_name = _to_new_name(key2);
+              if (new_name !== key2 && key2 in kwargs) {
+                if (new_name in kwargs) {
+                } else {
+                  kwargs[new_name] = kwargs[key2];
+                }
+                renames2.push([key2, new_name]);
+                delete kwargs[key2];
+              }
+            }
+            if (renames2.length) {
+              let name = get_name();
+              deprecate("camelcase_" + name, sub(
+                "%s(): following options are renamed: %s",
+                name,
+                renames2.map(([a, b]) => sub("%r -> %r", a, b))
+              ));
+            }
+            result.push(kwargs);
+            kwargs = {};
+          } else {
+            result.push(args2);
+            args2 = [];
+          }
+        } else if (key in kwargs && args2.length > 0) {
+          throw new TypeError(sub("%s() got multiple values for argument %r", get_name(), key));
+        } else if (key in kwargs) {
+          result.push(kwargs[key]);
+          delete kwargs[key];
+        } else if (args2.length > 0) {
+          result.push(args2.shift());
+        } else if (def !== no_default) {
+          result.push(def);
+        } else {
+          missing_positionals.push(key);
+        }
+      }
+      if (Object.keys(kwargs).length) {
+        throw new TypeError(sub(
+          "%s() got an unexpected keyword argument %r",
+          get_name(),
+          Object.keys(kwargs)[0]
+        ));
+      }
+      if (args2.length) {
+        let from = Object.entries(descriptor).filter(([k, v]) => k[0] !== "*" && v !== no_default).length;
+        let to = Object.entries(descriptor).filter(([k]) => k[0] !== "*").length;
+        throw new TypeError(sub(
+          "%s() takes %s positional argument%s but %s %s given",
+          get_name(),
+          from === to ? sub("from %s to %s", from, to) : to,
+          from === to && to === 1 ? "" : "s",
+          positional_count,
+          positional_count === 1 ? "was" : "were"
+        ));
+      }
+      if (missing_positionals.length) {
+        let strs = missing_positionals.map(repr);
+        if (strs.length > 1)
+          strs[strs.length - 1] = "and " + strs[strs.length - 1];
+        let str_joined = strs.join(strs.length === 2 ? "" : ", ");
+        throw new TypeError(sub(
+          "%s() missing %i required positional argument%s: %s",
+          get_name(),
+          strs.length,
+          strs.length === 1 ? "" : "s",
+          str_joined
+        ));
+      }
+      return result;
+    }
+    var _deprecations = {};
+    function deprecate(id, string) {
+      _deprecations[id] = _deprecations[id] || util.deprecate(() => {
+      }, string);
+      _deprecations[id]();
+    }
+    function _AttributeHolder(cls = Object) {
+      return class _AttributeHolder extends cls {
+        [util.inspect.custom]() {
+          let type_name = this.constructor.name;
+          let arg_strings = [];
+          let star_args = {};
+          for (let arg of this._get_args()) {
+            arg_strings.push(repr(arg));
+          }
+          for (let [name, value] of this._get_kwargs()) {
+            if (/^[a-z_][a-z0-9_$]*$/i.test(name)) {
+              arg_strings.push(sub("%s=%r", name, value));
+            } else {
+              star_args[name] = value;
+            }
+          }
+          if (Object.keys(star_args).length) {
+            arg_strings.push(sub("**%s", repr(star_args)));
+          }
+          return sub("%s(%s)", type_name, arg_strings.join(", "));
+        }
+        toString() {
+          return this[util.inspect.custom]();
+        }
+        _get_kwargs() {
+          return Object.entries(this);
+        }
+        _get_args() {
+          return [];
+        }
+      };
+    }
+    function _copy_items(items) {
+      if (items === void 0) {
+        return [];
+      }
+      return items.slice(0);
+    }
+    var HelpFormatter = _camelcase_alias(_callable(class HelpFormatter {
+      /*
+       *  Formatter for generating usage messages and argument help strings.
+       *
+       *  Only the name of this class is considered a public API. All the methods
+       *  provided by the class are considered an implementation detail.
+       */
+      constructor() {
+        let [
+          prog,
+          indent_increment,
+          max_help_position,
+          width
+        ] = _parse_opts(arguments, {
+          prog: no_default,
+          indent_increment: 2,
+          max_help_position: 24,
+          width: void 0
+        });
+        if (width === void 0) {
+          width = get_terminal_size().columns;
+          width -= 2;
+        }
+        this._prog = prog;
+        this._indent_increment = indent_increment;
+        this._max_help_position = Math.min(
+          max_help_position,
+          Math.max(width - 20, indent_increment * 2)
+        );
+        this._width = width;
+        this._current_indent = 0;
+        this._level = 0;
+        this._action_max_length = 0;
+        this._root_section = this._Section(this, void 0);
+        this._current_section = this._root_section;
+        this._whitespace_matcher = /[ \t\n\r\f\v]+/g;
+        this._long_break_matcher = /\n\n\n+/g;
+      }
+      // ===============================
+      // Section and indentation methods
+      // ===============================
+      _indent() {
+        this._current_indent += this._indent_increment;
+        this._level += 1;
+      }
+      _dedent() {
+        this._current_indent -= this._indent_increment;
+        assert(this._current_indent >= 0, "Indent decreased below 0.");
+        this._level -= 1;
+      }
+      _add_item(func, args2) {
+        this._current_section.items.push([func, args2]);
+      }
+      // ========================
+      // Message building methods
+      // ========================
+      start_section(heading) {
+        this._indent();
+        let section = this._Section(this, this._current_section, heading);
+        this._add_item(section.format_help.bind(section), []);
+        this._current_section = section;
+      }
+      end_section() {
+        this._current_section = this._current_section.parent;
+        this._dedent();
+      }
+      add_text(text) {
+        if (text !== SUPPRESS && text !== void 0) {
+          this._add_item(this._format_text.bind(this), [text]);
+        }
+      }
+      add_usage(usage, actions, groups, prefix = void 0) {
+        if (usage !== SUPPRESS) {
+          let args2 = [usage, actions, groups, prefix];
+          this._add_item(this._format_usage.bind(this), args2);
+        }
+      }
+      add_argument(action) {
+        if (action.help !== SUPPRESS) {
+          let invocations = [this._format_action_invocation(action)];
+          for (let subaction of this._iter_indented_subactions(action)) {
+            invocations.push(this._format_action_invocation(subaction));
+          }
+          let invocation_length = Math.max(...invocations.map((invocation) => invocation.length));
+          let action_length = invocation_length + this._current_indent;
+          this._action_max_length = Math.max(
+            this._action_max_length,
+            action_length
+          );
+          this._add_item(this._format_action.bind(this), [action]);
+        }
+      }
+      add_arguments(actions) {
+        for (let action of actions) {
+          this.add_argument(action);
+        }
+      }
+      // =======================
+      // Help-formatting methods
+      // =======================
+      format_help() {
+        let help = this._root_section.format_help();
+        if (help) {
+          help = help.replace(this._long_break_matcher, "\n\n");
+          help = help.replace(/^\n+|\n+$/g, "") + "\n";
+        }
+        return help;
+      }
+      _join_parts(part_strings) {
+        return part_strings.filter((part) => part && part !== SUPPRESS).join("");
+      }
+      _format_usage(usage, actions, groups, prefix) {
+        if (prefix === void 0) {
+          prefix = "usage: ";
+        }
+        if (usage !== void 0) {
+          usage = sub(usage, { prog: this._prog });
+        } else if (usage === void 0 && !actions.length) {
+          usage = sub("%(prog)s", { prog: this._prog });
+        } else if (usage === void 0) {
+          let prog = sub("%(prog)s", { prog: this._prog });
+          let optionals = [];
+          let positionals = [];
+          for (let action of actions) {
+            if (action.option_strings.length) {
+              optionals.push(action);
+            } else {
+              positionals.push(action);
+            }
+          }
+          let action_usage = this._format_actions_usage([].concat(optionals).concat(positionals), groups);
+          usage = [prog, action_usage].map(String).join(" ");
+          let text_width = this._width - this._current_indent;
+          if (prefix.length + usage.length > text_width) {
+            let part_regexp = /\(.*?\)+(?=\s|$)|\[.*?\]+(?=\s|$)|\S+/g;
+            let opt_usage = this._format_actions_usage(optionals, groups);
+            let pos_usage = this._format_actions_usage(positionals, groups);
+            let opt_parts = opt_usage.match(part_regexp) || [];
+            let pos_parts = pos_usage.match(part_regexp) || [];
+            assert(opt_parts.join(" ") === opt_usage);
+            assert(pos_parts.join(" ") === pos_usage);
+            let get_lines = (parts, indent, prefix2 = void 0) => {
+              let lines2 = [];
+              let line = [];
+              let line_len;
+              if (prefix2 !== void 0) {
+                line_len = prefix2.length - 1;
+              } else {
+                line_len = indent.length - 1;
+              }
+              for (let part of parts) {
+                if (line_len + 1 + part.length > text_width && line) {
+                  lines2.push(indent + line.join(" "));
+                  line = [];
+                  line_len = indent.length - 1;
+                }
+                line.push(part);
+                line_len += part.length + 1;
+              }
+              if (line.length) {
+                lines2.push(indent + line.join(" "));
+              }
+              if (prefix2 !== void 0) {
+                lines2[0] = lines2[0].slice(indent.length);
+              }
+              return lines2;
+            };
+            let lines;
+            if (prefix.length + prog.length <= 0.75 * text_width) {
+              let indent = " ".repeat(prefix.length + prog.length + 1);
+              if (opt_parts.length) {
+                lines = get_lines([prog].concat(opt_parts), indent, prefix);
+                lines = lines.concat(get_lines(pos_parts, indent));
+              } else if (pos_parts.length) {
+                lines = get_lines([prog].concat(pos_parts), indent, prefix);
+              } else {
+                lines = [prog];
+              }
+            } else {
+              let indent = " ".repeat(prefix.length);
+              let parts = [].concat(opt_parts).concat(pos_parts);
+              lines = get_lines(parts, indent);
+              if (lines.length > 1) {
+                lines = [];
+                lines = lines.concat(get_lines(opt_parts, indent));
+                lines = lines.concat(get_lines(pos_parts, indent));
+              }
+              lines = [prog].concat(lines);
+            }
+            usage = lines.join("\n");
+          }
+        }
+        return sub("%s%s\n\n", prefix, usage);
+      }
+      _format_actions_usage(actions, groups) {
+        let group_actions = /* @__PURE__ */ new Set();
+        let inserts = {};
+        for (let group of groups) {
+          let start = actions.indexOf(group._group_actions[0]);
+          if (start === -1) {
+            continue;
+          } else {
+            let end = start + group._group_actions.length;
+            if (_array_equal(actions.slice(start, end), group._group_actions)) {
+              for (let action of group._group_actions) {
+                group_actions.add(action);
+              }
+              if (!group.required) {
+                if (start in inserts) {
+                  inserts[start] += " [";
+                } else {
+                  inserts[start] = "[";
+                }
+                if (end in inserts) {
+                  inserts[end] += "]";
+                } else {
+                  inserts[end] = "]";
+                }
+              } else {
+                if (start in inserts) {
+                  inserts[start] += " (";
+                } else {
+                  inserts[start] = "(";
+                }
+                if (end in inserts) {
+                  inserts[end] += ")";
+                } else {
+                  inserts[end] = ")";
+                }
+              }
+              for (let i of range(start + 1, end)) {
+                inserts[i] = "|";
+              }
+            }
+          }
+        }
+        let parts = [];
+        for (let [i, action] of Object.entries(actions)) {
+          if (action.help === SUPPRESS) {
+            parts.push(void 0);
+            if (inserts[+i] === "|") {
+              delete inserts[+i];
+            } else if (inserts[+i + 1] === "|") {
+              delete inserts[+i + 1];
+            }
+          } else if (!action.option_strings.length) {
+            let default_value = this._get_default_metavar_for_positional(action);
+            let part = this._format_args(action, default_value);
+            if (group_actions.has(action)) {
+              if (part[0] === "[" && part[part.length - 1] === "]") {
+                part = part.slice(1, -1);
+              }
+            }
+            parts.push(part);
+          } else {
+            let option_string = action.option_strings[0];
+            let part;
+            if (action.nargs === 0) {
+              part = action.format_usage();
+            } else {
+              let default_value = this._get_default_metavar_for_optional(action);
+              let args_string = this._format_args(action, default_value);
+              part = sub("%s %s", option_string, args_string);
+            }
+            if (!action.required && !group_actions.has(action)) {
+              part = sub("[%s]", part);
+            }
+            parts.push(part);
+          }
+        }
+        for (let i of Object.keys(inserts).map(Number).sort((a, b) => b - a)) {
+          parts.splice(+i, 0, inserts[+i]);
+        }
+        let text = parts.filter(Boolean).join(" ");
+        text = text.replace(/([\[(]) /g, "$1");
+        text = text.replace(/ ([\])])/g, "$1");
+        text = text.replace(/[\[(] *[\])]/g, "");
+        text = text.replace(/\(([^|]*)\)/g, "$1", text);
+        text = text.trim();
+        return text;
+      }
+      _format_text(text) {
+        if (text.includes("%(prog)")) {
+          text = sub(text, { prog: this._prog });
+        }
+        let text_width = Math.max(this._width - this._current_indent, 11);
+        let indent = " ".repeat(this._current_indent);
+        return this._fill_text(text, text_width, indent) + "\n\n";
+      }
+      _format_action(action) {
+        let help_position = Math.min(
+          this._action_max_length + 2,
+          this._max_help_position
+        );
+        let help_width = Math.max(this._width - help_position, 11);
+        let action_width = help_position - this._current_indent - 2;
+        let action_header = this._format_action_invocation(action);
+        let indent_first;
+        if (!action.help) {
+          let tup = [this._current_indent, "", action_header];
+          action_header = sub("%*s%s\n", ...tup);
+        } else if (action_header.length <= action_width) {
+          let tup = [this._current_indent, "", action_width, action_header];
+          action_header = sub("%*s%-*s  ", ...tup);
+          indent_first = 0;
+        } else {
+          let tup = [this._current_indent, "", action_header];
+          action_header = sub("%*s%s\n", ...tup);
+          indent_first = help_position;
+        }
+        let parts = [action_header];
+        if (action.help) {
+          let help_text = this._expand_help(action);
+          let help_lines = this._split_lines(help_text, help_width);
+          parts.push(sub("%*s%s\n", indent_first, "", help_lines[0]));
+          for (let line of help_lines.slice(1)) {
+            parts.push(sub("%*s%s\n", help_position, "", line));
+          }
+        } else if (!action_header.endsWith("\n")) {
+          parts.push("\n");
+        }
+        for (let subaction of this._iter_indented_subactions(action)) {
+          parts.push(this._format_action(subaction));
+        }
+        return this._join_parts(parts);
+      }
+      _format_action_invocation(action) {
+        if (!action.option_strings.length) {
+          let default_value = this._get_default_metavar_for_positional(action);
+          let metavar = this._metavar_formatter(action, default_value)(1)[0];
+          return metavar;
+        } else {
+          let parts = [];
+          if (action.nargs === 0) {
+            parts = parts.concat(action.option_strings);
+          } else {
+            let default_value = this._get_default_metavar_for_optional(action);
+            let args_string = this._format_args(action, default_value);
+            for (let option_string of action.option_strings) {
+              parts.push(sub("%s %s", option_string, args_string));
+            }
+          }
+          return parts.join(", ");
+        }
+      }
+      _metavar_formatter(action, default_metavar) {
+        let result;
+        if (action.metavar !== void 0) {
+          result = action.metavar;
+        } else if (action.choices !== void 0) {
+          let choice_strs = _choices_to_array(action.choices).map(String);
+          result = sub("{%s}", choice_strs.join(","));
+        } else {
+          result = default_metavar;
+        }
+        function format(tuple_size) {
+          if (Array.isArray(result)) {
+            return result;
+          } else {
+            return Array(tuple_size).fill(result);
+          }
+        }
+        return format;
+      }
+      _format_args(action, default_metavar) {
+        let get_metavar = this._metavar_formatter(action, default_metavar);
+        let result;
+        if (action.nargs === void 0) {
+          result = sub("%s", ...get_metavar(1));
+        } else if (action.nargs === OPTIONAL) {
+          result = sub("[%s]", ...get_metavar(1));
+        } else if (action.nargs === ZERO_OR_MORE) {
+          let metavar = get_metavar(1);
+          if (metavar.length === 2) {
+            result = sub("[%s [%s ...]]", ...metavar);
+          } else {
+            result = sub("[%s ...]", ...metavar);
+          }
+        } else if (action.nargs === ONE_OR_MORE) {
+          result = sub("%s [%s ...]", ...get_metavar(2));
+        } else if (action.nargs === REMAINDER) {
+          result = "...";
+        } else if (action.nargs === PARSER) {
+          result = sub("%s ...", ...get_metavar(1));
+        } else if (action.nargs === SUPPRESS) {
+          result = "";
+        } else {
+          let formats;
+          try {
+            formats = range(action.nargs).map(() => "%s");
+          } catch (err) {
+            throw new TypeError("invalid nargs value");
+          }
+          result = sub(formats.join(" "), ...get_metavar(action.nargs));
+        }
+        return result;
+      }
+      _expand_help(action) {
+        let params = Object.assign({ prog: this._prog }, action);
+        for (let name of Object.keys(params)) {
+          if (params[name] === SUPPRESS) {
+            delete params[name];
+          }
+        }
+        for (let name of Object.keys(params)) {
+          if (params[name] && params[name].name) {
+            params[name] = params[name].name;
+          }
+        }
+        if (params.choices !== void 0) {
+          let choices_str = _choices_to_array(params.choices).map(String).join(", ");
+          params.choices = choices_str;
+        }
+        for (let key of Object.keys(params)) {
+          let old_name = _to_legacy_name(key);
+          if (old_name !== key) {
+            params[old_name] = params[key];
+          }
+        }
+        return sub(this._get_help_string(action), params);
+      }
+      *_iter_indented_subactions(action) {
+        if (typeof action._get_subactions === "function") {
+          this._indent();
+          yield* action._get_subactions();
+          this._dedent();
+        }
+      }
+      _split_lines(text, width) {
+        text = text.replace(this._whitespace_matcher, " ").trim();
+        let textwrap = require_textwrap();
+        return textwrap.wrap(text, { width });
+      }
+      _fill_text(text, width, indent) {
+        text = text.replace(this._whitespace_matcher, " ").trim();
+        let textwrap = require_textwrap();
+        return textwrap.fill(text, {
+          width,
+          initial_indent: indent,
+          subsequent_indent: indent
+        });
+      }
+      _get_help_string(action) {
+        return action.help;
+      }
+      _get_default_metavar_for_optional(action) {
+        return action.dest.toUpperCase();
+      }
+      _get_default_metavar_for_positional(action) {
+        return action.dest;
+      }
+    }));
+    HelpFormatter.prototype._Section = _callable(class _Section {
+      constructor(formatter, parent, heading = void 0) {
+        this.formatter = formatter;
+        this.parent = parent;
+        this.heading = heading;
+        this.items = [];
+      }
+      format_help() {
+        if (this.parent !== void 0) {
+          this.formatter._indent();
+        }
+        let item_help = this.formatter._join_parts(this.items.map(([func, args2]) => func.apply(null, args2)));
+        if (this.parent !== void 0) {
+          this.formatter._dedent();
+        }
+        if (!item_help) {
+          return "";
+        }
+        let heading;
+        if (this.heading !== SUPPRESS && this.heading !== void 0) {
+          let current_indent = this.formatter._current_indent;
+          heading = sub("%*s%s:\n", current_indent, "", this.heading);
+        } else {
+          heading = "";
+        }
+        return this.formatter._join_parts(["\n", heading, item_help, "\n"]);
+      }
+    });
+    var RawDescriptionHelpFormatter = _camelcase_alias(_callable(class RawDescriptionHelpFormatter extends HelpFormatter {
+      /*
+       *  Help message formatter which retains any formatting in descriptions.
+       *
+       *  Only the name of this class is considered a public API. All the methods
+       *  provided by the class are considered an implementation detail.
+       */
+      _fill_text(text, width, indent) {
+        return splitlines(text, true).map((line) => indent + line).join("");
+      }
+    }));
+    var RawTextHelpFormatter = _camelcase_alias(_callable(class RawTextHelpFormatter extends RawDescriptionHelpFormatter {
+      /*
+       *  Help message formatter which retains formatting of all help text.
+       *
+       *  Only the name of this class is considered a public API. All the methods
+       *  provided by the class are considered an implementation detail.
+       */
+      _split_lines(text) {
+        return splitlines(text);
+      }
+    }));
+    var ArgumentDefaultsHelpFormatter = _camelcase_alias(_callable(class ArgumentDefaultsHelpFormatter extends HelpFormatter {
+      /*
+       *  Help message formatter which adds default values to argument help.
+       *
+       *  Only the name of this class is considered a public API. All the methods
+       *  provided by the class are considered an implementation detail.
+       */
+      _get_help_string(action) {
+        let help = action.help;
+        if (!action.help.includes("%(default)") && !action.help.includes("%(defaultValue)")) {
+          if (action.default !== SUPPRESS) {
+            let defaulting_nargs = [OPTIONAL, ZERO_OR_MORE];
+            if (action.option_strings.length || defaulting_nargs.includes(action.nargs)) {
+              help += " (default: %(default)s)";
+            }
+          }
+        }
+        return help;
+      }
+    }));
+    var MetavarTypeHelpFormatter = _camelcase_alias(_callable(class MetavarTypeHelpFormatter extends HelpFormatter {
+      /*
+       *  Help message formatter which uses the argument 'type' as the default
+       *  metavar value (instead of the argument 'dest')
+       *
+       *  Only the name of this class is considered a public API. All the methods
+       *  provided by the class are considered an implementation detail.
+       */
+      _get_default_metavar_for_optional(action) {
+        return typeof action.type === "function" ? action.type.name : action.type;
+      }
+      _get_default_metavar_for_positional(action) {
+        return typeof action.type === "function" ? action.type.name : action.type;
+      }
+    }));
+    function _get_action_name(argument) {
+      if (argument === void 0) {
+        return void 0;
+      } else if (argument.option_strings.length) {
+        return argument.option_strings.join("/");
+      } else if (![void 0, SUPPRESS].includes(argument.metavar)) {
+        return argument.metavar;
+      } else if (![void 0, SUPPRESS].includes(argument.dest)) {
+        return argument.dest;
+      } else {
+        return void 0;
+      }
+    }
+    var ArgumentError = _callable(class ArgumentError extends Error {
+      /*
+       *  An error from creating or using an argument (optional or positional).
+       *
+       *  The string value of this exception is the message, augmented with
+       *  information about the argument that caused it.
+       */
+      constructor(argument, message) {
+        super();
+        this.name = "ArgumentError";
+        this._argument_name = _get_action_name(argument);
+        this._message = message;
+        this.message = this.str();
+      }
+      str() {
+        let format;
+        if (this._argument_name === void 0) {
+          format = "%(message)s";
+        } else {
+          format = "argument %(argument_name)s: %(message)s";
+        }
+        return sub(format, {
+          message: this._message,
+          argument_name: this._argument_name
+        });
+      }
+    });
+    var ArgumentTypeError = _callable(class ArgumentTypeError extends Error {
+      /*
+       * An error from trying to convert a command line string to a type.
+       */
+      constructor(message) {
+        super(message);
+        this.name = "ArgumentTypeError";
+      }
+    });
+    var Action = _camelcase_alias(_callable(class Action extends _AttributeHolder(Function) {
+      /*
+       *  Information about how to convert command line strings to Python objects.
+       *
+       *  Action objects are used by an ArgumentParser to represent the information
+       *  needed to parse a single argument from one or more strings from the
+       *  command line. The keyword arguments to the Action constructor are also
+       *  all attributes of Action instances.
+       *
+       *  Keyword Arguments:
+       *
+       *      - option_strings -- A list of command-line option strings which
+       *          should be associated with this action.
+       *
+       *      - dest -- The name of the attribute to hold the created object(s)
+       *
+       *      - nargs -- The number of command-line arguments that should be
+       *          consumed. By default, one argument will be consumed and a single
+       *          value will be produced.  Other values include:
+       *              - N (an integer) consumes N arguments (and produces a list)
+       *              - '?' consumes zero or one arguments
+       *              - '*' consumes zero or more arguments (and produces a list)
+       *              - '+' consumes one or more arguments (and produces a list)
+       *          Note that the difference between the default and nargs=1 is that
+       *          with the default, a single value will be produced, while with
+       *          nargs=1, a list containing a single value will be produced.
+       *
+       *      - const -- The value to be produced if the option is specified and the
+       *          option uses an action that takes no values.
+       *
+       *      - default -- The value to be produced if the option is not specified.
+       *
+       *      - type -- A callable that accepts a single string argument, and
+       *          returns the converted value.  The standard Python types str, int,
+       *          float, and complex are useful examples of such callables.  If None,
+       *          str is used.
+       *
+       *      - choices -- A container of values that should be allowed. If not None,
+       *          after a command-line argument has been converted to the appropriate
+       *          type, an exception will be raised if it is not a member of this
+       *          collection.
+       *
+       *      - required -- True if the action must always be specified at the
+       *          command line. This is only meaningful for optional command-line
+       *          arguments.
+       *
+       *      - help -- The help string describing the argument.
+       *
+       *      - metavar -- The name to be used for the option's argument with the
+       *          help string. If None, the 'dest' value will be used as the name.
+       */
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          nargs,
+          const_value,
+          default_value,
+          type,
+          choices,
+          required,
+          help,
+          metavar
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          nargs: void 0,
+          const: void 0,
+          default: void 0,
+          type: void 0,
+          choices: void 0,
+          required: false,
+          help: void 0,
+          metavar: void 0
+        });
+        super("return arguments.callee.call.apply(arguments.callee, arguments)");
+        this.option_strings = option_strings;
+        this.dest = dest;
+        this.nargs = nargs;
+        this.const = const_value;
+        this.default = default_value;
+        this.type = type;
+        this.choices = choices;
+        this.required = required;
+        this.help = help;
+        this.metavar = metavar;
+      }
+      _get_kwargs() {
+        let names = [
+          "option_strings",
+          "dest",
+          "nargs",
+          "const",
+          "default",
+          "type",
+          "choices",
+          "help",
+          "metavar"
+        ];
+        return names.map((name) => [name, getattr(this, name)]);
+      }
+      format_usage() {
+        return this.option_strings[0];
+      }
+      call() {
+        throw new Error(".call() not defined");
+      }
+    }));
+    var BooleanOptionalAction = _camelcase_alias(_callable(class BooleanOptionalAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          default_value,
+          type,
+          choices,
+          required,
+          help,
+          metavar
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          default: void 0,
+          type: void 0,
+          choices: void 0,
+          required: false,
+          help: void 0,
+          metavar: void 0
+        });
+        let _option_strings = [];
+        for (let option_string of option_strings) {
+          _option_strings.push(option_string);
+          if (option_string.startsWith("--")) {
+            option_string = "--no-" + option_string.slice(2);
+            _option_strings.push(option_string);
+          }
+        }
+        if (help !== void 0 && default_value !== void 0) {
+          help += ` (default: ${default_value})`;
+        }
+        super({
+          option_strings: _option_strings,
+          dest,
+          nargs: 0,
+          default: default_value,
+          type,
+          choices,
+          required,
+          help,
+          metavar
+        });
+      }
+      call(parser2, namespace, values, option_string = void 0) {
+        if (this.option_strings.includes(option_string)) {
+          setattr(namespace, this.dest, !option_string.startsWith("--no-"));
+        }
+      }
+      format_usage() {
+        return this.option_strings.join(" | ");
+      }
+    }));
+    var _StoreAction = _callable(class _StoreAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          nargs,
+          const_value,
+          default_value,
+          type,
+          choices,
+          required,
+          help,
+          metavar
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          nargs: void 0,
+          const: void 0,
+          default: void 0,
+          type: void 0,
+          choices: void 0,
+          required: false,
+          help: void 0,
+          metavar: void 0
+        });
+        if (nargs === 0) {
+          throw new TypeError("nargs for store actions must be != 0; if you have nothing to store, actions such as store true or store const may be more appropriate");
+        }
+        if (const_value !== void 0 && nargs !== OPTIONAL) {
+          throw new TypeError(sub("nargs must be %r to supply const", OPTIONAL));
+        }
+        super({
+          option_strings,
+          dest,
+          nargs,
+          const: const_value,
+          default: default_value,
+          type,
+          choices,
+          required,
+          help,
+          metavar
+        });
+      }
+      call(parser2, namespace, values) {
+        setattr(namespace, this.dest, values);
+      }
+    });
+    var _StoreConstAction = _callable(class _StoreConstAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          const_value,
+          default_value,
+          required,
+          help
+          //, metavar
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          const: no_default,
+          default: void 0,
+          required: false,
+          help: void 0,
+          metavar: void 0
+        });
+        super({
+          option_strings,
+          dest,
+          nargs: 0,
+          const: const_value,
+          default: default_value,
+          required,
+          help
+        });
+      }
+      call(parser2, namespace) {
+        setattr(namespace, this.dest, this.const);
+      }
+    });
+    var _StoreTrueAction = _callable(class _StoreTrueAction extends _StoreConstAction {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          default_value,
+          required,
+          help
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          default: false,
+          required: false,
+          help: void 0
+        });
+        super({
+          option_strings,
+          dest,
+          const: true,
+          default: default_value,
+          required,
+          help
+        });
+      }
+    });
+    var _StoreFalseAction = _callable(class _StoreFalseAction extends _StoreConstAction {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          default_value,
+          required,
+          help
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          default: true,
+          required: false,
+          help: void 0
+        });
+        super({
+          option_strings,
+          dest,
+          const: false,
+          default: default_value,
+          required,
+          help
+        });
+      }
+    });
+    var _AppendAction = _callable(class _AppendAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          nargs,
+          const_value,
+          default_value,
+          type,
+          choices,
+          required,
+          help,
+          metavar
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          nargs: void 0,
+          const: void 0,
+          default: void 0,
+          type: void 0,
+          choices: void 0,
+          required: false,
+          help: void 0,
+          metavar: void 0
+        });
+        if (nargs === 0) {
+          throw new TypeError("nargs for append actions must be != 0; if arg strings are not supplying the value to append, the append const action may be more appropriate");
+        }
+        if (const_value !== void 0 && nargs !== OPTIONAL) {
+          throw new TypeError(sub("nargs must be %r to supply const", OPTIONAL));
+        }
+        super({
+          option_strings,
+          dest,
+          nargs,
+          const: const_value,
+          default: default_value,
+          type,
+          choices,
+          required,
+          help,
+          metavar
+        });
+      }
+      call(parser2, namespace, values) {
+        let items = getattr(namespace, this.dest, void 0);
+        items = _copy_items(items);
+        items.push(values);
+        setattr(namespace, this.dest, items);
+      }
+    });
+    var _AppendConstAction = _callable(class _AppendConstAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          const_value,
+          default_value,
+          required,
+          help,
+          metavar
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          const: no_default,
+          default: void 0,
+          required: false,
+          help: void 0,
+          metavar: void 0
+        });
+        super({
+          option_strings,
+          dest,
+          nargs: 0,
+          const: const_value,
+          default: default_value,
+          required,
+          help,
+          metavar
+        });
+      }
+      call(parser2, namespace) {
+        let items = getattr(namespace, this.dest, void 0);
+        items = _copy_items(items);
+        items.push(this.const);
+        setattr(namespace, this.dest, items);
+      }
+    });
+    var _CountAction = _callable(class _CountAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          default_value,
+          required,
+          help
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: no_default,
+          default: void 0,
+          required: false,
+          help: void 0
+        });
+        super({
+          option_strings,
+          dest,
+          nargs: 0,
+          default: default_value,
+          required,
+          help
+        });
+      }
+      call(parser2, namespace) {
+        let count = getattr(namespace, this.dest, void 0);
+        if (count === void 0) {
+          count = 0;
+        }
+        setattr(namespace, this.dest, count + 1);
+      }
+    });
+    var _HelpAction = _callable(class _HelpAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          dest,
+          default_value,
+          help
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          dest: SUPPRESS,
+          default: SUPPRESS,
+          help: void 0
+        });
+        super({
+          option_strings,
+          dest,
+          default: default_value,
+          nargs: 0,
+          help
+        });
+      }
+      call(parser2) {
+        parser2.print_help();
+        parser2.exit();
+      }
+    });
+    var _VersionAction = _callable(class _VersionAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          version,
+          dest,
+          default_value,
+          help
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          version: void 0,
+          dest: SUPPRESS,
+          default: SUPPRESS,
+          help: "show program's version number and exit"
+        });
+        super({
+          option_strings,
+          dest,
+          default: default_value,
+          nargs: 0,
+          help
+        });
+        this.version = version;
+      }
+      call(parser2) {
+        let version = this.version;
+        if (version === void 0) {
+          version = parser2.version;
+        }
+        let formatter = parser2._get_formatter();
+        formatter.add_text(version);
+        parser2._print_message(formatter.format_help(), process.stdout);
+        parser2.exit();
+      }
+    });
+    var _SubParsersAction = _camelcase_alias(_callable(class _SubParsersAction extends Action {
+      constructor() {
+        let [
+          option_strings,
+          prog,
+          parser_class,
+          dest,
+          required,
+          help,
+          metavar
+        ] = _parse_opts(arguments, {
+          option_strings: no_default,
+          prog: no_default,
+          parser_class: no_default,
+          dest: SUPPRESS,
+          required: false,
+          help: void 0,
+          metavar: void 0
+        });
+        let name_parser_map = {};
+        super({
+          option_strings,
+          dest,
+          nargs: PARSER,
+          choices: name_parser_map,
+          required,
+          help,
+          metavar
+        });
+        this._prog_prefix = prog;
+        this._parser_class = parser_class;
+        this._name_parser_map = name_parser_map;
+        this._choices_actions = [];
+      }
+      add_parser() {
+        let [
+          name,
+          kwargs
+        ] = _parse_opts(arguments, {
+          name: no_default,
+          "**kwargs": no_default
+        });
+        if (kwargs.prog === void 0) {
+          kwargs.prog = sub("%s %s", this._prog_prefix, name);
+        }
+        let aliases = getattr(kwargs, "aliases", []);
+        delete kwargs.aliases;
+        if ("help" in kwargs) {
+          let help = kwargs.help;
+          delete kwargs.help;
+          let choice_action = this._ChoicesPseudoAction(name, aliases, help);
+          this._choices_actions.push(choice_action);
+        }
+        let parser2 = new this._parser_class(kwargs);
+        this._name_parser_map[name] = parser2;
+        for (let alias of aliases) {
+          this._name_parser_map[alias] = parser2;
+        }
+        return parser2;
+      }
+      _get_subactions() {
+        return this._choices_actions;
+      }
+      call(parser2, namespace, values) {
+        let parser_name = values[0];
+        let arg_strings = values.slice(1);
+        if (this.dest !== SUPPRESS) {
+          setattr(namespace, this.dest, parser_name);
+        }
+        if (hasattr(this._name_parser_map, parser_name)) {
+          parser2 = this._name_parser_map[parser_name];
+        } else {
+          let args2 = {
+            parser_name,
+            choices: this._name_parser_map.join(", ")
+          };
+          let msg = sub("unknown parser %(parser_name)r (choices: %(choices)s)", args2);
+          throw new ArgumentError(this, msg);
+        }
+        let subnamespace;
+        [subnamespace, arg_strings] = parser2.parse_known_args(arg_strings, void 0);
+        for (let [key, value] of Object.entries(subnamespace)) {
+          setattr(namespace, key, value);
+        }
+        if (arg_strings.length) {
+          setdefault(namespace, _UNRECOGNIZED_ARGS_ATTR, []);
+          getattr(namespace, _UNRECOGNIZED_ARGS_ATTR).push(...arg_strings);
+        }
+      }
+    }));
+    _SubParsersAction.prototype._ChoicesPseudoAction = _callable(class _ChoicesPseudoAction extends Action {
+      constructor(name, aliases, help) {
+        let metavar = name, dest = name;
+        if (aliases.length) {
+          metavar += sub(" (%s)", aliases.join(", "));
+        }
+        super({ option_strings: [], dest, help, metavar });
+      }
+    });
+    var _ExtendAction = _callable(class _ExtendAction extends _AppendAction {
+      call(parser2, namespace, values) {
+        let items = getattr(namespace, this.dest, void 0);
+        items = _copy_items(items);
+        items = items.concat(values);
+        setattr(namespace, this.dest, items);
+      }
+    });
+    var FileType = _callable(class FileType extends Function {
+      /*
+       *  Factory for creating file object types
+       *
+       *  Instances of FileType are typically passed as type= arguments to the
+       *  ArgumentParser add_argument() method.
+       *
+       *  Keyword Arguments:
+       *      - mode -- A string indicating how the file is to be opened. Accepts the
+       *          same values as the builtin open() function.
+       *      - bufsize -- The file's desired buffer size. Accepts the same values as
+       *          the builtin open() function.
+       *      - encoding -- The file's encoding. Accepts the same values as the
+       *          builtin open() function.
+       *      - errors -- A string indicating how encoding and decoding errors are to
+       *          be handled. Accepts the same value as the builtin open() function.
+       */
+      constructor() {
+        let [
+          flags,
+          encoding,
+          mode,
+          autoClose,
+          emitClose,
+          start,
+          end,
+          highWaterMark,
+          fs4
+        ] = _parse_opts(arguments, {
+          flags: "r",
+          encoding: void 0,
+          mode: void 0,
+          // 0o666
+          autoClose: void 0,
+          // true
+          emitClose: void 0,
+          // false
+          start: void 0,
+          // 0
+          end: void 0,
+          // Infinity
+          highWaterMark: void 0,
+          // 64 * 1024
+          fs: void 0
+        });
+        super("return arguments.callee.call.apply(arguments.callee, arguments)");
+        Object.defineProperty(this, "name", {
+          get() {
+            return sub("FileType(%r)", flags);
+          }
+        });
+        this._flags = flags;
+        this._options = {};
+        if (encoding !== void 0)
+          this._options.encoding = encoding;
+        if (mode !== void 0)
+          this._options.mode = mode;
+        if (autoClose !== void 0)
+          this._options.autoClose = autoClose;
+        if (emitClose !== void 0)
+          this._options.emitClose = emitClose;
+        if (start !== void 0)
+          this._options.start = start;
+        if (end !== void 0)
+          this._options.end = end;
+        if (highWaterMark !== void 0)
+          this._options.highWaterMark = highWaterMark;
+        if (fs4 !== void 0)
+          this._options.fs = fs4;
+      }
+      call(string) {
+        if (string === "-") {
+          if (this._flags.includes("r")) {
+            return process.stdin;
+          } else if (this._flags.includes("w")) {
+            return process.stdout;
+          } else {
+            let msg = sub('argument "-" with mode %r', this._flags);
+            throw new TypeError(msg);
+          }
+        }
+        let fd;
+        try {
+          fd = fs3.openSync(string, this._flags, this._options.mode);
+        } catch (e) {
+          let args2 = { filename: string, error: e.message };
+          let message = "can't open '%(filename)s': %(error)s";
+          throw new ArgumentTypeError(sub(message, args2));
+        }
+        let options = Object.assign({ fd, flags: this._flags }, this._options);
+        if (this._flags.includes("r")) {
+          return fs3.createReadStream(void 0, options);
+        } else if (this._flags.includes("w")) {
+          return fs3.createWriteStream(void 0, options);
+        } else {
+          let msg = sub('argument "%s" with mode %r', string, this._flags);
+          throw new TypeError(msg);
+        }
+      }
+      [util.inspect.custom]() {
+        let args2 = [this._flags];
+        let kwargs = Object.entries(this._options).map(([k, v]) => {
+          if (k === "mode")
+            v = { value: v, [util.inspect.custom]() {
+              return "0o" + this.value.toString(8);
+            } };
+          return [k, v];
+        });
+        let args_str = [].concat(args2.filter((arg) => arg !== -1).map(repr)).concat(kwargs.filter(([, arg]) => arg !== void 0).map(([kw, arg]) => sub("%s=%r", kw, arg))).join(", ");
+        return sub("%s(%s)", this.constructor.name, args_str);
+      }
+      toString() {
+        return this[util.inspect.custom]();
+      }
+    });
+    var Namespace = _callable(class Namespace extends _AttributeHolder() {
+      /*
+       *  Simple object for storing attributes.
+       *
+       *  Implements equality by attribute names and values, and provides a simple
+       *  string representation.
+       */
+      constructor(options = {}) {
+        super();
+        Object.assign(this, options);
+      }
+    });
+    Namespace.prototype[Symbol.toStringTag] = void 0;
+    var _ActionsContainer = _camelcase_alias(_callable(class _ActionsContainer {
+      constructor() {
+        let [
+          description,
+          prefix_chars,
+          argument_default,
+          conflict_handler
+        ] = _parse_opts(arguments, {
+          description: no_default,
+          prefix_chars: no_default,
+          argument_default: no_default,
+          conflict_handler: no_default
+        });
+        this.description = description;
+        this.argument_default = argument_default;
+        this.prefix_chars = prefix_chars;
+        this.conflict_handler = conflict_handler;
+        this._registries = {};
+        this.register("action", void 0, _StoreAction);
+        this.register("action", "store", _StoreAction);
+        this.register("action", "store_const", _StoreConstAction);
+        this.register("action", "store_true", _StoreTrueAction);
+        this.register("action", "store_false", _StoreFalseAction);
+        this.register("action", "append", _AppendAction);
+        this.register("action", "append_const", _AppendConstAction);
+        this.register("action", "count", _CountAction);
+        this.register("action", "help", _HelpAction);
+        this.register("action", "version", _VersionAction);
+        this.register("action", "parsers", _SubParsersAction);
+        this.register("action", "extend", _ExtendAction);
+        ["storeConst", "storeTrue", "storeFalse", "appendConst"].forEach((old_name) => {
+          let new_name = _to_new_name(old_name);
+          this.register("action", old_name, util.deprecate(
+            this._registry_get("action", new_name),
+            sub('{action: "%s"} is renamed to {action: "%s"}', old_name, new_name)
+          ));
+        });
+        this._get_handler();
+        this._actions = [];
+        this._option_string_actions = {};
+        this._action_groups = [];
+        this._mutually_exclusive_groups = [];
+        this._defaults = {};
+        this._negative_number_matcher = /^-\d+$|^-\d*\.\d+$/;
+        this._has_negative_number_optionals = [];
+      }
+      // ====================
+      // Registration methods
+      // ====================
+      register(registry_name, value, object) {
+        let registry = setdefault(this._registries, registry_name, {});
+        registry[value] = object;
+      }
+      _registry_get(registry_name, value, default_value = void 0) {
+        return getattr(this._registries[registry_name], value, default_value);
+      }
+      // ==================================
+      // Namespace default accessor methods
+      // ==================================
+      set_defaults(kwargs) {
+        Object.assign(this._defaults, kwargs);
+        for (let action of this._actions) {
+          if (action.dest in kwargs) {
+            action.default = kwargs[action.dest];
+          }
+        }
+      }
+      get_default(dest) {
+        for (let action of this._actions) {
+          if (action.dest === dest && action.default !== void 0) {
+            return action.default;
+          }
+        }
+        return this._defaults[dest];
+      }
+      // =======================
+      // Adding argument actions
+      // =======================
+      add_argument() {
+        let [
+          args2,
+          kwargs
+        ] = _parse_opts(arguments, {
+          "*args": no_default,
+          "**kwargs": no_default
+        });
+        if (args2.length === 1 && Array.isArray(args2[0])) {
+          args2 = args2[0];
+          deprecate(
+            "argument-array",
+            sub("use add_argument(%(args)s, {...}) instead of add_argument([ %(args)s ], { ... })", {
+              args: args2.map(repr).join(", ")
+            })
+          );
+        }
+        let chars = this.prefix_chars;
+        if (!args2.length || args2.length === 1 && !chars.includes(args2[0][0])) {
+          if (args2.length && "dest" in kwargs) {
+            throw new TypeError("dest supplied twice for positional argument");
+          }
+          kwargs = this._get_positional_kwargs(...args2, kwargs);
+        } else {
+          kwargs = this._get_optional_kwargs(...args2, kwargs);
+        }
+        if (!("default" in kwargs)) {
+          let dest = kwargs.dest;
+          if (dest in this._defaults) {
+            kwargs.default = this._defaults[dest];
+          } else if (this.argument_default !== void 0) {
+            kwargs.default = this.argument_default;
+          }
+        }
+        let action_class = this._pop_action_class(kwargs);
+        if (typeof action_class !== "function") {
+          throw new TypeError(sub('unknown action "%s"', action_class));
+        }
+        let action = new action_class(kwargs);
+        let type_func = this._registry_get("type", action.type, action.type);
+        if (typeof type_func !== "function") {
+          throw new TypeError(sub("%r is not callable", type_func));
+        }
+        if (type_func === FileType) {
+          throw new TypeError(sub("%r is a FileType class object, instance of it must be passed", type_func));
+        }
+        if ("_get_formatter" in this) {
+          try {
+            this._get_formatter()._format_args(action, void 0);
+          } catch (err) {
+            if (err instanceof TypeError && err.message !== "invalid nargs value") {
+              throw new TypeError("length of metavar tuple does not match nargs");
+            } else {
+              throw err;
+            }
+          }
+        }
+        return this._add_action(action);
+      }
+      add_argument_group() {
+        let group = _ArgumentGroup(this, ...arguments);
+        this._action_groups.push(group);
+        return group;
+      }
+      add_mutually_exclusive_group() {
+        let group = _MutuallyExclusiveGroup(this, ...arguments);
+        this._mutually_exclusive_groups.push(group);
+        return group;
+      }
+      _add_action(action) {
+        this._check_conflict(action);
+        this._actions.push(action);
+        action.container = this;
+        for (let option_string of action.option_strings) {
+          this._option_string_actions[option_string] = action;
+        }
+        for (let option_string of action.option_strings) {
+          if (this._negative_number_matcher.test(option_string)) {
+            if (!this._has_negative_number_optionals.length) {
+              this._has_negative_number_optionals.push(true);
+            }
+          }
+        }
+        return action;
+      }
+      _remove_action(action) {
+        _array_remove(this._actions, action);
+      }
+      _add_container_actions(container) {
+        let title_group_map = {};
+        for (let group of this._action_groups) {
+          if (group.title in title_group_map) {
+            let msg = "cannot merge actions - two groups are named %r";
+            throw new TypeError(sub(msg, group.title));
+          }
+          title_group_map[group.title] = group;
+        }
+        let group_map = /* @__PURE__ */ new Map();
+        for (let group of container._action_groups) {
+          if (!(group.title in title_group_map)) {
+            title_group_map[group.title] = this.add_argument_group({
+              title: group.title,
+              description: group.description,
+              conflict_handler: group.conflict_handler
+            });
+          }
+          for (let action of group._group_actions) {
+            group_map.set(action, title_group_map[group.title]);
+          }
+        }
+        for (let group of container._mutually_exclusive_groups) {
+          let mutex_group = this.add_mutually_exclusive_group({
+            required: group.required
+          });
+          for (let action of group._group_actions) {
+            group_map.set(action, mutex_group);
+          }
+        }
+        for (let action of container._actions) {
+          group_map.get(action)._add_action(action);
+        }
+      }
+      _get_positional_kwargs() {
+        let [
+          dest,
+          kwargs
+        ] = _parse_opts(arguments, {
+          dest: no_default,
+          "**kwargs": no_default
+        });
+        if ("required" in kwargs) {
+          let msg = "'required' is an invalid argument for positionals";
+          throw new TypeError(msg);
+        }
+        if (![OPTIONAL, ZERO_OR_MORE].includes(kwargs.nargs)) {
+          kwargs.required = true;
+        }
+        if (kwargs.nargs === ZERO_OR_MORE && !("default" in kwargs)) {
+          kwargs.required = true;
+        }
+        return Object.assign(kwargs, { dest, option_strings: [] });
+      }
+      _get_optional_kwargs() {
+        let [
+          args2,
+          kwargs
+        ] = _parse_opts(arguments, {
+          "*args": no_default,
+          "**kwargs": no_default
+        });
+        let option_strings = [];
+        let long_option_strings = [];
+        let option_string;
+        for (option_string of args2) {
+          if (!this.prefix_chars.includes(option_string[0])) {
+            let args3 = {
+              option: option_string,
+              prefix_chars: this.prefix_chars
+            };
+            let msg = "invalid option string %(option)r: must start with a character %(prefix_chars)r";
+            throw new TypeError(sub(msg, args3));
+          }
+          option_strings.push(option_string);
+          if (option_string.length > 1 && this.prefix_chars.includes(option_string[1])) {
+            long_option_strings.push(option_string);
+          }
+        }
+        let dest = kwargs.dest;
+        delete kwargs.dest;
+        if (dest === void 0) {
+          let dest_option_string;
+          if (long_option_strings.length) {
+            dest_option_string = long_option_strings[0];
+          } else {
+            dest_option_string = option_strings[0];
+          }
+          dest = _string_lstrip(dest_option_string, this.prefix_chars);
+          if (!dest) {
+            let msg = "dest= is required for options like %r";
+            throw new TypeError(sub(msg, option_string));
+          }
+          dest = dest.replace(/-/g, "_");
+        }
+        return Object.assign(kwargs, { dest, option_strings });
+      }
+      _pop_action_class(kwargs, default_value = void 0) {
+        let action = getattr(kwargs, "action", default_value);
+        delete kwargs.action;
+        return this._registry_get("action", action, action);
+      }
+      _get_handler() {
+        let handler_func_name = sub("_handle_conflict_%s", this.conflict_handler);
+        if (typeof this[handler_func_name] === "function") {
+          return this[handler_func_name];
+        } else {
+          let msg = "invalid conflict_resolution value: %r";
+          throw new TypeError(sub(msg, this.conflict_handler));
+        }
+      }
+      _check_conflict(action) {
+        let confl_optionals = [];
+        for (let option_string of action.option_strings) {
+          if (hasattr(this._option_string_actions, option_string)) {
+            let confl_optional = this._option_string_actions[option_string];
+            confl_optionals.push([option_string, confl_optional]);
+          }
+        }
+        if (confl_optionals.length) {
+          let conflict_handler = this._get_handler();
+          conflict_handler.call(this, action, confl_optionals);
+        }
+      }
+      _handle_conflict_error(action, conflicting_actions) {
+        let message = conflicting_actions.length === 1 ? "conflicting option string: %s" : "conflicting option strings: %s";
+        let conflict_string = conflicting_actions.map(([
+          option_string
+          /*, action*/
+        ]) => option_string).join(", ");
+        throw new ArgumentError(action, sub(message, conflict_string));
+      }
+      _handle_conflict_resolve(action, conflicting_actions) {
+        for (let [option_string, action2] of conflicting_actions) {
+          _array_remove(action2.option_strings, option_string);
+          delete this._option_string_actions[option_string];
+          if (!action2.option_strings.length) {
+            action2.container._remove_action(action2);
+          }
+        }
+      }
+    }));
+    var _ArgumentGroup = _callable(class _ArgumentGroup extends _ActionsContainer {
+      constructor() {
+        let [
+          container,
+          title,
+          description,
+          kwargs
+        ] = _parse_opts(arguments, {
+          container: no_default,
+          title: void 0,
+          description: void 0,
+          "**kwargs": no_default
+        });
+        setdefault(kwargs, "conflict_handler", container.conflict_handler);
+        setdefault(kwargs, "prefix_chars", container.prefix_chars);
+        setdefault(kwargs, "argument_default", container.argument_default);
+        super(Object.assign({ description }, kwargs));
+        this.title = title;
+        this._group_actions = [];
+        this._registries = container._registries;
+        this._actions = container._actions;
+        this._option_string_actions = container._option_string_actions;
+        this._defaults = container._defaults;
+        this._has_negative_number_optionals = container._has_negative_number_optionals;
+        this._mutually_exclusive_groups = container._mutually_exclusive_groups;
+      }
+      _add_action(action) {
+        action = super._add_action(action);
+        this._group_actions.push(action);
+        return action;
+      }
+      _remove_action(action) {
+        super._remove_action(action);
+        _array_remove(this._group_actions, action);
+      }
+    });
+    var _MutuallyExclusiveGroup = _callable(class _MutuallyExclusiveGroup extends _ArgumentGroup {
+      constructor() {
+        let [
+          container,
+          required
+        ] = _parse_opts(arguments, {
+          container: no_default,
+          required: false
+        });
+        super(container);
+        this.required = required;
+        this._container = container;
+      }
+      _add_action(action) {
+        if (action.required) {
+          let msg = "mutually exclusive arguments must be optional";
+          throw new TypeError(msg);
+        }
+        action = this._container._add_action(action);
+        this._group_actions.push(action);
+        return action;
+      }
+      _remove_action(action) {
+        this._container._remove_action(action);
+        _array_remove(this._group_actions, action);
+      }
+    });
+    var ArgumentParser2 = _camelcase_alias(_callable(class ArgumentParser extends _AttributeHolder(_ActionsContainer) {
+      /*
+       *  Object for parsing command line strings into Python objects.
+       *
+       *  Keyword Arguments:
+       *      - prog -- The name of the program (default: sys.argv[0])
+       *      - usage -- A usage message (default: auto-generated from arguments)
+       *      - description -- A description of what the program does
+       *      - epilog -- Text following the argument descriptions
+       *      - parents -- Parsers whose arguments should be copied into this one
+       *      - formatter_class -- HelpFormatter class for printing help messages
+       *      - prefix_chars -- Characters that prefix optional arguments
+       *      - fromfile_prefix_chars -- Characters that prefix files containing
+       *          additional arguments
+       *      - argument_default -- The default value for all arguments
+       *      - conflict_handler -- String indicating how to handle conflicts
+       *      - add_help -- Add a -h/-help option
+       *      - allow_abbrev -- Allow long options to be abbreviated unambiguously
+       *      - exit_on_error -- Determines whether or not ArgumentParser exits with
+       *          error info when an error occurs
+       */
+      constructor() {
+        let [
+          prog,
+          usage,
+          description,
+          epilog,
+          parents,
+          formatter_class,
+          prefix_chars,
+          fromfile_prefix_chars,
+          argument_default,
+          conflict_handler,
+          add_help,
+          allow_abbrev,
+          exit_on_error,
+          debug3,
+          // LEGACY (v1 compatibility), debug mode
+          version
+          // LEGACY (v1 compatibility), version
+        ] = _parse_opts(arguments, {
+          prog: void 0,
+          usage: void 0,
+          description: void 0,
+          epilog: void 0,
+          parents: [],
+          formatter_class: HelpFormatter,
+          prefix_chars: "-",
+          fromfile_prefix_chars: void 0,
+          argument_default: void 0,
+          conflict_handler: "error",
+          add_help: true,
+          allow_abbrev: true,
+          exit_on_error: true,
+          debug: void 0,
+          // LEGACY (v1 compatibility), debug mode
+          version: void 0
+          // LEGACY (v1 compatibility), version
+        });
+        if (debug3 !== void 0) {
+          deprecate(
+            "debug",
+            'The "debug" argument to ArgumentParser is deprecated. Please override ArgumentParser.exit function instead.'
+          );
+        }
+        if (version !== void 0) {
+          deprecate(
+            "version",
+            `The "version" argument to ArgumentParser is deprecated. Please use add_argument(..., { action: 'version', version: 'N', ... }) instead.`
+          );
+        }
+        super({
+          description,
+          prefix_chars,
+          argument_default,
+          conflict_handler
+        });
+        if (prog === void 0) {
+          prog = path2.basename(get_argv()[0] || "");
+        }
+        this.prog = prog;
+        this.usage = usage;
+        this.epilog = epilog;
+        this.formatter_class = formatter_class;
+        this.fromfile_prefix_chars = fromfile_prefix_chars;
+        this.add_help = add_help;
+        this.allow_abbrev = allow_abbrev;
+        this.exit_on_error = exit_on_error;
+        this.debug = debug3;
+        this._positionals = this.add_argument_group("positional arguments");
+        this._optionals = this.add_argument_group("optional arguments");
+        this._subparsers = void 0;
+        function identity(string) {
+          return string;
+        }
+        this.register("type", void 0, identity);
+        this.register("type", null, identity);
+        this.register("type", "auto", identity);
+        this.register("type", "int", function(x) {
+          let result = Number(x);
+          if (!Number.isInteger(result)) {
+            throw new TypeError(sub("could not convert string to int: %r", x));
+          }
+          return result;
+        });
+        this.register("type", "float", function(x) {
+          let result = Number(x);
+          if (isNaN(result)) {
+            throw new TypeError(sub("could not convert string to float: %r", x));
+          }
+          return result;
+        });
+        this.register("type", "str", String);
+        this.register(
+          "type",
+          "string",
+          util.deprecate(String, 'use {type:"str"} or {type:String} instead of {type:"string"}')
+        );
+        let default_prefix = prefix_chars.includes("-") ? "-" : prefix_chars[0];
+        if (this.add_help) {
+          this.add_argument(
+            default_prefix + "h",
+            default_prefix.repeat(2) + "help",
+            {
+              action: "help",
+              default: SUPPRESS,
+              help: "show this help message and exit"
+            }
+          );
+        }
+        if (version) {
+          this.add_argument(
+            default_prefix + "v",
+            default_prefix.repeat(2) + "version",
+            {
+              action: "version",
+              default: SUPPRESS,
+              version: this.version,
+              help: "show program's version number and exit"
+            }
+          );
+        }
+        for (let parent of parents) {
+          this._add_container_actions(parent);
+          Object.assign(this._defaults, parent._defaults);
+        }
+      }
+      // =======================
+      // Pretty __repr__ methods
+      // =======================
+      _get_kwargs() {
+        let names = [
+          "prog",
+          "usage",
+          "description",
+          "formatter_class",
+          "conflict_handler",
+          "add_help"
+        ];
+        return names.map((name) => [name, getattr(this, name)]);
+      }
+      // ==================================
+      // Optional/Positional adding methods
+      // ==================================
+      add_subparsers() {
+        let [
+          kwargs
+        ] = _parse_opts(arguments, {
+          "**kwargs": no_default
+        });
+        if (this._subparsers !== void 0) {
+          this.error("cannot have multiple subparser arguments");
+        }
+        setdefault(kwargs, "parser_class", this.constructor);
+        if ("title" in kwargs || "description" in kwargs) {
+          let title = getattr(kwargs, "title", "subcommands");
+          let description = getattr(kwargs, "description", void 0);
+          delete kwargs.title;
+          delete kwargs.description;
+          this._subparsers = this.add_argument_group(title, description);
+        } else {
+          this._subparsers = this._positionals;
+        }
+        if (kwargs.prog === void 0) {
+          let formatter = this._get_formatter();
+          let positionals = this._get_positional_actions();
+          let groups = this._mutually_exclusive_groups;
+          formatter.add_usage(this.usage, positionals, groups, "");
+          kwargs.prog = formatter.format_help().trim();
+        }
+        let parsers_class = this._pop_action_class(kwargs, "parsers");
+        let action = new parsers_class(Object.assign({ option_strings: [] }, kwargs));
+        this._subparsers._add_action(action);
+        return action;
+      }
+      _add_action(action) {
+        if (action.option_strings.length) {
+          this._optionals._add_action(action);
+        } else {
+          this._positionals._add_action(action);
+        }
+        return action;
+      }
+      _get_optional_actions() {
+        return this._actions.filter((action) => action.option_strings.length);
+      }
+      _get_positional_actions() {
+        return this._actions.filter((action) => !action.option_strings.length);
+      }
+      // =====================================
+      // Command line argument parsing methods
+      // =====================================
+      parse_args(args2 = void 0, namespace = void 0) {
+        let argv;
+        [args2, argv] = this.parse_known_args(args2, namespace);
+        if (argv && argv.length > 0) {
+          let msg = "unrecognized arguments: %s";
+          this.error(sub(msg, argv.join(" ")));
+        }
+        return args2;
+      }
+      parse_known_args(args2 = void 0, namespace = void 0) {
+        if (args2 === void 0) {
+          args2 = get_argv().slice(1);
+        }
+        if (namespace === void 0) {
+          namespace = new Namespace();
+        }
+        for (let action of this._actions) {
+          if (action.dest !== SUPPRESS) {
+            if (!hasattr(namespace, action.dest)) {
+              if (action.default !== SUPPRESS) {
+                setattr(namespace, action.dest, action.default);
+              }
+            }
+          }
+        }
+        for (let dest of Object.keys(this._defaults)) {
+          if (!hasattr(namespace, dest)) {
+            setattr(namespace, dest, this._defaults[dest]);
+          }
+        }
+        if (this.exit_on_error) {
+          try {
+            [namespace, args2] = this._parse_known_args(args2, namespace);
+          } catch (err) {
+            if (err instanceof ArgumentError) {
+              this.error(err.message);
+            } else {
+              throw err;
+            }
+          }
+        } else {
+          [namespace, args2] = this._parse_known_args(args2, namespace);
+        }
+        if (hasattr(namespace, _UNRECOGNIZED_ARGS_ATTR)) {
+          args2 = args2.concat(getattr(namespace, _UNRECOGNIZED_ARGS_ATTR));
+          delattr(namespace, _UNRECOGNIZED_ARGS_ATTR);
+        }
+        return [namespace, args2];
+      }
+      _parse_known_args(arg_strings, namespace) {
+        if (this.fromfile_prefix_chars !== void 0) {
+          arg_strings = this._read_args_from_files(arg_strings);
+        }
+        let action_conflicts = /* @__PURE__ */ new Map();
+        for (let mutex_group of this._mutually_exclusive_groups) {
+          let group_actions = mutex_group._group_actions;
+          for (let [i, mutex_action] of Object.entries(mutex_group._group_actions)) {
+            let conflicts = action_conflicts.get(mutex_action) || [];
+            conflicts = conflicts.concat(group_actions.slice(0, +i));
+            conflicts = conflicts.concat(group_actions.slice(+i + 1));
+            action_conflicts.set(mutex_action, conflicts);
+          }
+        }
+        let option_string_indices = {};
+        let arg_string_pattern_parts = [];
+        let arg_strings_iter = Object.entries(arg_strings)[Symbol.iterator]();
+        for (let [i, arg_string] of arg_strings_iter) {
+          if (arg_string === "--") {
+            arg_string_pattern_parts.push("-");
+            for ([i, arg_string] of arg_strings_iter) {
+              arg_string_pattern_parts.push("A");
+            }
+          } else {
+            let option_tuple = this._parse_optional(arg_string);
+            let pattern;
+            if (option_tuple === void 0) {
+              pattern = "A";
+            } else {
+              option_string_indices[i] = option_tuple;
+              pattern = "O";
+            }
+            arg_string_pattern_parts.push(pattern);
+          }
+        }
+        let arg_strings_pattern = arg_string_pattern_parts.join("");
+        let seen_actions = /* @__PURE__ */ new Set();
+        let seen_non_default_actions = /* @__PURE__ */ new Set();
+        let extras;
+        let take_action = (action, argument_strings, option_string = void 0) => {
+          seen_actions.add(action);
+          let argument_values = this._get_values(action, argument_strings);
+          if (argument_values !== action.default) {
+            seen_non_default_actions.add(action);
+            for (let conflict_action of action_conflicts.get(action) || []) {
+              if (seen_non_default_actions.has(conflict_action)) {
+                let msg = "not allowed with argument %s";
+                let action_name = _get_action_name(conflict_action);
+                throw new ArgumentError(action, sub(msg, action_name));
+              }
+            }
+          }
+          if (argument_values !== SUPPRESS) {
+            action(this, namespace, argument_values, option_string);
+          }
+        };
+        let consume_optional = (start_index2) => {
+          let option_tuple = option_string_indices[start_index2];
+          let [action, option_string, explicit_arg] = option_tuple;
+          let action_tuples = [];
+          let stop;
+          for (; ; ) {
+            if (action === void 0) {
+              extras.push(arg_strings[start_index2]);
+              return start_index2 + 1;
+            }
+            if (explicit_arg !== void 0) {
+              let arg_count = this._match_argument(action, "A");
+              let chars = this.prefix_chars;
+              if (arg_count === 0 && !chars.includes(option_string[1])) {
+                action_tuples.push([action, [], option_string]);
+                let char = option_string[0];
+                option_string = char + explicit_arg[0];
+                let new_explicit_arg = explicit_arg.slice(1) || void 0;
+                let optionals_map = this._option_string_actions;
+                if (hasattr(optionals_map, option_string)) {
+                  action = optionals_map[option_string];
+                  explicit_arg = new_explicit_arg;
+                } else {
+                  let msg = "ignored explicit argument %r";
+                  throw new ArgumentError(action, sub(msg, explicit_arg));
+                }
+              } else if (arg_count === 1) {
+                stop = start_index2 + 1;
+                let args2 = [explicit_arg];
+                action_tuples.push([action, args2, option_string]);
+                break;
+              } else {
+                let msg = "ignored explicit argument %r";
+                throw new ArgumentError(action, sub(msg, explicit_arg));
+              }
+            } else {
+              let start = start_index2 + 1;
+              let selected_patterns = arg_strings_pattern.slice(start);
+              let arg_count = this._match_argument(action, selected_patterns);
+              stop = start + arg_count;
+              let args2 = arg_strings.slice(start, stop);
+              action_tuples.push([action, args2, option_string]);
+              break;
+            }
+          }
+          assert(action_tuples.length);
+          for (let [action2, args2, option_string2] of action_tuples) {
+            take_action(action2, args2, option_string2);
+          }
+          return stop;
+        };
+        let positionals = this._get_positional_actions();
+        let consume_positionals = (start_index2) => {
+          let selected_pattern = arg_strings_pattern.slice(start_index2);
+          let arg_counts = this._match_arguments_partial(positionals, selected_pattern);
+          for (let i = 0; i < positionals.length && i < arg_counts.length; i++) {
+            let action = positionals[i];
+            let arg_count = arg_counts[i];
+            let args2 = arg_strings.slice(start_index2, start_index2 + arg_count);
+            start_index2 += arg_count;
+            take_action(action, args2);
+          }
+          positionals = positionals.slice(arg_counts.length);
+          return start_index2;
+        };
+        extras = [];
+        let start_index = 0;
+        let max_option_string_index = Math.max(-1, ...Object.keys(option_string_indices).map(Number));
+        while (start_index <= max_option_string_index) {
+          let next_option_string_index = Math.min(
+            ...Object.keys(option_string_indices).map(Number).filter((index) => index >= start_index)
+          );
+          if (start_index !== next_option_string_index) {
+            let positionals_end_index = consume_positionals(start_index);
+            if (positionals_end_index > start_index) {
+              start_index = positionals_end_index;
+              continue;
+            } else {
+              start_index = positionals_end_index;
+            }
+          }
+          if (!(start_index in option_string_indices)) {
+            let strings = arg_strings.slice(start_index, next_option_string_index);
+            extras = extras.concat(strings);
+            start_index = next_option_string_index;
+          }
+          start_index = consume_optional(start_index);
+        }
+        let stop_index = consume_positionals(start_index);
+        extras = extras.concat(arg_strings.slice(stop_index));
+        let required_actions = [];
+        for (let action of this._actions) {
+          if (!seen_actions.has(action)) {
+            if (action.required) {
+              required_actions.push(_get_action_name(action));
+            } else {
+              if (action.default !== void 0 && typeof action.default === "string" && hasattr(namespace, action.dest) && action.default === getattr(namespace, action.dest)) {
+                setattr(
+                  namespace,
+                  action.dest,
+                  this._get_value(action, action.default)
+                );
+              }
+            }
+          }
+        }
+        if (required_actions.length) {
+          this.error(sub(
+            "the following arguments are required: %s",
+            required_actions.join(", ")
+          ));
+        }
+        for (let group of this._mutually_exclusive_groups) {
+          if (group.required) {
+            let no_actions_used = true;
+            for (let action of group._group_actions) {
+              if (seen_non_default_actions.has(action)) {
+                no_actions_used = false;
+                break;
+              }
+            }
+            if (no_actions_used) {
+              let names = group._group_actions.filter((action) => action.help !== SUPPRESS).map((action) => _get_action_name(action));
+              let msg = "one of the arguments %s is required";
+              this.error(sub(msg, names.join(" ")));
+            }
+          }
+        }
+        return [namespace, extras];
+      }
+      _read_args_from_files(arg_strings) {
+        let new_arg_strings = [];
+        for (let arg_string of arg_strings) {
+          if (!arg_string || !this.fromfile_prefix_chars.includes(arg_string[0])) {
+            new_arg_strings.push(arg_string);
+          } else {
+            try {
+              let args_file = fs3.readFileSync(arg_string.slice(1), "utf8");
+              let arg_strings2 = [];
+              for (let arg_line of splitlines(args_file)) {
+                for (let arg of this.convert_arg_line_to_args(arg_line)) {
+                  arg_strings2.push(arg);
+                }
+              }
+              arg_strings2 = this._read_args_from_files(arg_strings2);
+              new_arg_strings = new_arg_strings.concat(arg_strings2);
+            } catch (err) {
+              this.error(err.message);
+            }
+          }
+        }
+        return new_arg_strings;
+      }
+      convert_arg_line_to_args(arg_line) {
+        return [arg_line];
+      }
+      _match_argument(action, arg_strings_pattern) {
+        let nargs_pattern = this._get_nargs_pattern(action);
+        let match = arg_strings_pattern.match(new RegExp("^" + nargs_pattern));
+        if (match === null) {
+          let nargs_errors = {
+            undefined: "expected one argument",
+            [OPTIONAL]: "expected at most one argument",
+            [ONE_OR_MORE]: "expected at least one argument"
+          };
+          let msg = nargs_errors[action.nargs];
+          if (msg === void 0) {
+            msg = sub(action.nargs === 1 ? "expected %s argument" : "expected %s arguments", action.nargs);
+          }
+          throw new ArgumentError(action, msg);
+        }
+        return match[1].length;
+      }
+      _match_arguments_partial(actions, arg_strings_pattern) {
+        let result = [];
+        for (let i of range(actions.length, 0, -1)) {
+          let actions_slice = actions.slice(0, i);
+          let pattern = actions_slice.map((action) => this._get_nargs_pattern(action)).join("");
+          let match = arg_strings_pattern.match(new RegExp("^" + pattern));
+          if (match !== null) {
+            result = result.concat(match.slice(1).map((string) => string.length));
+            break;
+          }
+        }
+        return result;
+      }
+      _parse_optional(arg_string) {
+        if (!arg_string) {
+          return void 0;
+        }
+        if (!this.prefix_chars.includes(arg_string[0])) {
+          return void 0;
+        }
+        if (arg_string in this._option_string_actions) {
+          let action = this._option_string_actions[arg_string];
+          return [action, arg_string, void 0];
+        }
+        if (arg_string.length === 1) {
+          return void 0;
+        }
+        if (arg_string.includes("=")) {
+          let [option_string, explicit_arg] = _string_split(arg_string, "=", 1);
+          if (option_string in this._option_string_actions) {
+            let action = this._option_string_actions[option_string];
+            return [action, option_string, explicit_arg];
+          }
+        }
+        let option_tuples = this._get_option_tuples(arg_string);
+        if (option_tuples.length > 1) {
+          let options = option_tuples.map(([
+            ,
+            option_string
+            /*, explicit_arg*/
+          ]) => option_string).join(", ");
+          let args2 = { option: arg_string, matches: options };
+          let msg = "ambiguous option: %(option)s could match %(matches)s";
+          this.error(sub(msg, args2));
+        } else if (option_tuples.length === 1) {
+          let [option_tuple] = option_tuples;
+          return option_tuple;
+        }
+        if (this._negative_number_matcher.test(arg_string)) {
+          if (!this._has_negative_number_optionals.length) {
+            return void 0;
+          }
+        }
+        if (arg_string.includes(" ")) {
+          return void 0;
+        }
+        return [void 0, arg_string, void 0];
+      }
+      _get_option_tuples(option_string) {
+        let result = [];
+        let chars = this.prefix_chars;
+        if (chars.includes(option_string[0]) && chars.includes(option_string[1])) {
+          if (this.allow_abbrev) {
+            let option_prefix, explicit_arg;
+            if (option_string.includes("=")) {
+              [option_prefix, explicit_arg] = _string_split(option_string, "=", 1);
+            } else {
+              option_prefix = option_string;
+              explicit_arg = void 0;
+            }
+            for (let option_string2 of Object.keys(this._option_string_actions)) {
+              if (option_string2.startsWith(option_prefix)) {
+                let action = this._option_string_actions[option_string2];
+                let tup = [action, option_string2, explicit_arg];
+                result.push(tup);
+              }
+            }
+          }
+        } else if (chars.includes(option_string[0]) && !chars.includes(option_string[1])) {
+          let option_prefix = option_string;
+          let explicit_arg = void 0;
+          let short_option_prefix = option_string.slice(0, 2);
+          let short_explicit_arg = option_string.slice(2);
+          for (let option_string2 of Object.keys(this._option_string_actions)) {
+            if (option_string2 === short_option_prefix) {
+              let action = this._option_string_actions[option_string2];
+              let tup = [action, option_string2, short_explicit_arg];
+              result.push(tup);
+            } else if (option_string2.startsWith(option_prefix)) {
+              let action = this._option_string_actions[option_string2];
+              let tup = [action, option_string2, explicit_arg];
+              result.push(tup);
+            }
+          }
+        } else {
+          this.error(sub("unexpected option string: %s", option_string));
+        }
+        return result;
+      }
+      _get_nargs_pattern(action) {
+        let nargs = action.nargs;
+        let nargs_pattern;
+        if (nargs === void 0) {
+          nargs_pattern = "(-*A-*)";
+        } else if (nargs === OPTIONAL) {
+          nargs_pattern = "(-*A?-*)";
+        } else if (nargs === ZERO_OR_MORE) {
+          nargs_pattern = "(-*[A-]*)";
+        } else if (nargs === ONE_OR_MORE) {
+          nargs_pattern = "(-*A[A-]*)";
+        } else if (nargs === REMAINDER) {
+          nargs_pattern = "([-AO]*)";
+        } else if (nargs === PARSER) {
+          nargs_pattern = "(-*A[-AO]*)";
+        } else if (nargs === SUPPRESS) {
+          nargs_pattern = "(-*-*)";
+        } else {
+          nargs_pattern = sub("(-*%s-*)", "A".repeat(nargs).split("").join("-*"));
+        }
+        if (action.option_strings.length) {
+          nargs_pattern = nargs_pattern.replace(/-\*/g, "");
+          nargs_pattern = nargs_pattern.replace(/-/g, "");
+        }
+        return nargs_pattern;
+      }
+      // ========================
+      // Alt command line argument parsing, allowing free intermix
+      // ========================
+      parse_intermixed_args(args2 = void 0, namespace = void 0) {
+        let argv;
+        [args2, argv] = this.parse_known_intermixed_args(args2, namespace);
+        if (argv.length) {
+          let msg = "unrecognized arguments: %s";
+          this.error(sub(msg, argv.join(" ")));
+        }
+        return args2;
+      }
+      parse_known_intermixed_args(args2 = void 0, namespace = void 0) {
+        let extras;
+        let positionals = this._get_positional_actions();
+        let a = positionals.filter((action) => [PARSER, REMAINDER].includes(action.nargs));
+        if (a.length) {
+          throw new TypeError(sub("parse_intermixed_args: positional arg with nargs=%s", a[0].nargs));
+        }
+        for (let group of this._mutually_exclusive_groups) {
+          for (let action of group._group_actions) {
+            if (positionals.includes(action)) {
+              throw new TypeError("parse_intermixed_args: positional in mutuallyExclusiveGroup");
+            }
+          }
+        }
+        let save_usage;
+        try {
+          save_usage = this.usage;
+          let remaining_args;
+          try {
+            if (this.usage === void 0) {
+              this.usage = this.format_usage().slice(7);
+            }
+            for (let action of positionals) {
+              action.save_nargs = action.nargs;
+              action.nargs = SUPPRESS;
+              action.save_default = action.default;
+              action.default = SUPPRESS;
+            }
+            [namespace, remaining_args] = this.parse_known_args(
+              args2,
+              namespace
+            );
+            for (let action of positionals) {
+              let attr = getattr(namespace, action.dest);
+              if (Array.isArray(attr) && attr.length === 0) {
+                console.warn(sub("Do not expect %s in %s", action.dest, namespace));
+                delattr(namespace, action.dest);
+              }
+            }
+          } finally {
+            for (let action of positionals) {
+              action.nargs = action.save_nargs;
+              action.default = action.save_default;
+            }
+          }
+          let optionals = this._get_optional_actions();
+          try {
+            for (let action of optionals) {
+              action.save_required = action.required;
+              action.required = false;
+            }
+            for (let group of this._mutually_exclusive_groups) {
+              group.save_required = group.required;
+              group.required = false;
+            }
+            [namespace, extras] = this.parse_known_args(
+              remaining_args,
+              namespace
+            );
+          } finally {
+            for (let action of optionals) {
+              action.required = action.save_required;
+            }
+            for (let group of this._mutually_exclusive_groups) {
+              group.required = group.save_required;
+            }
+          }
+        } finally {
+          this.usage = save_usage;
+        }
+        return [namespace, extras];
+      }
+      // ========================
+      // Value conversion methods
+      // ========================
+      _get_values(action, arg_strings) {
+        if (![PARSER, REMAINDER].includes(action.nargs)) {
+          try {
+            _array_remove(arg_strings, "--");
+          } catch (err) {
+          }
+        }
+        let value;
+        if (!arg_strings.length && action.nargs === OPTIONAL) {
+          if (action.option_strings.length) {
+            value = action.const;
+          } else {
+            value = action.default;
+          }
+          if (typeof value === "string") {
+            value = this._get_value(action, value);
+            this._check_value(action, value);
+          }
+        } else if (!arg_strings.length && action.nargs === ZERO_OR_MORE && !action.option_strings.length) {
+          if (action.default !== void 0) {
+            value = action.default;
+          } else {
+            value = arg_strings;
+          }
+          this._check_value(action, value);
+        } else if (arg_strings.length === 1 && [void 0, OPTIONAL].includes(action.nargs)) {
+          let arg_string = arg_strings[0];
+          value = this._get_value(action, arg_string);
+          this._check_value(action, value);
+        } else if (action.nargs === REMAINDER) {
+          value = arg_strings.map((v) => this._get_value(action, v));
+        } else if (action.nargs === PARSER) {
+          value = arg_strings.map((v) => this._get_value(action, v));
+          this._check_value(action, value[0]);
+        } else if (action.nargs === SUPPRESS) {
+          value = SUPPRESS;
+        } else {
+          value = arg_strings.map((v) => this._get_value(action, v));
+          for (let v of value) {
+            this._check_value(action, v);
+          }
+        }
+        return value;
+      }
+      _get_value(action, arg_string) {
+        let type_func = this._registry_get("type", action.type, action.type);
+        if (typeof type_func !== "function") {
+          let msg = "%r is not callable";
+          throw new ArgumentError(action, sub(msg, type_func));
+        }
+        let result;
+        try {
+          try {
+            result = type_func(arg_string);
+          } catch (err) {
+            if (err instanceof TypeError && /Class constructor .* cannot be invoked without 'new'/.test(err.message)) {
+              result = new type_func(arg_string);
+            } else {
+              throw err;
+            }
+          }
+        } catch (err) {
+          if (err instanceof ArgumentTypeError) {
+            let msg = err.message;
+            throw new ArgumentError(action, msg);
+          } else if (err instanceof TypeError) {
+            let name = getattr(action.type, "name", repr(action.type));
+            let args2 = { type: name, value: arg_string };
+            let msg = "invalid %(type)s value: %(value)r";
+            throw new ArgumentError(action, sub(msg, args2));
+          } else {
+            throw err;
+          }
+        }
+        return result;
+      }
+      _check_value(action, value) {
+        if (action.choices !== void 0 && !_choices_to_array(action.choices).includes(value)) {
+          let args2 = {
+            value,
+            choices: _choices_to_array(action.choices).map(repr).join(", ")
+          };
+          let msg = "invalid choice: %(value)r (choose from %(choices)s)";
+          throw new ArgumentError(action, sub(msg, args2));
+        }
+      }
+      // =======================
+      // Help-formatting methods
+      // =======================
+      format_usage() {
+        let formatter = this._get_formatter();
+        formatter.add_usage(
+          this.usage,
+          this._actions,
+          this._mutually_exclusive_groups
+        );
+        return formatter.format_help();
+      }
+      format_help() {
+        let formatter = this._get_formatter();
+        formatter.add_usage(
+          this.usage,
+          this._actions,
+          this._mutually_exclusive_groups
+        );
+        formatter.add_text(this.description);
+        for (let action_group of this._action_groups) {
+          formatter.start_section(action_group.title);
+          formatter.add_text(action_group.description);
+          formatter.add_arguments(action_group._group_actions);
+          formatter.end_section();
+        }
+        formatter.add_text(this.epilog);
+        return formatter.format_help();
+      }
+      _get_formatter() {
+        return new this.formatter_class({ prog: this.prog });
+      }
+      // =====================
+      // Help-printing methods
+      // =====================
+      print_usage(file = void 0) {
+        if (file === void 0)
+          file = process.stdout;
+        this._print_message(this.format_usage(), file);
+      }
+      print_help(file = void 0) {
+        if (file === void 0)
+          file = process.stdout;
+        this._print_message(this.format_help(), file);
+      }
+      _print_message(message, file = void 0) {
+        if (message) {
+          if (file === void 0)
+            file = process.stderr;
+          file.write(message);
+        }
+      }
+      // ===============
+      // Exiting methods
+      // ===============
+      exit(status = 0, message = void 0) {
+        if (message) {
+          this._print_message(message, process.stderr);
+        }
+        process.exit(status);
+      }
+      error(message) {
+        if (this.debug === true)
+          throw new Error(message);
+        this.print_usage(process.stderr);
+        let args2 = { prog: this.prog, message };
+        this.exit(2, sub("%(prog)s: error: %(message)s\n", args2));
+      }
+    }));
+    module2.exports = {
+      ArgumentParser: ArgumentParser2,
+      ArgumentError,
+      ArgumentTypeError,
+      BooleanOptionalAction,
+      FileType,
+      HelpFormatter,
+      ArgumentDefaultsHelpFormatter,
+      RawDescriptionHelpFormatter,
+      RawTextHelpFormatter,
+      MetavarTypeHelpFormatter,
+      Namespace,
+      Action,
+      ONE_OR_MORE,
+      OPTIONAL,
+      PARSER,
+      REMAINDER,
+      SUPPRESS,
+      ZERO_OR_MORE
+    };
+    Object.defineProperty(module2.exports, "Const", {
+      get() {
+        let result = {};
+        Object.entries({ ONE_OR_MORE, OPTIONAL, PARSER, REMAINDER, SUPPRESS, ZERO_OR_MORE }).forEach(([n, v]) => {
+          Object.defineProperty(result, n, {
+            get() {
+              deprecate(n, sub("use argparse.%s instead of argparse.Const.%s", n, n));
+              return v;
+            }
+          });
+        });
+        Object.entries({ _UNRECOGNIZED_ARGS_ATTR }).forEach(([n, v]) => {
+          Object.defineProperty(result, n, {
+            get() {
+              deprecate(n, sub("argparse.Const.%s is an internal symbol and will no longer be available", n));
+              return v;
+            }
+          });
+        });
+        return result;
+      },
+      enumerable: false
+    });
   }
 });
 
-// node_modules/.f/_/argparse/1.0.10/argparse/index.js
-var require_argparse2 = __commonJS({
-  "node_modules/.f/_/argparse/1.0.10/argparse/index.js"(exports, module2) {
-    "use strict";
-    module2.exports = require_argparse();
-  }
-});
-
-// node_modules/.f/_/color-name/1.1.4/color-name/index.js
+// node_modules/color-name/index.js
 var require_color_name = __commonJS({
-  "node_modules/.f/_/color-name/1.1.4/color-name/index.js"(exports, module2) {
+  "node_modules/color-name/index.js"(exports, module2) {
     "use strict";
     module2.exports = {
       "aliceblue": [240, 248, 255],
@@ -2499,9 +3385,9 @@ var require_color_name = __commonJS({
   }
 });
 
-// node_modules/.f/_/color-convert/2.0.1/color-convert/conversions.js
+// node_modules/color-convert/conversions.js
 var require_conversions = __commonJS({
-  "node_modules/.f/_/color-convert/2.0.1/color-convert/conversions.js"(exports, module2) {
+  "node_modules/color-convert/conversions.js"(exports, module2) {
     var cssKeywords = require_color_name();
     var reverseKeywords = {};
     for (const key of Object.keys(cssKeywords)) {
@@ -3170,15 +4056,17 @@ var require_conversions = __commonJS({
   }
 });
 
-// node_modules/.f/_/color-convert/2.0.1/color-convert/route.js
+// node_modules/color-convert/route.js
 var require_route = __commonJS({
-  "node_modules/.f/_/color-convert/2.0.1/color-convert/route.js"(exports, module2) {
+  "node_modules/color-convert/route.js"(exports, module2) {
     var conversions = require_conversions();
     function buildGraph() {
       const graph = {};
       const models = Object.keys(conversions);
       for (let len = models.length, i = 0; i < len; i++) {
         graph[models[i]] = {
+          // http://jsperf.com/1-vs-infinity
+          // micro-opt, but this is simple.
           distance: -1,
           parent: null
         };
@@ -3238,9 +4126,9 @@ var require_route = __commonJS({
   }
 });
 
-// node_modules/.f/_/color-convert/2.0.1/color-convert/index.js
+// node_modules/color-convert/index.js
 var require_color_convert = __commonJS({
-  "node_modules/.f/_/color-convert/2.0.1/color-convert/index.js"(exports, module2) {
+  "node_modules/color-convert/index.js"(exports, module2) {
     var conversions = require_conversions();
     var route = require_route();
     var convert = {};
@@ -3299,9 +4187,9 @@ var require_color_convert = __commonJS({
   }
 });
 
-// node_modules/.f/_/ansi-styles/4.2.1/ansi-styles/index.js
+// node_modules/ansi-styles/index.js
 var require_ansi_styles = __commonJS({
-  "node_modules/.f/_/ansi-styles/4.2.1/ansi-styles/index.js"(exports, module2) {
+  "node_modules/ansi-styles/index.js"(exports, module2) {
     "use strict";
     var wrapAnsi16 = (fn, offset) => (...args2) => {
       const code = fn(...args2);
@@ -3354,6 +4242,7 @@ var require_ansi_styles = __commonJS({
       const styles = {
         modifier: {
           reset: [0, 0],
+          // 21 isn't widely supported and 22 does the same thing
           bold: [1, 22],
           dim: [2, 22],
           italic: [3, 23],
@@ -3371,6 +4260,7 @@ var require_ansi_styles = __commonJS({
           magenta: [35, 39],
           cyan: [36, 39],
           white: [37, 39],
+          // Bright color
           blackBright: [90, 39],
           redBright: [91, 39],
           greenBright: [92, 39],
@@ -3389,6 +4279,7 @@ var require_ansi_styles = __commonJS({
           bgMagenta: [45, 49],
           bgCyan: [46, 49],
           bgWhite: [47, 49],
+          // Bright color
           bgBlackBright: [100, 49],
           bgRedBright: [101, 49],
           bgGreenBright: [102, 49],
@@ -3438,9 +4329,9 @@ var require_ansi_styles = __commonJS({
   }
 });
 
-// node_modules/.f/_/has-flag/4.0.0/has-flag/index.js
+// node_modules/has-flag/index.js
 var require_has_flag = __commonJS({
-  "node_modules/.f/_/has-flag/4.0.0/has-flag/index.js"(exports, module2) {
+  "node_modules/has-flag/index.js"(exports, module2) {
     "use strict";
     module2.exports = (flag, argv = process.argv) => {
       const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
@@ -3451,9 +4342,9 @@ var require_has_flag = __commonJS({
   }
 });
 
-// node_modules/.f/_/supports-color/7.2.0/supports-color/index.js
+// node_modules/supports-color/index.js
 var require_supports_color = __commonJS({
-  "node_modules/.f/_/supports-color/7.2.0/supports-color/index.js"(exports, module2) {
+  "node_modules/supports-color/index.js"(exports, module2) {
     "use strict";
     var os = require("os");
     var tty = require("tty");
@@ -3553,9 +4444,9 @@ var require_supports_color = __commonJS({
   }
 });
 
-// node_modules/.f/_/chalk/4.1.0/chalk/source/util.js
+// node_modules/chalk/source/util.js
 var require_util = __commonJS({
-  "node_modules/.f/_/chalk/4.1.0/chalk/source/util.js"(exports, module2) {
+  "node_modules/chalk/source/util.js"(exports, module2) {
     "use strict";
     var stringReplaceAll = (string, substring, replacer) => {
       let index = string.indexOf(substring);
@@ -3592,9 +4483,9 @@ var require_util = __commonJS({
   }
 });
 
-// node_modules/.f/_/chalk/4.1.0/chalk/source/templates.js
+// node_modules/chalk/source/templates.js
 var require_templates = __commonJS({
-  "node_modules/.f/_/chalk/4.1.0/chalk/source/templates.js"(exports, module2) {
+  "node_modules/chalk/source/templates.js"(exports, module2) {
     "use strict";
     var TEMPLATE_REGEX = /(?:\\(u(?:[a-f\d]{4}|\{[a-f\d]{1,6}\})|x[a-f\d]{2}|.))|(?:\{(~)?(\w+(?:\([^)]*\))?(?:\.\w+(?:\([^)]*\))?)*)(?:[ \t]|(?=\r?\n)))|(\})|((?:.|[\r\n\f])+?)/gi;
     var STYLE_REGEX = /(?:^|\.)(\w+)(?:\(([^)]*)\))?/g;
@@ -3706,9 +4597,9 @@ var require_templates = __commonJS({
   }
 });
 
-// node_modules/.f/_/chalk/4.1.0/chalk/source/index.js
+// node_modules/chalk/source/index.js
 var require_source = __commonJS({
-  "node_modules/.f/_/chalk/4.1.0/chalk/source/index.js"(exports, module2) {
+  "node_modules/chalk/source/index.js"(exports, module2) {
     "use strict";
     var ansiStyles = require_ansi_styles();
     var { stdout: stdoutColor, stderr: stderrColor } = require_supports_color();
@@ -3884,9 +4775,9 @@ var require_source = __commonJS({
   }
 });
 
-// node_modules/.f/_/universalify/0.1.2/universalify/index.js
+// node_modules/universalify/index.js
 var require_universalify = __commonJS({
-  "node_modules/.f/_/universalify/0.1.2/universalify/index.js"(exports) {
+  "node_modules/universalify/index.js"(exports) {
     "use strict";
     exports.fromCallback = function(fn) {
       return Object.defineProperty(function() {
@@ -3917,9 +4808,9 @@ var require_universalify = __commonJS({
   }
 });
 
-// node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/polyfills.js
+// node_modules/graceful-fs/polyfills.js
 var require_polyfills = __commonJS({
-  "node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/polyfills.js"(exports, module2) {
+  "node_modules/graceful-fs/polyfills.js"(exports, module2) {
     var constants = require("constants");
     var origCwd = process.cwd;
     var cwd = null;
@@ -4222,9 +5113,9 @@ var require_polyfills = __commonJS({
   }
 });
 
-// node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/legacy-streams.js
+// node_modules/graceful-fs/legacy-streams.js
 var require_legacy_streams = __commonJS({
-  "node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/legacy-streams.js"(exports, module2) {
+  "node_modules/graceful-fs/legacy-streams.js"(exports, module2) {
     var Stream = require("stream").Stream;
     module2.exports = legacy;
     function legacy(fs3) {
@@ -4321,9 +5212,9 @@ var require_legacy_streams = __commonJS({
   }
 });
 
-// node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/clone.js
+// node_modules/graceful-fs/clone.js
 var require_clone = __commonJS({
-  "node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/clone.js"(exports, module2) {
+  "node_modules/graceful-fs/clone.js"(exports, module2) {
     "use strict";
     module2.exports = clone2;
     function clone2(obj) {
@@ -4341,9 +5232,9 @@ var require_clone = __commonJS({
   }
 });
 
-// node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/graceful-fs.js
+// node_modules/graceful-fs/graceful-fs.js
 var require_graceful_fs = __commonJS({
-  "node_modules/.f/_/graceful-fs/4.2.3/graceful-fs/graceful-fs.js"(exports, module2) {
+  "node_modules/graceful-fs/graceful-fs.js"(exports, module2) {
     var fs3 = require("fs");
     var polyfills = require_polyfills();
     var legacy = require_legacy_streams();
@@ -4635,9 +5526,9 @@ var require_graceful_fs = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/fs/index.js
+// node_modules/fs-extra/lib/fs/index.js
 var require_fs = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/fs/index.js"(exports) {
+  "node_modules/fs-extra/lib/fs/index.js"(exports) {
     "use strict";
     var u = require_universalify().fromCallback;
     var fs3 = require_graceful_fs();
@@ -4721,9 +5612,9 @@ var require_fs = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/win32.js
+// node_modules/fs-extra/lib/mkdirs/win32.js
 var require_win32 = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/win32.js"(exports, module2) {
+  "node_modules/fs-extra/lib/mkdirs/win32.js"(exports, module2) {
     "use strict";
     var path2 = require("path");
     function getRootPath(p) {
@@ -4745,9 +5636,9 @@ var require_win32 = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/mkdirs.js
+// node_modules/fs-extra/lib/mkdirs/mkdirs.js
 var require_mkdirs = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/mkdirs.js"(exports, module2) {
+  "node_modules/fs-extra/lib/mkdirs/mkdirs.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var path2 = require("path");
@@ -4806,9 +5697,9 @@ var require_mkdirs = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/mkdirs-sync.js
+// node_modules/fs-extra/lib/mkdirs/mkdirs-sync.js
 var require_mkdirs_sync = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/mkdirs-sync.js"(exports, module2) {
+  "node_modules/fs-extra/lib/mkdirs/mkdirs-sync.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var path2 = require("path");
@@ -4857,9 +5748,9 @@ var require_mkdirs_sync = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/index.js
+// node_modules/fs-extra/lib/mkdirs/index.js
 var require_mkdirs2 = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/mkdirs/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/mkdirs/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var mkdirs = u(require_mkdirs());
@@ -4867,6 +5758,7 @@ var require_mkdirs2 = __commonJS({
     module2.exports = {
       mkdirs,
       mkdirsSync,
+      // alias
       mkdirp: mkdirs,
       mkdirpSync: mkdirsSync,
       ensureDir: mkdirs,
@@ -4875,9 +5767,9 @@ var require_mkdirs2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/util/utimes.js
+// node_modules/fs-extra/lib/util/utimes.js
 var require_utimes = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/util/utimes.js"(exports, module2) {
+  "node_modules/fs-extra/lib/util/utimes.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var os = require("os");
@@ -4885,7 +5777,7 @@ var require_utimes = __commonJS({
     function hasMillisResSync() {
       let tmpfile = path2.join("millis-test-sync" + Date.now().toString() + Math.random().toString().slice(2));
       tmpfile = path2.join(os.tmpdir(), tmpfile);
-      const d = new Date(1435410243862);
+      const d = /* @__PURE__ */ new Date(1435410243862);
       fs3.writeFileSync(tmpfile, "https://github.com/jprichardson/node-fs-extra/pull/141");
       const fd = fs3.openSync(tmpfile, "r+");
       fs3.futimesSync(fd, d, d);
@@ -4895,7 +5787,7 @@ var require_utimes = __commonJS({
     function hasMillisRes(callback) {
       let tmpfile = path2.join("millis-test" + Date.now().toString() + Math.random().toString().slice(2));
       tmpfile = path2.join(os.tmpdir(), tmpfile);
-      const d = new Date(1435410243862);
+      const d = /* @__PURE__ */ new Date(1435410243862);
       fs3.writeFile(tmpfile, "https://github.com/jprichardson/node-fs-extra/pull/141", (err) => {
         if (err)
           return callback(err);
@@ -4954,9 +5846,9 @@ var require_utimes = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/util/buffer.js
+// node_modules/fs-extra/lib/util/buffer.js
 var require_buffer = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/util/buffer.js"(exports, module2) {
+  "node_modules/fs-extra/lib/util/buffer.js"(exports, module2) {
     "use strict";
     module2.exports = function(size) {
       if (typeof Buffer.allocUnsafe === "function") {
@@ -4971,9 +5863,9 @@ var require_buffer = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy-sync/copy-sync.js
+// node_modules/fs-extra/lib/copy-sync/copy-sync.js
 var require_copy_sync = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy-sync/copy-sync.js"(exports, module2) {
+  "node_modules/fs-extra/lib/copy-sync/copy-sync.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var path2 = require("path");
@@ -5140,9 +6032,9 @@ var require_copy_sync = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy-sync/index.js
+// node_modules/fs-extra/lib/copy-sync/index.js
 var require_copy_sync2 = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy-sync/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/copy-sync/index.js"(exports, module2) {
     "use strict";
     module2.exports = {
       copySync: require_copy_sync()
@@ -5150,9 +6042,9 @@ var require_copy_sync2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/path-exists/index.js
+// node_modules/fs-extra/lib/path-exists/index.js
 var require_path_exists = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/path-exists/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/path-exists/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromPromise;
     var fs3 = require_fs();
@@ -5166,9 +6058,9 @@ var require_path_exists = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy/copy.js
+// node_modules/fs-extra/lib/copy/copy.js
 var require_copy = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy/copy.js"(exports, module2) {
+  "node_modules/fs-extra/lib/copy/copy.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var path2 = require("path");
@@ -5406,9 +6298,9 @@ var require_copy = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy/index.js
+// node_modules/fs-extra/lib/copy/index.js
 var require_copy2 = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/copy/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/copy/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     module2.exports = {
@@ -5417,9 +6309,9 @@ var require_copy2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/remove/rimraf.js
+// node_modules/fs-extra/lib/remove/rimraf.js
 var require_rimraf = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/remove/rimraf.js"(exports, module2) {
+  "node_modules/fs-extra/lib/remove/rimraf.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var path2 = require("path");
@@ -5668,9 +6560,9 @@ var require_rimraf = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/remove/index.js
+// node_modules/fs-extra/lib/remove/index.js
 var require_remove = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/remove/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/remove/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var rimraf = require_rimraf();
@@ -5681,9 +6573,9 @@ var require_remove = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/empty/index.js
+// node_modules/fs-extra/lib/empty/index.js
 var require_empty = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/empty/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/empty/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var fs3 = require("fs");
@@ -5731,9 +6623,9 @@ var require_empty = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/file.js
+// node_modules/fs-extra/lib/ensure/file.js
 var require_file = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/file.js"(exports, module2) {
+  "node_modules/fs-extra/lib/ensure/file.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var path2 = require("path");
@@ -5786,9 +6678,9 @@ var require_file = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/link.js
+// node_modules/fs-extra/lib/ensure/link.js
 var require_link = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/link.js"(exports, module2) {
+  "node_modules/fs-extra/lib/ensure/link.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var path2 = require("path");
@@ -5852,9 +6744,9 @@ var require_link = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/symlink-paths.js
+// node_modules/fs-extra/lib/ensure/symlink-paths.js
 var require_symlink_paths = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/symlink-paths.js"(exports, module2) {
+  "node_modules/fs-extra/lib/ensure/symlink-paths.js"(exports, module2) {
     "use strict";
     var path2 = require("path");
     var fs3 = require_graceful_fs();
@@ -5934,9 +6826,9 @@ var require_symlink_paths = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/symlink-type.js
+// node_modules/fs-extra/lib/ensure/symlink-type.js
 var require_symlink_type = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/symlink-type.js"(exports, module2) {
+  "node_modules/fs-extra/lib/ensure/symlink-type.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     function symlinkType(srcpath, type, callback) {
@@ -5969,9 +6861,9 @@ var require_symlink_type = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/symlink.js
+// node_modules/fs-extra/lib/ensure/symlink.js
 var require_symlink = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/symlink.js"(exports, module2) {
+  "node_modules/fs-extra/lib/ensure/symlink.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var path2 = require("path");
@@ -6038,22 +6930,25 @@ var require_symlink = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/index.js
+// node_modules/fs-extra/lib/ensure/index.js
 var require_ensure = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/ensure/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/ensure/index.js"(exports, module2) {
     "use strict";
     var file = require_file();
     var link = require_link();
     var symlink = require_symlink();
     module2.exports = {
+      // file
       createFile: file.createFile,
       createFileSync: file.createFileSync,
       ensureFile: file.createFile,
       ensureFileSync: file.createFileSync,
+      // link
       createLink: link.createLink,
       createLinkSync: link.createLinkSync,
       ensureLink: link.createLink,
       ensureLinkSync: link.createLinkSync,
+      // symlink
       createSymlink: symlink.createSymlink,
       createSymlinkSync: symlink.createSymlinkSync,
       ensureSymlink: symlink.createSymlink,
@@ -6062,9 +6957,9 @@ var require_ensure = __commonJS({
   }
 });
 
-// node_modules/.f/_/jsonfile/4.0.0/jsonfile/index.js
+// node_modules/jsonfile/index.js
 var require_jsonfile = __commonJS({
-  "node_modules/.f/_/jsonfile/4.0.0/jsonfile/index.js"(exports, module2) {
+  "node_modules/jsonfile/index.js"(exports, module2) {
     var _fs;
     try {
       _fs = require_graceful_fs();
@@ -6179,13 +7074,14 @@ var require_jsonfile = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/jsonfile.js
+// node_modules/fs-extra/lib/json/jsonfile.js
 var require_jsonfile2 = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/jsonfile.js"(exports, module2) {
+  "node_modules/fs-extra/lib/json/jsonfile.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var jsonFile2 = require_jsonfile();
     module2.exports = {
+      // jsonfile exports
       readJson: u(jsonFile2.readFile),
       readJsonSync: jsonFile2.readFileSync,
       writeJson: u(jsonFile2.writeFile),
@@ -6194,9 +7090,9 @@ var require_jsonfile2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/output-json.js
+// node_modules/fs-extra/lib/json/output-json.js
 var require_output_json = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/output-json.js"(exports, module2) {
+  "node_modules/fs-extra/lib/json/output-json.js"(exports, module2) {
     "use strict";
     var path2 = require("path");
     var mkdir = require_mkdirs2();
@@ -6224,9 +7120,9 @@ var require_output_json = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/output-json-sync.js
+// node_modules/fs-extra/lib/json/output-json-sync.js
 var require_output_json_sync = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/output-json-sync.js"(exports, module2) {
+  "node_modules/fs-extra/lib/json/output-json-sync.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var path2 = require("path");
@@ -6243,9 +7139,9 @@ var require_output_json_sync = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/index.js
+// node_modules/fs-extra/lib/json/index.js
 var require_json = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/json/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/json/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var jsonFile2 = require_jsonfile2();
@@ -6261,9 +7157,9 @@ var require_json = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/move-sync/index.js
+// node_modules/fs-extra/lib/move-sync/index.js
 var require_move_sync = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/move-sync/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/move-sync/index.js"(exports, module2) {
     "use strict";
     var fs3 = require_graceful_fs();
     var path2 = require("path");
@@ -6362,9 +7258,9 @@ var require_move_sync = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/move/index.js
+// node_modules/fs-extra/lib/move/index.js
 var require_move = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/move/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/move/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var fs3 = require_graceful_fs();
@@ -6445,9 +7341,9 @@ var require_move = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/output/index.js
+// node_modules/fs-extra/lib/output/index.js
 var require_output = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/output/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/output/index.js"(exports, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
     var fs3 = require_graceful_fs();
@@ -6487,13 +7383,15 @@ var require_output = __commonJS({
   }
 });
 
-// node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/index.js
+// node_modules/fs-extra/lib/index.js
 var require_lib = __commonJS({
-  "node_modules/.f/_/fs-extra/7.0.1/fs-extra/lib/index.js"(exports, module2) {
+  "node_modules/fs-extra/lib/index.js"(exports, module2) {
     "use strict";
     module2.exports = Object.assign(
       {},
+      // Export promiseified graceful-fs:
       require_fs(),
+      // Export extra methods:
       require_copy_sync2(),
       require_copy2(),
       require_empty(),
@@ -6517,42 +7415,42 @@ var require_lib = __commonJS({
   }
 });
 
-// node_modules/.f/_/json5/2.1.1/json5/lib/unicode.js
+// node_modules/json5/lib/unicode.js
 var require_unicode = __commonJS({
-  "node_modules/.f/_/json5/2.1.1/json5/lib/unicode.js"(exports, module2) {
+  "node_modules/json5/lib/unicode.js"(exports, module2) {
     module2.exports.Space_Separator = /[\u1680\u2000-\u200A\u202F\u205F\u3000]/;
     module2.exports.ID_Start = /[\xAA\xB5\xBA\xC0-\xD6\xD8-\xF6\xF8-\u02C1\u02C6-\u02D1\u02E0-\u02E4\u02EC\u02EE\u0370-\u0374\u0376\u0377\u037A-\u037D\u037F\u0386\u0388-\u038A\u038C\u038E-\u03A1\u03A3-\u03F5\u03F7-\u0481\u048A-\u052F\u0531-\u0556\u0559\u0561-\u0587\u05D0-\u05EA\u05F0-\u05F2\u0620-\u064A\u066E\u066F\u0671-\u06D3\u06D5\u06E5\u06E6\u06EE\u06EF\u06FA-\u06FC\u06FF\u0710\u0712-\u072F\u074D-\u07A5\u07B1\u07CA-\u07EA\u07F4\u07F5\u07FA\u0800-\u0815\u081A\u0824\u0828\u0840-\u0858\u0860-\u086A\u08A0-\u08B4\u08B6-\u08BD\u0904-\u0939\u093D\u0950\u0958-\u0961\u0971-\u0980\u0985-\u098C\u098F\u0990\u0993-\u09A8\u09AA-\u09B0\u09B2\u09B6-\u09B9\u09BD\u09CE\u09DC\u09DD\u09DF-\u09E1\u09F0\u09F1\u09FC\u0A05-\u0A0A\u0A0F\u0A10\u0A13-\u0A28\u0A2A-\u0A30\u0A32\u0A33\u0A35\u0A36\u0A38\u0A39\u0A59-\u0A5C\u0A5E\u0A72-\u0A74\u0A85-\u0A8D\u0A8F-\u0A91\u0A93-\u0AA8\u0AAA-\u0AB0\u0AB2\u0AB3\u0AB5-\u0AB9\u0ABD\u0AD0\u0AE0\u0AE1\u0AF9\u0B05-\u0B0C\u0B0F\u0B10\u0B13-\u0B28\u0B2A-\u0B30\u0B32\u0B33\u0B35-\u0B39\u0B3D\u0B5C\u0B5D\u0B5F-\u0B61\u0B71\u0B83\u0B85-\u0B8A\u0B8E-\u0B90\u0B92-\u0B95\u0B99\u0B9A\u0B9C\u0B9E\u0B9F\u0BA3\u0BA4\u0BA8-\u0BAA\u0BAE-\u0BB9\u0BD0\u0C05-\u0C0C\u0C0E-\u0C10\u0C12-\u0C28\u0C2A-\u0C39\u0C3D\u0C58-\u0C5A\u0C60\u0C61\u0C80\u0C85-\u0C8C\u0C8E-\u0C90\u0C92-\u0CA8\u0CAA-\u0CB3\u0CB5-\u0CB9\u0CBD\u0CDE\u0CE0\u0CE1\u0CF1\u0CF2\u0D05-\u0D0C\u0D0E-\u0D10\u0D12-\u0D3A\u0D3D\u0D4E\u0D54-\u0D56\u0D5F-\u0D61\u0D7A-\u0D7F\u0D85-\u0D96\u0D9A-\u0DB1\u0DB3-\u0DBB\u0DBD\u0DC0-\u0DC6\u0E01-\u0E30\u0E32\u0E33\u0E40-\u0E46\u0E81\u0E82\u0E84\u0E87\u0E88\u0E8A\u0E8D\u0E94-\u0E97\u0E99-\u0E9F\u0EA1-\u0EA3\u0EA5\u0EA7\u0EAA\u0EAB\u0EAD-\u0EB0\u0EB2\u0EB3\u0EBD\u0EC0-\u0EC4\u0EC6\u0EDC-\u0EDF\u0F00\u0F40-\u0F47\u0F49-\u0F6C\u0F88-\u0F8C\u1000-\u102A\u103F\u1050-\u1055\u105A-\u105D\u1061\u1065\u1066\u106E-\u1070\u1075-\u1081\u108E\u10A0-\u10C5\u10C7\u10CD\u10D0-\u10FA\u10FC-\u1248\u124A-\u124D\u1250-\u1256\u1258\u125A-\u125D\u1260-\u1288\u128A-\u128D\u1290-\u12B0\u12B2-\u12B5\u12B8-\u12BE\u12C0\u12C2-\u12C5\u12C8-\u12D6\u12D8-\u1310\u1312-\u1315\u1318-\u135A\u1380-\u138F\u13A0-\u13F5\u13F8-\u13FD\u1401-\u166C\u166F-\u167F\u1681-\u169A\u16A0-\u16EA\u16EE-\u16F8\u1700-\u170C\u170E-\u1711\u1720-\u1731\u1740-\u1751\u1760-\u176C\u176E-\u1770\u1780-\u17B3\u17D7\u17DC\u1820-\u1877\u1880-\u1884\u1887-\u18A8\u18AA\u18B0-\u18F5\u1900-\u191E\u1950-\u196D\u1970-\u1974\u1980-\u19AB\u19B0-\u19C9\u1A00-\u1A16\u1A20-\u1A54\u1AA7\u1B05-\u1B33\u1B45-\u1B4B\u1B83-\u1BA0\u1BAE\u1BAF\u1BBA-\u1BE5\u1C00-\u1C23\u1C4D-\u1C4F\u1C5A-\u1C7D\u1C80-\u1C88\u1CE9-\u1CEC\u1CEE-\u1CF1\u1CF5\u1CF6\u1D00-\u1DBF\u1E00-\u1F15\u1F18-\u1F1D\u1F20-\u1F45\u1F48-\u1F4D\u1F50-\u1F57\u1F59\u1F5B\u1F5D\u1F5F-\u1F7D\u1F80-\u1FB4\u1FB6-\u1FBC\u1FBE\u1FC2-\u1FC4\u1FC6-\u1FCC\u1FD0-\u1FD3\u1FD6-\u1FDB\u1FE0-\u1FEC\u1FF2-\u1FF4\u1FF6-\u1FFC\u2071\u207F\u2090-\u209C\u2102\u2107\u210A-\u2113\u2115\u2119-\u211D\u2124\u2126\u2128\u212A-\u212D\u212F-\u2139\u213C-\u213F\u2145-\u2149\u214E\u2160-\u2188\u2C00-\u2C2E\u2C30-\u2C5E\u2C60-\u2CE4\u2CEB-\u2CEE\u2CF2\u2CF3\u2D00-\u2D25\u2D27\u2D2D\u2D30-\u2D67\u2D6F\u2D80-\u2D96\u2DA0-\u2DA6\u2DA8-\u2DAE\u2DB0-\u2DB6\u2DB8-\u2DBE\u2DC0-\u2DC6\u2DC8-\u2DCE\u2DD0-\u2DD6\u2DD8-\u2DDE\u2E2F\u3005-\u3007\u3021-\u3029\u3031-\u3035\u3038-\u303C\u3041-\u3096\u309D-\u309F\u30A1-\u30FA\u30FC-\u30FF\u3105-\u312E\u3131-\u318E\u31A0-\u31BA\u31F0-\u31FF\u3400-\u4DB5\u4E00-\u9FEA\uA000-\uA48C\uA4D0-\uA4FD\uA500-\uA60C\uA610-\uA61F\uA62A\uA62B\uA640-\uA66E\uA67F-\uA69D\uA6A0-\uA6EF\uA717-\uA71F\uA722-\uA788\uA78B-\uA7AE\uA7B0-\uA7B7\uA7F7-\uA801\uA803-\uA805\uA807-\uA80A\uA80C-\uA822\uA840-\uA873\uA882-\uA8B3\uA8F2-\uA8F7\uA8FB\uA8FD\uA90A-\uA925\uA930-\uA946\uA960-\uA97C\uA984-\uA9B2\uA9CF\uA9E0-\uA9E4\uA9E6-\uA9EF\uA9FA-\uA9FE\uAA00-\uAA28\uAA40-\uAA42\uAA44-\uAA4B\uAA60-\uAA76\uAA7A\uAA7E-\uAAAF\uAAB1\uAAB5\uAAB6\uAAB9-\uAABD\uAAC0\uAAC2\uAADB-\uAADD\uAAE0-\uAAEA\uAAF2-\uAAF4\uAB01-\uAB06\uAB09-\uAB0E\uAB11-\uAB16\uAB20-\uAB26\uAB28-\uAB2E\uAB30-\uAB5A\uAB5C-\uAB65\uAB70-\uABE2\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB\uF900-\uFA6D\uFA70-\uFAD9\uFB00-\uFB06\uFB13-\uFB17\uFB1D\uFB1F-\uFB28\uFB2A-\uFB36\uFB38-\uFB3C\uFB3E\uFB40\uFB41\uFB43\uFB44\uFB46-\uFBB1\uFBD3-\uFD3D\uFD50-\uFD8F\uFD92-\uFDC7\uFDF0-\uFDFB\uFE70-\uFE74\uFE76-\uFEFC\uFF21-\uFF3A\uFF41-\uFF5A\uFF66-\uFFBE\uFFC2-\uFFC7\uFFCA-\uFFCF\uFFD2-\uFFD7\uFFDA-\uFFDC]|\uD800[\uDC00-\uDC0B\uDC0D-\uDC26\uDC28-\uDC3A\uDC3C\uDC3D\uDC3F-\uDC4D\uDC50-\uDC5D\uDC80-\uDCFA\uDD40-\uDD74\uDE80-\uDE9C\uDEA0-\uDED0\uDF00-\uDF1F\uDF2D-\uDF4A\uDF50-\uDF75\uDF80-\uDF9D\uDFA0-\uDFC3\uDFC8-\uDFCF\uDFD1-\uDFD5]|\uD801[\uDC00-\uDC9D\uDCB0-\uDCD3\uDCD8-\uDCFB\uDD00-\uDD27\uDD30-\uDD63\uDE00-\uDF36\uDF40-\uDF55\uDF60-\uDF67]|\uD802[\uDC00-\uDC05\uDC08\uDC0A-\uDC35\uDC37\uDC38\uDC3C\uDC3F-\uDC55\uDC60-\uDC76\uDC80-\uDC9E\uDCE0-\uDCF2\uDCF4\uDCF5\uDD00-\uDD15\uDD20-\uDD39\uDD80-\uDDB7\uDDBE\uDDBF\uDE00\uDE10-\uDE13\uDE15-\uDE17\uDE19-\uDE33\uDE60-\uDE7C\uDE80-\uDE9C\uDEC0-\uDEC7\uDEC9-\uDEE4\uDF00-\uDF35\uDF40-\uDF55\uDF60-\uDF72\uDF80-\uDF91]|\uD803[\uDC00-\uDC48\uDC80-\uDCB2\uDCC0-\uDCF2]|\uD804[\uDC03-\uDC37\uDC83-\uDCAF\uDCD0-\uDCE8\uDD03-\uDD26\uDD50-\uDD72\uDD76\uDD83-\uDDB2\uDDC1-\uDDC4\uDDDA\uDDDC\uDE00-\uDE11\uDE13-\uDE2B\uDE80-\uDE86\uDE88\uDE8A-\uDE8D\uDE8F-\uDE9D\uDE9F-\uDEA8\uDEB0-\uDEDE\uDF05-\uDF0C\uDF0F\uDF10\uDF13-\uDF28\uDF2A-\uDF30\uDF32\uDF33\uDF35-\uDF39\uDF3D\uDF50\uDF5D-\uDF61]|\uD805[\uDC00-\uDC34\uDC47-\uDC4A\uDC80-\uDCAF\uDCC4\uDCC5\uDCC7\uDD80-\uDDAE\uDDD8-\uDDDB\uDE00-\uDE2F\uDE44\uDE80-\uDEAA\uDF00-\uDF19]|\uD806[\uDCA0-\uDCDF\uDCFF\uDE00\uDE0B-\uDE32\uDE3A\uDE50\uDE5C-\uDE83\uDE86-\uDE89\uDEC0-\uDEF8]|\uD807[\uDC00-\uDC08\uDC0A-\uDC2E\uDC40\uDC72-\uDC8F\uDD00-\uDD06\uDD08\uDD09\uDD0B-\uDD30\uDD46]|\uD808[\uDC00-\uDF99]|\uD809[\uDC00-\uDC6E\uDC80-\uDD43]|[\uD80C\uD81C-\uD820\uD840-\uD868\uD86A-\uD86C\uD86F-\uD872\uD874-\uD879][\uDC00-\uDFFF]|\uD80D[\uDC00-\uDC2E]|\uD811[\uDC00-\uDE46]|\uD81A[\uDC00-\uDE38\uDE40-\uDE5E\uDED0-\uDEED\uDF00-\uDF2F\uDF40-\uDF43\uDF63-\uDF77\uDF7D-\uDF8F]|\uD81B[\uDF00-\uDF44\uDF50\uDF93-\uDF9F\uDFE0\uDFE1]|\uD821[\uDC00-\uDFEC]|\uD822[\uDC00-\uDEF2]|\uD82C[\uDC00-\uDD1E\uDD70-\uDEFB]|\uD82F[\uDC00-\uDC6A\uDC70-\uDC7C\uDC80-\uDC88\uDC90-\uDC99]|\uD835[\uDC00-\uDC54\uDC56-\uDC9C\uDC9E\uDC9F\uDCA2\uDCA5\uDCA6\uDCA9-\uDCAC\uDCAE-\uDCB9\uDCBB\uDCBD-\uDCC3\uDCC5-\uDD05\uDD07-\uDD0A\uDD0D-\uDD14\uDD16-\uDD1C\uDD1E-\uDD39\uDD3B-\uDD3E\uDD40-\uDD44\uDD46\uDD4A-\uDD50\uDD52-\uDEA5\uDEA8-\uDEC0\uDEC2-\uDEDA\uDEDC-\uDEFA\uDEFC-\uDF14\uDF16-\uDF34\uDF36-\uDF4E\uDF50-\uDF6E\uDF70-\uDF88\uDF8A-\uDFA8\uDFAA-\uDFC2\uDFC4-\uDFCB]|\uD83A[\uDC00-\uDCC4\uDD00-\uDD43]|\uD83B[\uDE00-\uDE03\uDE05-\uDE1F\uDE21\uDE22\uDE24\uDE27\uDE29-\uDE32\uDE34-\uDE37\uDE39\uDE3B\uDE42\uDE47\uDE49\uDE4B\uDE4D-\uDE4F\uDE51\uDE52\uDE54\uDE57\uDE59\uDE5B\uDE5D\uDE5F\uDE61\uDE62\uDE64\uDE67-\uDE6A\uDE6C-\uDE72\uDE74-\uDE77\uDE79-\uDE7C\uDE7E\uDE80-\uDE89\uDE8B-\uDE9B\uDEA1-\uDEA3\uDEA5-\uDEA9\uDEAB-\uDEBB]|\uD869[\uDC00-\uDED6\uDF00-\uDFFF]|\uD86D[\uDC00-\uDF34\uDF40-\uDFFF]|\uD86E[\uDC00-\uDC1D\uDC20-\uDFFF]|\uD873[\uDC00-\uDEA1\uDEB0-\uDFFF]|\uD87A[\uDC00-\uDFE0]|\uD87E[\uDC00-\uDE1D]/;
     module2.exports.ID_Continue = /[\xAA\xB5\xBA\xC0-\xD6\xD8-\xF6\xF8-\u02C1\u02C6-\u02D1\u02E0-\u02E4\u02EC\u02EE\u0300-\u0374\u0376\u0377\u037A-\u037D\u037F\u0386\u0388-\u038A\u038C\u038E-\u03A1\u03A3-\u03F5\u03F7-\u0481\u0483-\u0487\u048A-\u052F\u0531-\u0556\u0559\u0561-\u0587\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7\u05D0-\u05EA\u05F0-\u05F2\u0610-\u061A\u0620-\u0669\u066E-\u06D3\u06D5-\u06DC\u06DF-\u06E8\u06EA-\u06FC\u06FF\u0710-\u074A\u074D-\u07B1\u07C0-\u07F5\u07FA\u0800-\u082D\u0840-\u085B\u0860-\u086A\u08A0-\u08B4\u08B6-\u08BD\u08D4-\u08E1\u08E3-\u0963\u0966-\u096F\u0971-\u0983\u0985-\u098C\u098F\u0990\u0993-\u09A8\u09AA-\u09B0\u09B2\u09B6-\u09B9\u09BC-\u09C4\u09C7\u09C8\u09CB-\u09CE\u09D7\u09DC\u09DD\u09DF-\u09E3\u09E6-\u09F1\u09FC\u0A01-\u0A03\u0A05-\u0A0A\u0A0F\u0A10\u0A13-\u0A28\u0A2A-\u0A30\u0A32\u0A33\u0A35\u0A36\u0A38\u0A39\u0A3C\u0A3E-\u0A42\u0A47\u0A48\u0A4B-\u0A4D\u0A51\u0A59-\u0A5C\u0A5E\u0A66-\u0A75\u0A81-\u0A83\u0A85-\u0A8D\u0A8F-\u0A91\u0A93-\u0AA8\u0AAA-\u0AB0\u0AB2\u0AB3\u0AB5-\u0AB9\u0ABC-\u0AC5\u0AC7-\u0AC9\u0ACB-\u0ACD\u0AD0\u0AE0-\u0AE3\u0AE6-\u0AEF\u0AF9-\u0AFF\u0B01-\u0B03\u0B05-\u0B0C\u0B0F\u0B10\u0B13-\u0B28\u0B2A-\u0B30\u0B32\u0B33\u0B35-\u0B39\u0B3C-\u0B44\u0B47\u0B48\u0B4B-\u0B4D\u0B56\u0B57\u0B5C\u0B5D\u0B5F-\u0B63\u0B66-\u0B6F\u0B71\u0B82\u0B83\u0B85-\u0B8A\u0B8E-\u0B90\u0B92-\u0B95\u0B99\u0B9A\u0B9C\u0B9E\u0B9F\u0BA3\u0BA4\u0BA8-\u0BAA\u0BAE-\u0BB9\u0BBE-\u0BC2\u0BC6-\u0BC8\u0BCA-\u0BCD\u0BD0\u0BD7\u0BE6-\u0BEF\u0C00-\u0C03\u0C05-\u0C0C\u0C0E-\u0C10\u0C12-\u0C28\u0C2A-\u0C39\u0C3D-\u0C44\u0C46-\u0C48\u0C4A-\u0C4D\u0C55\u0C56\u0C58-\u0C5A\u0C60-\u0C63\u0C66-\u0C6F\u0C80-\u0C83\u0C85-\u0C8C\u0C8E-\u0C90\u0C92-\u0CA8\u0CAA-\u0CB3\u0CB5-\u0CB9\u0CBC-\u0CC4\u0CC6-\u0CC8\u0CCA-\u0CCD\u0CD5\u0CD6\u0CDE\u0CE0-\u0CE3\u0CE6-\u0CEF\u0CF1\u0CF2\u0D00-\u0D03\u0D05-\u0D0C\u0D0E-\u0D10\u0D12-\u0D44\u0D46-\u0D48\u0D4A-\u0D4E\u0D54-\u0D57\u0D5F-\u0D63\u0D66-\u0D6F\u0D7A-\u0D7F\u0D82\u0D83\u0D85-\u0D96\u0D9A-\u0DB1\u0DB3-\u0DBB\u0DBD\u0DC0-\u0DC6\u0DCA\u0DCF-\u0DD4\u0DD6\u0DD8-\u0DDF\u0DE6-\u0DEF\u0DF2\u0DF3\u0E01-\u0E3A\u0E40-\u0E4E\u0E50-\u0E59\u0E81\u0E82\u0E84\u0E87\u0E88\u0E8A\u0E8D\u0E94-\u0E97\u0E99-\u0E9F\u0EA1-\u0EA3\u0EA5\u0EA7\u0EAA\u0EAB\u0EAD-\u0EB9\u0EBB-\u0EBD\u0EC0-\u0EC4\u0EC6\u0EC8-\u0ECD\u0ED0-\u0ED9\u0EDC-\u0EDF\u0F00\u0F18\u0F19\u0F20-\u0F29\u0F35\u0F37\u0F39\u0F3E-\u0F47\u0F49-\u0F6C\u0F71-\u0F84\u0F86-\u0F97\u0F99-\u0FBC\u0FC6\u1000-\u1049\u1050-\u109D\u10A0-\u10C5\u10C7\u10CD\u10D0-\u10FA\u10FC-\u1248\u124A-\u124D\u1250-\u1256\u1258\u125A-\u125D\u1260-\u1288\u128A-\u128D\u1290-\u12B0\u12B2-\u12B5\u12B8-\u12BE\u12C0\u12C2-\u12C5\u12C8-\u12D6\u12D8-\u1310\u1312-\u1315\u1318-\u135A\u135D-\u135F\u1380-\u138F\u13A0-\u13F5\u13F8-\u13FD\u1401-\u166C\u166F-\u167F\u1681-\u169A\u16A0-\u16EA\u16EE-\u16F8\u1700-\u170C\u170E-\u1714\u1720-\u1734\u1740-\u1753\u1760-\u176C\u176E-\u1770\u1772\u1773\u1780-\u17D3\u17D7\u17DC\u17DD\u17E0-\u17E9\u180B-\u180D\u1810-\u1819\u1820-\u1877\u1880-\u18AA\u18B0-\u18F5\u1900-\u191E\u1920-\u192B\u1930-\u193B\u1946-\u196D\u1970-\u1974\u1980-\u19AB\u19B0-\u19C9\u19D0-\u19D9\u1A00-\u1A1B\u1A20-\u1A5E\u1A60-\u1A7C\u1A7F-\u1A89\u1A90-\u1A99\u1AA7\u1AB0-\u1ABD\u1B00-\u1B4B\u1B50-\u1B59\u1B6B-\u1B73\u1B80-\u1BF3\u1C00-\u1C37\u1C40-\u1C49\u1C4D-\u1C7D\u1C80-\u1C88\u1CD0-\u1CD2\u1CD4-\u1CF9\u1D00-\u1DF9\u1DFB-\u1F15\u1F18-\u1F1D\u1F20-\u1F45\u1F48-\u1F4D\u1F50-\u1F57\u1F59\u1F5B\u1F5D\u1F5F-\u1F7D\u1F80-\u1FB4\u1FB6-\u1FBC\u1FBE\u1FC2-\u1FC4\u1FC6-\u1FCC\u1FD0-\u1FD3\u1FD6-\u1FDB\u1FE0-\u1FEC\u1FF2-\u1FF4\u1FF6-\u1FFC\u203F\u2040\u2054\u2071\u207F\u2090-\u209C\u20D0-\u20DC\u20E1\u20E5-\u20F0\u2102\u2107\u210A-\u2113\u2115\u2119-\u211D\u2124\u2126\u2128\u212A-\u212D\u212F-\u2139\u213C-\u213F\u2145-\u2149\u214E\u2160-\u2188\u2C00-\u2C2E\u2C30-\u2C5E\u2C60-\u2CE4\u2CEB-\u2CF3\u2D00-\u2D25\u2D27\u2D2D\u2D30-\u2D67\u2D6F\u2D7F-\u2D96\u2DA0-\u2DA6\u2DA8-\u2DAE\u2DB0-\u2DB6\u2DB8-\u2DBE\u2DC0-\u2DC6\u2DC8-\u2DCE\u2DD0-\u2DD6\u2DD8-\u2DDE\u2DE0-\u2DFF\u2E2F\u3005-\u3007\u3021-\u302F\u3031-\u3035\u3038-\u303C\u3041-\u3096\u3099\u309A\u309D-\u309F\u30A1-\u30FA\u30FC-\u30FF\u3105-\u312E\u3131-\u318E\u31A0-\u31BA\u31F0-\u31FF\u3400-\u4DB5\u4E00-\u9FEA\uA000-\uA48C\uA4D0-\uA4FD\uA500-\uA60C\uA610-\uA62B\uA640-\uA66F\uA674-\uA67D\uA67F-\uA6F1\uA717-\uA71F\uA722-\uA788\uA78B-\uA7AE\uA7B0-\uA7B7\uA7F7-\uA827\uA840-\uA873\uA880-\uA8C5\uA8D0-\uA8D9\uA8E0-\uA8F7\uA8FB\uA8FD\uA900-\uA92D\uA930-\uA953\uA960-\uA97C\uA980-\uA9C0\uA9CF-\uA9D9\uA9E0-\uA9FE\uAA00-\uAA36\uAA40-\uAA4D\uAA50-\uAA59\uAA60-\uAA76\uAA7A-\uAAC2\uAADB-\uAADD\uAAE0-\uAAEF\uAAF2-\uAAF6\uAB01-\uAB06\uAB09-\uAB0E\uAB11-\uAB16\uAB20-\uAB26\uAB28-\uAB2E\uAB30-\uAB5A\uAB5C-\uAB65\uAB70-\uABEA\uABEC\uABED\uABF0-\uABF9\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB\uF900-\uFA6D\uFA70-\uFAD9\uFB00-\uFB06\uFB13-\uFB17\uFB1D-\uFB28\uFB2A-\uFB36\uFB38-\uFB3C\uFB3E\uFB40\uFB41\uFB43\uFB44\uFB46-\uFBB1\uFBD3-\uFD3D\uFD50-\uFD8F\uFD92-\uFDC7\uFDF0-\uFDFB\uFE00-\uFE0F\uFE20-\uFE2F\uFE33\uFE34\uFE4D-\uFE4F\uFE70-\uFE74\uFE76-\uFEFC\uFF10-\uFF19\uFF21-\uFF3A\uFF3F\uFF41-\uFF5A\uFF66-\uFFBE\uFFC2-\uFFC7\uFFCA-\uFFCF\uFFD2-\uFFD7\uFFDA-\uFFDC]|\uD800[\uDC00-\uDC0B\uDC0D-\uDC26\uDC28-\uDC3A\uDC3C\uDC3D\uDC3F-\uDC4D\uDC50-\uDC5D\uDC80-\uDCFA\uDD40-\uDD74\uDDFD\uDE80-\uDE9C\uDEA0-\uDED0\uDEE0\uDF00-\uDF1F\uDF2D-\uDF4A\uDF50-\uDF7A\uDF80-\uDF9D\uDFA0-\uDFC3\uDFC8-\uDFCF\uDFD1-\uDFD5]|\uD801[\uDC00-\uDC9D\uDCA0-\uDCA9\uDCB0-\uDCD3\uDCD8-\uDCFB\uDD00-\uDD27\uDD30-\uDD63\uDE00-\uDF36\uDF40-\uDF55\uDF60-\uDF67]|\uD802[\uDC00-\uDC05\uDC08\uDC0A-\uDC35\uDC37\uDC38\uDC3C\uDC3F-\uDC55\uDC60-\uDC76\uDC80-\uDC9E\uDCE0-\uDCF2\uDCF4\uDCF5\uDD00-\uDD15\uDD20-\uDD39\uDD80-\uDDB7\uDDBE\uDDBF\uDE00-\uDE03\uDE05\uDE06\uDE0C-\uDE13\uDE15-\uDE17\uDE19-\uDE33\uDE38-\uDE3A\uDE3F\uDE60-\uDE7C\uDE80-\uDE9C\uDEC0-\uDEC7\uDEC9-\uDEE6\uDF00-\uDF35\uDF40-\uDF55\uDF60-\uDF72\uDF80-\uDF91]|\uD803[\uDC00-\uDC48\uDC80-\uDCB2\uDCC0-\uDCF2]|\uD804[\uDC00-\uDC46\uDC66-\uDC6F\uDC7F-\uDCBA\uDCD0-\uDCE8\uDCF0-\uDCF9\uDD00-\uDD34\uDD36-\uDD3F\uDD50-\uDD73\uDD76\uDD80-\uDDC4\uDDCA-\uDDCC\uDDD0-\uDDDA\uDDDC\uDE00-\uDE11\uDE13-\uDE37\uDE3E\uDE80-\uDE86\uDE88\uDE8A-\uDE8D\uDE8F-\uDE9D\uDE9F-\uDEA8\uDEB0-\uDEEA\uDEF0-\uDEF9\uDF00-\uDF03\uDF05-\uDF0C\uDF0F\uDF10\uDF13-\uDF28\uDF2A-\uDF30\uDF32\uDF33\uDF35-\uDF39\uDF3C-\uDF44\uDF47\uDF48\uDF4B-\uDF4D\uDF50\uDF57\uDF5D-\uDF63\uDF66-\uDF6C\uDF70-\uDF74]|\uD805[\uDC00-\uDC4A\uDC50-\uDC59\uDC80-\uDCC5\uDCC7\uDCD0-\uDCD9\uDD80-\uDDB5\uDDB8-\uDDC0\uDDD8-\uDDDD\uDE00-\uDE40\uDE44\uDE50-\uDE59\uDE80-\uDEB7\uDEC0-\uDEC9\uDF00-\uDF19\uDF1D-\uDF2B\uDF30-\uDF39]|\uD806[\uDCA0-\uDCE9\uDCFF\uDE00-\uDE3E\uDE47\uDE50-\uDE83\uDE86-\uDE99\uDEC0-\uDEF8]|\uD807[\uDC00-\uDC08\uDC0A-\uDC36\uDC38-\uDC40\uDC50-\uDC59\uDC72-\uDC8F\uDC92-\uDCA7\uDCA9-\uDCB6\uDD00-\uDD06\uDD08\uDD09\uDD0B-\uDD36\uDD3A\uDD3C\uDD3D\uDD3F-\uDD47\uDD50-\uDD59]|\uD808[\uDC00-\uDF99]|\uD809[\uDC00-\uDC6E\uDC80-\uDD43]|[\uD80C\uD81C-\uD820\uD840-\uD868\uD86A-\uD86C\uD86F-\uD872\uD874-\uD879][\uDC00-\uDFFF]|\uD80D[\uDC00-\uDC2E]|\uD811[\uDC00-\uDE46]|\uD81A[\uDC00-\uDE38\uDE40-\uDE5E\uDE60-\uDE69\uDED0-\uDEED\uDEF0-\uDEF4\uDF00-\uDF36\uDF40-\uDF43\uDF50-\uDF59\uDF63-\uDF77\uDF7D-\uDF8F]|\uD81B[\uDF00-\uDF44\uDF50-\uDF7E\uDF8F-\uDF9F\uDFE0\uDFE1]|\uD821[\uDC00-\uDFEC]|\uD822[\uDC00-\uDEF2]|\uD82C[\uDC00-\uDD1E\uDD70-\uDEFB]|\uD82F[\uDC00-\uDC6A\uDC70-\uDC7C\uDC80-\uDC88\uDC90-\uDC99\uDC9D\uDC9E]|\uD834[\uDD65-\uDD69\uDD6D-\uDD72\uDD7B-\uDD82\uDD85-\uDD8B\uDDAA-\uDDAD\uDE42-\uDE44]|\uD835[\uDC00-\uDC54\uDC56-\uDC9C\uDC9E\uDC9F\uDCA2\uDCA5\uDCA6\uDCA9-\uDCAC\uDCAE-\uDCB9\uDCBB\uDCBD-\uDCC3\uDCC5-\uDD05\uDD07-\uDD0A\uDD0D-\uDD14\uDD16-\uDD1C\uDD1E-\uDD39\uDD3B-\uDD3E\uDD40-\uDD44\uDD46\uDD4A-\uDD50\uDD52-\uDEA5\uDEA8-\uDEC0\uDEC2-\uDEDA\uDEDC-\uDEFA\uDEFC-\uDF14\uDF16-\uDF34\uDF36-\uDF4E\uDF50-\uDF6E\uDF70-\uDF88\uDF8A-\uDFA8\uDFAA-\uDFC2\uDFC4-\uDFCB\uDFCE-\uDFFF]|\uD836[\uDE00-\uDE36\uDE3B-\uDE6C\uDE75\uDE84\uDE9B-\uDE9F\uDEA1-\uDEAF]|\uD838[\uDC00-\uDC06\uDC08-\uDC18\uDC1B-\uDC21\uDC23\uDC24\uDC26-\uDC2A]|\uD83A[\uDC00-\uDCC4\uDCD0-\uDCD6\uDD00-\uDD4A\uDD50-\uDD59]|\uD83B[\uDE00-\uDE03\uDE05-\uDE1F\uDE21\uDE22\uDE24\uDE27\uDE29-\uDE32\uDE34-\uDE37\uDE39\uDE3B\uDE42\uDE47\uDE49\uDE4B\uDE4D-\uDE4F\uDE51\uDE52\uDE54\uDE57\uDE59\uDE5B\uDE5D\uDE5F\uDE61\uDE62\uDE64\uDE67-\uDE6A\uDE6C-\uDE72\uDE74-\uDE77\uDE79-\uDE7C\uDE7E\uDE80-\uDE89\uDE8B-\uDE9B\uDEA1-\uDEA3\uDEA5-\uDEA9\uDEAB-\uDEBB]|\uD869[\uDC00-\uDED6\uDF00-\uDFFF]|\uD86D[\uDC00-\uDF34\uDF40-\uDFFF]|\uD86E[\uDC00-\uDC1D\uDC20-\uDFFF]|\uD873[\uDC00-\uDEA1\uDEB0-\uDFFF]|\uD87A[\uDC00-\uDFE0]|\uD87E[\uDC00-\uDE1D]|\uDB40[\uDD00-\uDDEF]/;
   }
 });
 
-// node_modules/.f/_/json5/2.1.1/json5/lib/util.js
+// node_modules/json5/lib/util.js
 var require_util2 = __commonJS({
-  "node_modules/.f/_/json5/2.1.1/json5/lib/util.js"(exports, module2) {
+  "node_modules/json5/lib/util.js"(exports, module2) {
     var unicode = require_unicode();
     module2.exports = {
       isSpaceSeparator(c) {
-        return unicode.Space_Separator.test(c);
+        return typeof c === "string" && unicode.Space_Separator.test(c);
       },
       isIdStartChar(c) {
-        return c >= "a" && c <= "z" || c >= "A" && c <= "Z" || c === "$" || c === "_" || unicode.ID_Start.test(c);
+        return typeof c === "string" && (c >= "a" && c <= "z" || c >= "A" && c <= "Z" || c === "$" || c === "_" || unicode.ID_Start.test(c));
       },
       isIdContinueChar(c) {
-        return c >= "a" && c <= "z" || c >= "A" && c <= "Z" || c >= "0" && c <= "9" || c === "$" || c === "_" || c === "\u200C" || c === "\u200D" || unicode.ID_Continue.test(c);
+        return typeof c === "string" && (c >= "a" && c <= "z" || c >= "A" && c <= "Z" || c >= "0" && c <= "9" || c === "$" || c === "_" || c === "\u200C" || c === "\u200D" || unicode.ID_Continue.test(c));
       },
       isDigit(c) {
-        return /[0-9]/.test(c);
+        return typeof c === "string" && /[0-9]/.test(c);
       },
       isHexDigit(c) {
-        return /[0-9A-Fa-f]/.test(c);
+        return typeof c === "string" && /[0-9A-Fa-f]/.test(c);
       }
     };
   }
 });
 
-// node_modules/.f/_/json5/2.1.1/json5/lib/parse.js
+// node_modules/json5/lib/parse.js
 var require_parse = __commonJS({
-  "node_modules/.f/_/json5/2.1.1/json5/lib/parse.js"(exports, module2) {
+  "node_modules/json5/lib/parse.js"(exports, module2) {
     var util = require_util2();
     var source;
     var parseState;
@@ -6585,12 +7483,34 @@ var require_parse = __commonJS({
     function internalize(holder, name, reviver) {
       const value = holder[name];
       if (value != null && typeof value === "object") {
-        for (const key2 in value) {
-          const replacement = internalize(value, key2, reviver);
-          if (replacement === void 0) {
-            delete value[key2];
-          } else {
-            value[key2] = replacement;
+        if (Array.isArray(value)) {
+          for (let i = 0; i < value.length; i++) {
+            const key2 = String(i);
+            const replacement = internalize(value, key2, reviver);
+            if (replacement === void 0) {
+              delete value[key2];
+            } else {
+              Object.defineProperty(value, key2, {
+                value: replacement,
+                writable: true,
+                enumerable: true,
+                configurable: true
+              });
+            }
+          }
+        } else {
+          for (const key2 in value) {
+            const replacement = internalize(value, key2, reviver);
+            if (replacement === void 0) {
+              delete value[key2];
+            } else {
+              Object.defineProperty(value, key2, {
+                value: replacement,
+                writable: true,
+                enumerable: true,
+                configurable: true
+              });
+            }
           }
         }
       }
@@ -7289,7 +8209,12 @@ var require_parse = __commonJS({
         if (Array.isArray(parent)) {
           parent.push(value);
         } else {
-          parent[key] = value;
+          Object.defineProperty(parent, key, {
+            value,
+            writable: true,
+            enumerable: true,
+            configurable: true
+          });
         }
       }
       if (value !== null && typeof value === "object") {
@@ -7370,9 +8295,9 @@ var require_parse = __commonJS({
   }
 });
 
-// node_modules/.f/_/json5/2.1.1/json5/lib/stringify.js
+// node_modules/json5/lib/stringify.js
 var require_stringify = __commonJS({
-  "node_modules/.f/_/json5/2.1.1/json5/lib/stringify.js"(exports, module2) {
+  "node_modules/json5/lib/stringify.js"(exports, module2) {
     var util = require_util2();
     module2.exports = function stringify(value, replacer, space) {
       const stack = [];
@@ -7589,9 +8514,9 @@ var require_stringify = __commonJS({
   }
 });
 
-// node_modules/.f/_/json5/2.1.1/json5/lib/index.js
+// node_modules/json5/lib/index.js
 var require_lib2 = __commonJS({
-  "node_modules/.f/_/json5/2.1.1/json5/lib/index.js"(exports, module2) {
+  "node_modules/json5/lib/index.js"(exports, module2) {
     var parse2 = require_parse();
     var stringify = require_stringify();
     var JSON52 = {
@@ -7602,9 +8527,9 @@ var require_lib2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/btoa/1.2.1/btoa/index.js
+// node_modules/btoa/index.js
 var require_btoa = __commonJS({
-  "node_modules/.f/_/btoa/1.2.1/btoa/index.js"(exports, module2) {
+  "node_modules/btoa/index.js"(exports, module2) {
     (function() {
       "use strict";
       function btoa2(str) {
@@ -7621,9 +8546,9 @@ var require_btoa = __commonJS({
   }
 });
 
-// node_modules/.f/_/node-fetch/2.6.0/node-fetch/lib/index.js
+// node_modules/node-fetch/lib/index.js
 var require_lib3 = __commonJS({
-  "node_modules/.f/_/node-fetch/2.6.0/node-fetch/lib/index.js"(exports, module2) {
+  "node_modules/node-fetch/lib/index.js"(exports, module2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function _interopDefault(ex) {
@@ -7797,15 +8722,26 @@ var require_lib3 = __commonJS({
       get bodyUsed() {
         return this[INTERNALS].disturbed;
       },
+      /**
+       * Decode response as ArrayBuffer
+       *
+       * @return  Promise
+       */
       arrayBuffer() {
         return consumeBody.call(this).then(function(buf) {
           return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
         });
       },
+      /**
+       * Return raw response as Blob
+       *
+       * @return Promise
+       */
       blob() {
         let ct = this.headers && this.headers.get("content-type") || "";
         return consumeBody.call(this).then(function(buf) {
           return Object.assign(
+            // Prevent copying
             new Blob([], {
               type: ct.toLowerCase()
             }),
@@ -7815,6 +8751,11 @@ var require_lib3 = __commonJS({
           );
         });
       },
+      /**
+       * Decode response as json
+       *
+       * @return  Promise
+       */
       json() {
         var _this2 = this;
         return consumeBody.call(this).then(function(buffer) {
@@ -7825,14 +8766,30 @@ var require_lib3 = __commonJS({
           }
         });
       },
+      /**
+       * Decode response as text
+       *
+       * @return  Promise
+       */
       text() {
         return consumeBody.call(this).then(function(buffer) {
           return buffer.toString();
         });
       },
+      /**
+       * Decode response as buffer (non-spec api)
+       *
+       * @return  Promise
+       */
       buffer() {
         return consumeBody.call(this);
       },
+      /**
+       * Decode response as text, while automatically detecting the encoding and
+       * trying to decode to UTF-8 (non-spec api)
+       *
+       * @return  Promise
+       */
       textConverted() {
         var _this3 = this;
         return consumeBody.call(this).then(function(buffer) {
@@ -8010,7 +8967,8 @@ var require_lib3 = __commonJS({
       } else if (Buffer.isBuffer(body)) {
         return body.length;
       } else if (body && typeof body.getLengthSync === "function") {
-        if (body._lengthRetrievers && body._lengthRetrievers.length == 0 || body.hasKnownLength && body.hasKnownLength()) {
+        if (body._lengthRetrievers && body._lengthRetrievers.length == 0 || // 1.x
+        body.hasKnownLength && body.hasKnownLength()) {
           return body.getLengthSync();
         }
         return null;
@@ -8057,6 +9015,12 @@ var require_lib3 = __commonJS({
     }
     var MAP = Symbol("map");
     var Headers = class {
+      /**
+       * Headers class
+       *
+       * @param   Object  headers  Response headers
+       * @return  Void
+       */
       constructor() {
         let init2 = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : void 0;
         this[MAP] = /* @__PURE__ */ Object.create(null);
@@ -8101,6 +9065,12 @@ var require_lib3 = __commonJS({
           throw new TypeError("Provided initializer must be an object");
         }
       }
+      /**
+       * Return combined header value given name
+       *
+       * @param   String  name  Header name
+       * @return  Mixed
+       */
       get(name) {
         name = `${name}`;
         validateName(name);
@@ -8110,6 +9080,13 @@ var require_lib3 = __commonJS({
         }
         return this[MAP][key].join(", ");
       }
+      /**
+       * Iterate over all headers
+       *
+       * @param   Function  callback  Executed for each item with parameters (value, name, thisArg)
+       * @param   Boolean   thisArg   `this` context for callback function
+       * @return  Void
+       */
       forEach(callback) {
         let thisArg = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : void 0;
         let pairs = getHeaders(this);
@@ -8122,6 +9099,13 @@ var require_lib3 = __commonJS({
           i++;
         }
       }
+      /**
+       * Overwrite header values given name
+       *
+       * @param   String  name   Header name
+       * @param   String  value  Header value
+       * @return  Void
+       */
       set(name, value) {
         name = `${name}`;
         value = `${value}`;
@@ -8130,6 +9114,13 @@ var require_lib3 = __commonJS({
         const key = find(this[MAP], name);
         this[MAP][key !== void 0 ? key : name] = [value];
       }
+      /**
+       * Append a value onto existing header
+       *
+       * @param   String  name   Header name
+       * @param   String  value  Header value
+       * @return  Void
+       */
       append(name, value) {
         name = `${name}`;
         value = `${value}`;
@@ -8142,11 +9133,23 @@ var require_lib3 = __commonJS({
           this[MAP][name] = [value];
         }
       }
+      /**
+       * Check for header name existence
+       *
+       * @param   String   name  Header name
+       * @return  Boolean
+       */
       has(name) {
         name = `${name}`;
         validateName(name);
         return find(this[MAP], name) !== void 0;
       }
+      /**
+       * Delete all header values given name
+       *
+       * @param   String  name  Header name
+       * @return  Void
+       */
       delete(name) {
         name = `${name}`;
         validateName(name);
@@ -8155,15 +9158,37 @@ var require_lib3 = __commonJS({
           delete this[MAP][key];
         }
       }
+      /**
+       * Return raw headers (non-spec api)
+       *
+       * @return  Object
+       */
       raw() {
         return this[MAP];
       }
+      /**
+       * Get an iterator on keys.
+       *
+       * @return  Iterator
+       */
       keys() {
         return createHeadersIterator(this, "key");
       }
+      /**
+       * Get an iterator on values.
+       *
+       * @return  Iterator
+       */
       values() {
         return createHeadersIterator(this, "value");
       }
+      /**
+       * Get an iterator on entries.
+       *
+       * This is the default iterator of the Headers object.
+       *
+       * @return  Iterator
+       */
       [Symbol.iterator]() {
         return createHeadersIterator(this, "key+value");
       }
@@ -8295,6 +9320,9 @@ var require_lib3 = __commonJS({
       get status() {
         return this[INTERNALS$1].status;
       }
+      /**
+       * Convenience property representing if the request ended normally
+       */
       get ok() {
         return this[INTERNALS$1].status >= 200 && this[INTERNALS$1].status < 300;
       }
@@ -8307,6 +9335,11 @@ var require_lib3 = __commonJS({
       get headers() {
         return this[INTERNALS$1].headers;
       }
+      /**
+       * Clone this response
+       *
+       * @return  Response
+       */
       clone() {
         return new Response(clone2(this), {
           url: this.url,
@@ -8409,6 +9442,11 @@ var require_lib3 = __commonJS({
       get signal() {
         return this[INTERNALS$2].signal;
       }
+      /**
+       * Clone this request
+       *
+       * @return  Request
+       */
       clone() {
         return new Request(this);
       }
@@ -8662,9 +9700,9 @@ var require_lib3 = __commonJS({
   }
 });
 
-// node_modules/.f/_/cross-fetch/3.0.4/cross-fetch/dist/node-ponyfill.js
+// node_modules/cross-fetch/dist/node-ponyfill.js
 var require_node_ponyfill = __commonJS({
-  "node_modules/.f/_/cross-fetch/3.0.4/cross-fetch/dist/node-ponyfill.js"(exports, module2) {
+  "node_modules/cross-fetch/dist/node-ponyfill.js"(exports, module2) {
     var nodeFetch = require_lib3();
     var realFetch = nodeFetch.default || nodeFetch;
     var fetch2 = function(url, options) {
@@ -8682,9 +9720,9 @@ var require_node_ponyfill = __commonJS({
   }
 });
 
-// node_modules/.f/_/object-keys/1.1.1/object-keys/isArguments.js
+// node_modules/object-keys/isArguments.js
 var require_isArguments = __commonJS({
-  "node_modules/.f/_/object-keys/1.1.1/object-keys/isArguments.js"(exports, module2) {
+  "node_modules/object-keys/isArguments.js"(exports, module2) {
     "use strict";
     var toStr = Object.prototype.toString;
     module2.exports = function isArguments(value) {
@@ -8698,9 +9736,9 @@ var require_isArguments = __commonJS({
   }
 });
 
-// node_modules/.f/_/object-keys/1.1.1/object-keys/implementation.js
+// node_modules/object-keys/implementation.js
 var require_implementation = __commonJS({
-  "node_modules/.f/_/object-keys/1.1.1/object-keys/implementation.js"(exports, module2) {
+  "node_modules/object-keys/implementation.js"(exports, module2) {
     "use strict";
     var keysShim;
     if (!Object.keys) {
@@ -8830,9 +9868,9 @@ var require_implementation = __commonJS({
   }
 });
 
-// node_modules/.f/_/object-keys/1.1.1/object-keys/index.js
+// node_modules/object-keys/index.js
 var require_object_keys = __commonJS({
-  "node_modules/.f/_/object-keys/1.1.1/object-keys/index.js"(exports, module2) {
+  "node_modules/object-keys/index.js"(exports, module2) {
     "use strict";
     var slice = Array.prototype.slice;
     var isArgs = require_isArguments();
@@ -8864,9 +9902,9 @@ var require_object_keys = __commonJS({
   }
 });
 
-// node_modules/.f/_/is-arguments/1.0.4/is-arguments/index.js
+// node_modules/is-arguments/index.js
 var require_is_arguments = __commonJS({
-  "node_modules/.f/_/is-arguments/1.0.4/is-arguments/index.js"(exports, module2) {
+  "node_modules/is-arguments/index.js"(exports, module2) {
     "use strict";
     var hasToStringTag = typeof Symbol === "function" && typeof Symbol.toStringTag === "symbol";
     var toStr = Object.prototype.toString;
@@ -8890,9 +9928,9 @@ var require_is_arguments = __commonJS({
   }
 });
 
-// node_modules/.f/_/object-is/1.0.1/object-is/index.js
+// node_modules/object-is/index.js
 var require_object_is = __commonJS({
-  "node_modules/.f/_/object-is/1.0.1/object-is/index.js"(exports, module2) {
+  "node_modules/object-is/index.js"(exports, module2) {
     "use strict";
     var NumberIsNaN = function(value) {
       return value !== value;
@@ -8910,9 +9948,9 @@ var require_object_is = __commonJS({
   }
 });
 
-// node_modules/.f/_/function-bind/1.1.1/function-bind/implementation.js
+// node_modules/function-bind/implementation.js
 var require_implementation2 = __commonJS({
-  "node_modules/.f/_/function-bind/1.1.1/function-bind/implementation.js"(exports, module2) {
+  "node_modules/function-bind/implementation.js"(exports, module2) {
     "use strict";
     var ERROR_MESSAGE = "Function.prototype.bind called on incompatible ";
     var slice = Array.prototype.slice;
@@ -8960,27 +9998,27 @@ var require_implementation2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/function-bind/1.1.1/function-bind/index.js
+// node_modules/function-bind/index.js
 var require_function_bind = __commonJS({
-  "node_modules/.f/_/function-bind/1.1.1/function-bind/index.js"(exports, module2) {
+  "node_modules/function-bind/index.js"(exports, module2) {
     "use strict";
     var implementation = require_implementation2();
     module2.exports = Function.prototype.bind || implementation;
   }
 });
 
-// node_modules/.f/_/has/1.0.3/has/src/index.js
+// node_modules/has/src/index.js
 var require_src = __commonJS({
-  "node_modules/.f/_/has/1.0.3/has/src/index.js"(exports, module2) {
+  "node_modules/has/src/index.js"(exports, module2) {
     "use strict";
     var bind = require_function_bind();
     module2.exports = bind.call(Function.call, Object.prototype.hasOwnProperty);
   }
 });
 
-// node_modules/.f/_/is-regex/1.0.4/is-regex/index.js
+// node_modules/is-regex/index.js
 var require_is_regex = __commonJS({
-  "node_modules/.f/_/is-regex/1.0.4/is-regex/index.js"(exports, module2) {
+  "node_modules/is-regex/index.js"(exports, module2) {
     "use strict";
     var has = require_src();
     var regexExec = RegExp.prototype.exec;
@@ -9017,9 +10055,9 @@ var require_is_regex = __commonJS({
   }
 });
 
-// node_modules/.f/_/define-properties/1.1.3/define-properties/index.js
+// node_modules/define-properties/index.js
 var require_define_properties = __commonJS({
-  "node_modules/.f/_/define-properties/1.1.3/define-properties/index.js"(exports, module2) {
+  "node_modules/define-properties/index.js"(exports, module2) {
     "use strict";
     var keys = require_object_keys();
     var hasSymbols = typeof Symbol === "function" && typeof Symbol("foo") === "symbol";
@@ -9072,9 +10110,9 @@ var require_define_properties = __commonJS({
   }
 });
 
-// node_modules/.f/_/has-symbols/1.0.1/has-symbols/shams.js
+// node_modules/has-symbols/shams.js
 var require_shams = __commonJS({
-  "node_modules/.f/_/has-symbols/1.0.1/has-symbols/shams.js"(exports, module2) {
+  "node_modules/has-symbols/shams.js"(exports, module2) {
     "use strict";
     module2.exports = function hasSymbols() {
       if (typeof Symbol !== "function" || typeof Object.getOwnPropertySymbols !== "function") {
@@ -9124,9 +10162,9 @@ var require_shams = __commonJS({
   }
 });
 
-// node_modules/.f/_/has-symbols/1.0.1/has-symbols/index.js
+// node_modules/has-symbols/index.js
 var require_has_symbols = __commonJS({
-  "node_modules/.f/_/has-symbols/1.0.1/has-symbols/index.js"(exports, module2) {
+  "node_modules/has-symbols/index.js"(exports, module2) {
     "use strict";
     var origSymbol = global.Symbol;
     var hasSymbolSham = require_shams();
@@ -9148,9 +10186,9 @@ var require_has_symbols = __commonJS({
   }
 });
 
-// node_modules/.f/_/es-abstract/1.17.0-next.1/es-abstract/GetIntrinsic.js
+// node_modules/es-abstract/GetIntrinsic.js
 var require_GetIntrinsic = __commonJS({
-  "node_modules/.f/_/es-abstract/1.17.0-next.1/es-abstract/GetIntrinsic.js"(exports, module2) {
+  "node_modules/es-abstract/GetIntrinsic.js"(exports, module2) {
     "use strict";
     var undefined2;
     var $TypeError = TypeError;
@@ -9213,6 +10251,7 @@ var require_GetIntrinsic = __commonJS({
       "$ %Error%": Error,
       "$ %ErrorPrototype%": Error.prototype,
       "$ %eval%": eval,
+      // eslint-disable-line no-eval
       "$ %EvalError%": EvalError,
       "$ %EvalErrorPrototype%": EvalError.prototype,
       "$ %Float32Array%": typeof Float32Array === "undefined" ? undefined2 : Float32Array,
@@ -9338,9 +10377,9 @@ var require_GetIntrinsic = __commonJS({
   }
 });
 
-// node_modules/.f/_/es-abstract/1.17.0-next.1/es-abstract/helpers/callBind.js
+// node_modules/es-abstract/helpers/callBind.js
 var require_callBind = __commonJS({
-  "node_modules/.f/_/es-abstract/1.17.0-next.1/es-abstract/helpers/callBind.js"(exports, module2) {
+  "node_modules/es-abstract/helpers/callBind.js"(exports, module2) {
     "use strict";
     var bind = require_function_bind();
     var GetIntrinsic = require_GetIntrinsic();
@@ -9356,9 +10395,9 @@ var require_callBind = __commonJS({
   }
 });
 
-// node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/implementation.js
+// node_modules/regexp.prototype.flags/implementation.js
 var require_implementation3 = __commonJS({
-  "node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/implementation.js"(exports, module2) {
+  "node_modules/regexp.prototype.flags/implementation.js"(exports, module2) {
     "use strict";
     var $Object = Object;
     var $TypeError = TypeError;
@@ -9390,9 +10429,9 @@ var require_implementation3 = __commonJS({
   }
 });
 
-// node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/polyfill.js
+// node_modules/regexp.prototype.flags/polyfill.js
 var require_polyfill = __commonJS({
-  "node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/polyfill.js"(exports, module2) {
+  "node_modules/regexp.prototype.flags/polyfill.js"(exports, module2) {
     "use strict";
     var implementation = require_implementation3();
     var supportsDescriptors = require_define_properties().supportsDescriptors;
@@ -9413,9 +10452,9 @@ var require_polyfill = __commonJS({
   }
 });
 
-// node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/shim.js
+// node_modules/regexp.prototype.flags/shim.js
 var require_shim = __commonJS({
-  "node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/shim.js"(exports, module2) {
+  "node_modules/regexp.prototype.flags/shim.js"(exports, module2) {
     "use strict";
     var supportsDescriptors = require_define_properties().supportsDescriptors;
     var getPolyfill = require_polyfill();
@@ -9443,9 +10482,9 @@ var require_shim = __commonJS({
   }
 });
 
-// node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/index.js
+// node_modules/regexp.prototype.flags/index.js
 var require_regexp_prototype = __commonJS({
-  "node_modules/.f/_/regexp.prototype.flags/1.3.0/regexp.prototype.flags/index.js"(exports, module2) {
+  "node_modules/regexp.prototype.flags/index.js"(exports, module2) {
     "use strict";
     var define2 = require_define_properties();
     var callBind = require_callBind();
@@ -9462,9 +10501,9 @@ var require_regexp_prototype = __commonJS({
   }
 });
 
-// node_modules/.f/_/is-date-object/1.0.1/is-date-object/index.js
+// node_modules/is-date-object/index.js
 var require_is_date_object = __commonJS({
-  "node_modules/.f/_/is-date-object/1.0.1/is-date-object/index.js"(exports, module2) {
+  "node_modules/is-date-object/index.js"(exports, module2) {
     "use strict";
     var getDay = Date.prototype.getDay;
     var tryDateObject = function tryDateObject2(value) {
@@ -9487,9 +10526,9 @@ var require_is_date_object = __commonJS({
   }
 });
 
-// node_modules/.f/_/deep-equal/1.1.1/deep-equal/index.js
+// node_modules/deep-equal/index.js
 var require_deep_equal = __commonJS({
-  "node_modules/.f/_/deep-equal/1.1.1/deep-equal/index.js"(exports, module2) {
+  "node_modules/deep-equal/index.js"(exports, module2) {
     var objectKeys = require_object_keys();
     var isArguments = require_is_arguments();
     var is = require_object_is();
@@ -9594,9 +10633,9 @@ var require_deep_equal = __commonJS({
   }
 });
 
-// node_modules/.f/_/deepmerge/3.3.0/deepmerge/dist/umd.js
+// node_modules/deepmerge/dist/umd.js
 var require_umd = __commonJS({
-  "node_modules/.f/_/deepmerge/3.3.0/deepmerge/dist/umd.js"(exports, module2) {
+  "node_modules/deepmerge/dist/umd.js"(exports, module2) {
     (function(global2, factory) {
       typeof exports === "object" && typeof module2 !== "undefined" ? module2.exports = factory() : typeof define === "function" && define.amd ? define(factory) : (global2 = global2 || self, global2.deepmerge = factory());
     })(exports, function() {
@@ -9687,9 +10726,9 @@ var require_umd = __commonJS({
   }
 });
 
-// node_modules/.f/_/is/3.3.0/is/index.js
+// node_modules/is/index.js
 var require_is = __commonJS({
-  "node_modules/.f/_/is/3.3.0/is/index.js"(exports, module2) {
+  "node_modules/is/index.js"(exports, module2) {
     "use strict";
     var objProto = Object.prototype;
     var owns = objProto.hasOwnProperty;
@@ -9962,9 +11001,9 @@ var require_is = __commonJS({
   }
 });
 
-// node_modules/.f/_/node.extend/2.0.2/node.extend/lib/extend.js
+// node_modules/node.extend/lib/extend.js
 var require_extend = __commonJS({
-  "node_modules/.f/_/node.extend/2.0.2/node.extend/lib/extend.js"(exports, module2) {
+  "node_modules/node.extend/lib/extend.js"(exports, module2) {
     "use strict";
     var is = require_is();
     var has = require_src();
@@ -10037,17 +11076,17 @@ var require_extend = __commonJS({
   }
 });
 
-// node_modules/.f/_/node.extend/2.0.2/node.extend/index.js
+// node_modules/node.extend/index.js
 var require_node = __commonJS({
-  "node_modules/.f/_/node.extend/2.0.2/node.extend/index.js"(exports, module2) {
+  "node_modules/node.extend/index.js"(exports, module2) {
     "use strict";
     module2.exports = require_extend();
   }
 });
 
-// node_modules/.f/_/object.assign/4.1.0/object.assign/implementation.js
+// node_modules/object.assign/implementation.js
 var require_implementation4 = __commonJS({
-  "node_modules/.f/_/object.assign/4.1.0/object.assign/implementation.js"(exports, module2) {
+  "node_modules/object.assign/implementation.js"(exports, module2) {
     "use strict";
     var keys = require_object_keys();
     var bind = require_function_bind();
@@ -10091,9 +11130,9 @@ var require_implementation4 = __commonJS({
   }
 });
 
-// node_modules/.f/_/object.assign/4.1.0/object.assign/polyfill.js
+// node_modules/object.assign/polyfill.js
 var require_polyfill2 = __commonJS({
-  "node_modules/.f/_/object.assign/4.1.0/object.assign/polyfill.js"(exports, module2) {
+  "node_modules/object.assign/polyfill.js"(exports, module2) {
     "use strict";
     var implementation = require_implementation4();
     var lacksProperEnumerationOrder = function() {
@@ -10140,9 +11179,9 @@ var require_polyfill2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/object.assign/4.1.0/object.assign/shim.js
+// node_modules/object.assign/shim.js
 var require_shim2 = __commonJS({
-  "node_modules/.f/_/object.assign/4.1.0/object.assign/shim.js"(exports, module2) {
+  "node_modules/object.assign/shim.js"(exports, module2) {
     "use strict";
     var define2 = require_define_properties();
     var getPolyfill = require_polyfill2();
@@ -10160,9 +11199,9 @@ var require_shim2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/object.assign/4.1.0/object.assign/index.js
+// node_modules/object.assign/index.js
 var require_object = __commonJS({
-  "node_modules/.f/_/object.assign/4.1.0/object.assign/index.js"(exports, module2) {
+  "node_modules/object.assign/index.js"(exports, module2) {
     "use strict";
     var defineProperties = require_define_properties();
     var implementation = require_implementation4();
@@ -10178,9 +11217,9 @@ var require_object = __commonJS({
   }
 });
 
-// node_modules/.f/_/asap/2.0.6/asap/raw.js
+// node_modules/asap/raw.js
 var require_raw = __commonJS({
-  "node_modules/.f/_/asap/2.0.6/asap/raw.js"(exports, module2) {
+  "node_modules/asap/raw.js"(exports, module2) {
     "use strict";
     var domain;
     var hasSetImmediate = typeof setImmediate === "function";
@@ -10234,9 +11273,9 @@ var require_raw = __commonJS({
   }
 });
 
-// node_modules/.f/_/promise/7.3.1/promise/lib/core.js
+// node_modules/promise/lib/core.js
 var require_core = __commonJS({
-  "node_modules/.f/_/promise/7.3.1/promise/lib/core.js"(exports, module2) {
+  "node_modules/promise/lib/core.js"(exports, module2) {
     "use strict";
     var asap = require_raw();
     function noop() {
@@ -10415,9 +11454,9 @@ var require_core = __commonJS({
   }
 });
 
-// node_modules/.f/_/promise/7.3.1/promise/lib/es6-extensions.js
+// node_modules/promise/lib/es6-extensions.js
 var require_es6_extensions = __commonJS({
-  "node_modules/.f/_/promise/7.3.1/promise/lib/es6-extensions.js"(exports, module2) {
+  "node_modules/promise/lib/es6-extensions.js"(exports, module2) {
     "use strict";
     var Promise2 = require_core();
     module2.exports = Promise2;
@@ -10521,9 +11560,9 @@ var require_es6_extensions = __commonJS({
   }
 });
 
-// node_modules/.f/_/promise-deferred/2.0.3/promise-deferred/index.js
+// node_modules/promise-deferred/index.js
 var require_promise_deferred = __commonJS({
-  "node_modules/.f/_/promise-deferred/2.0.3/promise-deferred/index.js"(exports, module2) {
+  "node_modules/promise-deferred/index.js"(exports, module2) {
     "use strict";
     var Promise2 = require_es6_extensions();
     var Deferred = function Deferred2() {
@@ -10542,9 +11581,9 @@ var require_promise_deferred = __commonJS({
   }
 });
 
-// node_modules/.f/_/is-callable/1.2.2/is-callable/index.js
+// node_modules/is-callable/index.js
 var require_is_callable = __commonJS({
-  "node_modules/.f/_/is-callable/1.2.2/is-callable/index.js"(exports, module2) {
+  "node_modules/is-callable/index.js"(exports, module2) {
     "use strict";
     var fnToStr = Function.prototype.toString;
     var reflectApply = typeof Reflect === "object" && Reflect !== null && Reflect.apply;
@@ -10590,18 +11629,42 @@ var require_is_callable = __commonJS({
       }
     };
     var toStr = Object.prototype.toString;
+    var objectClass = "[object Object]";
     var fnClass = "[object Function]";
     var genClass = "[object GeneratorFunction]";
-    var hasToStringTag = typeof Symbol === "function" && typeof Symbol.toStringTag === "symbol";
+    var ddaClass = "[object HTMLAllCollection]";
+    var ddaClass2 = "[object HTML document.all class]";
+    var ddaClass3 = "[object HTMLCollection]";
+    var hasToStringTag = typeof Symbol === "function" && !!Symbol.toStringTag;
+    var isIE68 = !(0 in [,]);
+    var isDDA = function isDocumentDotAll() {
+      return false;
+    };
+    if (typeof document === "object") {
+      all = document.all;
+      if (toStr.call(all) === toStr.call(document.all)) {
+        isDDA = function isDocumentDotAll(value) {
+          if ((isIE68 || !value) && (typeof value === "undefined" || typeof value === "object")) {
+            try {
+              var str = toStr.call(value);
+              return (str === ddaClass || str === ddaClass2 || str === ddaClass3 || str === objectClass) && value("") == null;
+            } catch (e) {
+            }
+          }
+          return false;
+        };
+      }
+    }
+    var all;
     module2.exports = reflectApply ? function isCallable(value) {
+      if (isDDA(value)) {
+        return true;
+      }
       if (!value) {
         return false;
       }
       if (typeof value !== "function" && typeof value !== "object") {
         return false;
-      }
-      if (typeof value === "function" && !value.prototype) {
-        return true;
       }
       try {
         reflectApply(value, null, badArrayLike);
@@ -10610,16 +11673,16 @@ var require_is_callable = __commonJS({
           return false;
         }
       }
-      return !isES6ClassFn(value);
+      return !isES6ClassFn(value) && tryFunctionObject(value);
     } : function isCallable(value) {
+      if (isDDA(value)) {
+        return true;
+      }
       if (!value) {
         return false;
       }
       if (typeof value !== "function" && typeof value !== "object") {
         return false;
-      }
-      if (typeof value === "function" && !value.prototype) {
-        return true;
       }
       if (hasToStringTag) {
         return tryFunctionObject(value);
@@ -10628,14 +11691,17 @@ var require_is_callable = __commonJS({
         return false;
       }
       var strClass = toStr.call(value);
-      return strClass === fnClass || strClass === genClass;
+      if (strClass !== fnClass && strClass !== genClass && !/^\[object HTML/.test(strClass)) {
+        return false;
+      }
+      return tryFunctionObject(value);
     };
   }
 });
 
-// node_modules/.f/_/promiseback/2.0.3/promiseback/index.js
+// node_modules/promiseback/index.js
 var require_promiseback = __commonJS({
-  "node_modules/.f/_/promiseback/2.0.3/promiseback/index.js"(exports, module2) {
+  "node_modules/promiseback/index.js"(exports, module2) {
     "use strict";
     var Deferred = require_promise_deferred();
     var Promise2 = Deferred.Promise;
@@ -10672,9 +11738,9 @@ var require_promiseback = __commonJS({
   }
 });
 
-// node_modules/.f/_/safer-buffer/2.1.2/safer-buffer/safer.js
+// node_modules/safer-buffer/safer.js
 var require_safer = __commonJS({
-  "node_modules/.f/_/safer-buffer/2.1.2/safer-buffer/safer.js"(exports, module2) {
+  "node_modules/safer-buffer/safer.js"(exports, module2) {
     "use strict";
     var buffer = require("buffer");
     var Buffer2 = buffer.Buffer;
@@ -10744,9 +11810,9 @@ var require_safer = __commonJS({
   }
 });
 
-// node_modules/.f/_/json-file-plus/3.3.1/json-file-plus/index.js
+// node_modules/json-file-plus/index.js
 var require_json_file_plus = __commonJS({
-  "node_modules/.f/_/json-file-plus/3.3.1/json-file-plus/index.js"(exports, module2) {
+  "node_modules/json-file-plus/index.js"(exports, module2) {
     "use strict";
     var fs3 = require("fs");
     var path2 = require("path");
@@ -10864,9 +11930,9 @@ var require_json_file_plus = __commonJS({
   }
 });
 
-// node_modules/.f/_/picomatch/2.2.2/picomatch/lib/constants.js
+// node_modules/picomatch/lib/constants.js
 var require_constants = __commonJS({
-  "node_modules/.f/_/picomatch/2.2.2/picomatch/lib/constants.js"(exports, module2) {
+  "node_modules/picomatch/lib/constants.js"(exports, module2) {
     "use strict";
     var path2 = require("path");
     var WIN_SLASH = "\\\\/";
@@ -10936,61 +12002,112 @@ var require_constants = __commonJS({
     module2.exports = {
       MAX_LENGTH: 1024 * 64,
       POSIX_REGEX_SOURCE,
+      // regular expressions
       REGEX_BACKSLASH: /\\(?![*+?^${}(|)[\]])/g,
       REGEX_NON_SPECIAL_CHARS: /^[^@![\].,$*+?^{}()|\\/]+/,
       REGEX_SPECIAL_CHARS: /[-*+?.^${}(|)[\]]/,
       REGEX_SPECIAL_CHARS_BACKREF: /(\\?)((\W)(\3*))/g,
       REGEX_SPECIAL_CHARS_GLOBAL: /([-*+?.^${}(|)[\]])/g,
       REGEX_REMOVE_BACKSLASH: /(?:\[.*?[^\\]\]|\\(?=.))/g,
+      // Replace globs with equivalent patterns to reduce parsing time.
       REPLACEMENTS: {
         "***": "*",
         "**/**": "**",
         "**/**/**": "**"
       },
+      // Digits
       CHAR_0: 48,
+      /* 0 */
       CHAR_9: 57,
+      /* 9 */
+      // Alphabet chars.
       CHAR_UPPERCASE_A: 65,
+      /* A */
       CHAR_LOWERCASE_A: 97,
+      /* a */
       CHAR_UPPERCASE_Z: 90,
+      /* Z */
       CHAR_LOWERCASE_Z: 122,
+      /* z */
       CHAR_LEFT_PARENTHESES: 40,
+      /* ( */
       CHAR_RIGHT_PARENTHESES: 41,
+      /* ) */
       CHAR_ASTERISK: 42,
+      /* * */
+      // Non-alphabetic chars.
       CHAR_AMPERSAND: 38,
+      /* & */
       CHAR_AT: 64,
+      /* @ */
       CHAR_BACKWARD_SLASH: 92,
+      /* \ */
       CHAR_CARRIAGE_RETURN: 13,
+      /* \r */
       CHAR_CIRCUMFLEX_ACCENT: 94,
+      /* ^ */
       CHAR_COLON: 58,
+      /* : */
       CHAR_COMMA: 44,
+      /* , */
       CHAR_DOT: 46,
+      /* . */
       CHAR_DOUBLE_QUOTE: 34,
+      /* " */
       CHAR_EQUAL: 61,
+      /* = */
       CHAR_EXCLAMATION_MARK: 33,
+      /* ! */
       CHAR_FORM_FEED: 12,
+      /* \f */
       CHAR_FORWARD_SLASH: 47,
+      /* / */
       CHAR_GRAVE_ACCENT: 96,
+      /* ` */
       CHAR_HASH: 35,
+      /* # */
       CHAR_HYPHEN_MINUS: 45,
+      /* - */
       CHAR_LEFT_ANGLE_BRACKET: 60,
+      /* < */
       CHAR_LEFT_CURLY_BRACE: 123,
+      /* { */
       CHAR_LEFT_SQUARE_BRACKET: 91,
+      /* [ */
       CHAR_LINE_FEED: 10,
+      /* \n */
       CHAR_NO_BREAK_SPACE: 160,
+      /* \u00A0 */
       CHAR_PERCENT: 37,
+      /* % */
       CHAR_PLUS: 43,
+      /* + */
       CHAR_QUESTION_MARK: 63,
+      /* ? */
       CHAR_RIGHT_ANGLE_BRACKET: 62,
+      /* > */
       CHAR_RIGHT_CURLY_BRACE: 125,
+      /* } */
       CHAR_RIGHT_SQUARE_BRACKET: 93,
+      /* ] */
       CHAR_SEMICOLON: 59,
+      /* ; */
       CHAR_SINGLE_QUOTE: 39,
+      /* ' */
       CHAR_SPACE: 32,
+      /*   */
       CHAR_TAB: 9,
+      /* \t */
       CHAR_UNDERSCORE: 95,
+      /* _ */
       CHAR_VERTICAL_LINE: 124,
+      /* | */
       CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
+      /* \uFEFF */
       SEP: path2.sep,
+      /**
+       * Create EXTGLOB_CHARS
+       */
       extglobChars(chars) {
         return {
           "!": { type: "negate", open: "(?:(?!(?:", close: `))${chars.STAR})` },
@@ -11000,6 +12117,9 @@ var require_constants = __commonJS({
           "@": { type: "at", open: "(?:", close: ")" }
         };
       },
+      /**
+       * Create GLOB_CHARS
+       */
       globChars(win32) {
         return win32 === true ? WINDOWS_CHARS : POSIX_CHARS;
       }
@@ -11007,9 +12127,9 @@ var require_constants = __commonJS({
   }
 });
 
-// node_modules/.f/_/picomatch/2.2.2/picomatch/lib/utils.js
-var require_utils2 = __commonJS({
-  "node_modules/.f/_/picomatch/2.2.2/picomatch/lib/utils.js"(exports) {
+// node_modules/picomatch/lib/utils.js
+var require_utils = __commonJS({
+  "node_modules/picomatch/lib/utils.js"(exports) {
     "use strict";
     var path2 = require("path");
     var win32 = process.platform === "win32";
@@ -11070,27 +12190,42 @@ var require_utils2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/picomatch/2.2.2/picomatch/lib/scan.js
+// node_modules/picomatch/lib/scan.js
 var require_scan = __commonJS({
-  "node_modules/.f/_/picomatch/2.2.2/picomatch/lib/scan.js"(exports, module2) {
+  "node_modules/picomatch/lib/scan.js"(exports, module2) {
     "use strict";
-    var utils = require_utils2();
+    var utils = require_utils();
     var {
       CHAR_ASTERISK,
+      /* * */
       CHAR_AT,
+      /* @ */
       CHAR_BACKWARD_SLASH,
+      /* \ */
       CHAR_COMMA,
+      /* , */
       CHAR_DOT,
+      /* . */
       CHAR_EXCLAMATION_MARK,
+      /* ! */
       CHAR_FORWARD_SLASH,
+      /* / */
       CHAR_LEFT_CURLY_BRACE,
+      /* { */
       CHAR_LEFT_PARENTHESES,
+      /* ( */
       CHAR_LEFT_SQUARE_BRACKET,
+      /* [ */
       CHAR_PLUS,
+      /* + */
       CHAR_QUESTION_MARK,
+      /* ? */
       CHAR_RIGHT_CURLY_BRACE,
+      /* } */
       CHAR_RIGHT_PARENTHESES,
+      /* ) */
       CHAR_RIGHT_SQUARE_BRACKET
+      /* ] */
     } = require_constants();
     var isPathSeparator = (code) => {
       return code === CHAR_FORWARD_SLASH || code === CHAR_BACKWARD_SLASH;
@@ -11382,12 +12517,12 @@ var require_scan = __commonJS({
   }
 });
 
-// node_modules/.f/_/picomatch/2.2.2/picomatch/lib/parse.js
+// node_modules/picomatch/lib/parse.js
 var require_parse2 = __commonJS({
-  "node_modules/.f/_/picomatch/2.2.2/picomatch/lib/parse.js"(exports, module2) {
+  "node_modules/picomatch/lib/parse.js"(exports, module2) {
     "use strict";
     var constants = require_constants();
-    var utils = require_utils2();
+    var utils = require_utils();
     var {
       MAX_LENGTH,
       POSIX_REGEX_SOURCE,
@@ -12158,14 +13293,14 @@ var require_parse2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/picomatch/2.2.2/picomatch/lib/picomatch.js
+// node_modules/picomatch/lib/picomatch.js
 var require_picomatch = __commonJS({
-  "node_modules/.f/_/picomatch/2.2.2/picomatch/lib/picomatch.js"(exports, module2) {
+  "node_modules/picomatch/lib/picomatch.js"(exports, module2) {
     "use strict";
     var path2 = require("path");
     var scan = require_scan();
     var parse2 = require_parse2();
-    var utils = require_utils2();
+    var utils = require_utils();
     var constants = require_constants();
     var isObject = (val) => val && typeof val === "object" && !Array.isArray(val);
     var picomatch = (glob, options, returnState = false) => {
@@ -12312,17 +13447,17 @@ var require_picomatch = __commonJS({
   }
 });
 
-// node_modules/.f/_/picomatch/2.2.2/picomatch/index.js
+// node_modules/picomatch/index.js
 var require_picomatch2 = __commonJS({
-  "node_modules/.f/_/picomatch/2.2.2/picomatch/index.js"(exports, module2) {
+  "node_modules/picomatch/index.js"(exports, module2) {
     "use strict";
     module2.exports = require_picomatch();
   }
 });
 
-// node_modules/.f/_/readdirp/3.5.0/readdirp/index.js
+// node_modules/readdirp/index.js
 var require_readdirp = __commonJS({
-  "node_modules/.f/_/readdirp/3.5.0/readdirp/index.js"(exports, module2) {
+  "node_modules/readdirp/index.js"(exports, module2) {
     "use strict";
     var fs3 = require("fs");
     var { Readable } = require("stream");
@@ -12374,8 +13509,10 @@ var require_readdirp = __commonJS({
       static get defaultOptions() {
         return {
           root: ".",
+          /* eslint-disable no-unused-vars */
           fileFilter: (path2) => true,
           directoryFilter: (path2) => true,
+          /* eslint-enable no-unused-vars */
           type: FILE_TYPE,
           lstat: false,
           depth: 2147483648,
@@ -12550,9 +13687,9 @@ var require_readdirp = __commonJS({
   }
 });
 
-// node_modules/.f/_/normalize-path/3.0.0/normalize-path/index.js
+// node_modules/normalize-path/index.js
 var require_normalize_path = __commonJS({
-  "node_modules/.f/_/normalize-path/3.0.0/normalize-path/index.js"(exports, module2) {
+  "node_modules/normalize-path/index.js"(exports, module2) {
     module2.exports = function(path2, stripTrailing) {
       if (typeof path2 !== "string") {
         throw new TypeError("expected path to be a string");
@@ -12579,9 +13716,9 @@ var require_normalize_path = __commonJS({
   }
 });
 
-// node_modules/.f/_/anymatch/3.1.1/anymatch/index.js
+// node_modules/anymatch/index.js
 var require_anymatch = __commonJS({
-  "node_modules/.f/_/anymatch/3.1.1/anymatch/index.js"(exports, module2) {
+  "node_modules/anymatch/index.js"(exports, module2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var picomatch = require_picomatch2();
@@ -12646,9 +13783,9 @@ var require_anymatch = __commonJS({
   }
 });
 
-// node_modules/.f/_/is-extglob/2.1.1/is-extglob/index.js
+// node_modules/is-extglob/index.js
 var require_is_extglob = __commonJS({
-  "node_modules/.f/_/is-extglob/2.1.1/is-extglob/index.js"(exports, module2) {
+  "node_modules/is-extglob/index.js"(exports, module2) {
     module2.exports = function isExtglob(str) {
       if (typeof str !== "string" || str === "") {
         return false;
@@ -12664,9 +13801,9 @@ var require_is_extglob = __commonJS({
   }
 });
 
-// node_modules/.f/_/is-glob/4.0.1/is-glob/index.js
+// node_modules/is-glob/index.js
 var require_is_glob = __commonJS({
-  "node_modules/.f/_/is-glob/4.0.1/is-glob/index.js"(exports, module2) {
+  "node_modules/is-glob/index.js"(exports, module2) {
     var isExtglob = require_is_extglob();
     var chars = { "{": "}", "(": ")", "[": "]" };
     var strictRegex = /\\(.)|(^!|\*|[\].+)]\?|\[[^\\\]]+\]|\{[^\\}]+\}|\(\?[:!=][^\\)]+\)|\([^|]+\|[^\\)]+\))/;
@@ -12702,9 +13839,9 @@ var require_is_glob = __commonJS({
   }
 });
 
-// node_modules/.f/_/glob-parent/5.1.1/glob-parent/index.js
+// node_modules/glob-parent/index.js
 var require_glob_parent = __commonJS({
-  "node_modules/.f/_/glob-parent/5.1.1/glob-parent/index.js"(exports, module2) {
+  "node_modules/glob-parent/index.js"(exports, module2) {
     "use strict";
     var isGlob = require_is_glob();
     var pathPosixDirname = require("path").posix.dirname;
@@ -12731,9 +13868,9 @@ var require_glob_parent = __commonJS({
   }
 });
 
-// node_modules/.f/_/braces/3.0.2/braces/lib/utils.js
-var require_utils3 = __commonJS({
-  "node_modules/.f/_/braces/3.0.2/braces/lib/utils.js"(exports) {
+// node_modules/braces/lib/utils.js
+var require_utils2 = __commonJS({
+  "node_modules/braces/lib/utils.js"(exports) {
     "use strict";
     exports.isInteger = (num) => {
       if (typeof num === "number") {
@@ -12815,11 +13952,11 @@ var require_utils3 = __commonJS({
   }
 });
 
-// node_modules/.f/_/braces/3.0.2/braces/lib/stringify.js
+// node_modules/braces/lib/stringify.js
 var require_stringify2 = __commonJS({
-  "node_modules/.f/_/braces/3.0.2/braces/lib/stringify.js"(exports, module2) {
+  "node_modules/braces/lib/stringify.js"(exports, module2) {
     "use strict";
-    var utils = require_utils3();
+    var utils = require_utils2();
     module2.exports = (ast, options = {}) => {
       let stringify = (node, parent = {}) => {
         let invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
@@ -12846,9 +13983,9 @@ var require_stringify2 = __commonJS({
   }
 });
 
-// node_modules/.f/_/is-number/7.0.0/is-number/index.js
+// node_modules/is-number/index.js
 var require_is_number = __commonJS({
-  "node_modules/.f/_/is-number/7.0.0/is-number/index.js"(exports, module2) {
+  "node_modules/is-number/index.js"(exports, module2) {
     "use strict";
     module2.exports = function(num) {
       if (typeof num === "number") {
@@ -12862,9 +13999,9 @@ var require_is_number = __commonJS({
   }
 });
 
-// node_modules/.f/_/to-regex-range/5.0.1/to-regex-range/index.js
+// node_modules/to-regex-range/index.js
 var require_to_regex_range = __commonJS({
-  "node_modules/.f/_/to-regex-range/5.0.1/to-regex-range/index.js"(exports, module2) {
+  "node_modules/to-regex-range/index.js"(exports, module2) {
     "use strict";
     var isNumber = require_is_number();
     var toRegexRange = (min, max, options) => {
@@ -13074,9 +14211,9 @@ var require_to_regex_range = __commonJS({
   }
 });
 
-// node_modules/.f/_/fill-range/7.0.1/fill-range/index.js
+// node_modules/fill-range/index.js
 var require_fill_range = __commonJS({
-  "node_modules/.f/_/fill-range/7.0.1/fill-range/index.js"(exports, module2) {
+  "node_modules/fill-range/index.js"(exports, module2) {
     "use strict";
     var util = require("util");
     var toRegexRange = require_to_regex_range();
@@ -13280,12 +14417,12 @@ var require_fill_range = __commonJS({
   }
 });
 
-// node_modules/.f/_/braces/3.0.2/braces/lib/compile.js
+// node_modules/braces/lib/compile.js
 var require_compile = __commonJS({
-  "node_modules/.f/_/braces/3.0.2/braces/lib/compile.js"(exports, module2) {
+  "node_modules/braces/lib/compile.js"(exports, module2) {
     "use strict";
     var fill = require_fill_range();
-    var utils = require_utils3();
+    var utils = require_utils2();
     var compile = (ast, options = {}) => {
       let walk = (node, parent = {}) => {
         let invalidBlock = utils.isInvalidBrace(parent);
@@ -13331,13 +14468,13 @@ var require_compile = __commonJS({
   }
 });
 
-// node_modules/.f/_/braces/3.0.2/braces/lib/expand.js
+// node_modules/braces/lib/expand.js
 var require_expand = __commonJS({
-  "node_modules/.f/_/braces/3.0.2/braces/lib/expand.js"(exports, module2) {
+  "node_modules/braces/lib/expand.js"(exports, module2) {
     "use strict";
     var fill = require_fill_range();
     var stringify = require_stringify2();
-    var utils = require_utils3();
+    var utils = require_utils2();
     var append = (queue = "", stash = "", enclose = false) => {
       let result = [];
       queue = [].concat(queue);
@@ -13428,79 +14565,138 @@ var require_expand = __commonJS({
   }
 });
 
-// node_modules/.f/_/braces/3.0.2/braces/lib/constants.js
+// node_modules/braces/lib/constants.js
 var require_constants2 = __commonJS({
-  "node_modules/.f/_/braces/3.0.2/braces/lib/constants.js"(exports, module2) {
+  "node_modules/braces/lib/constants.js"(exports, module2) {
     "use strict";
     module2.exports = {
       MAX_LENGTH: 1024 * 64,
+      // Digits
       CHAR_0: "0",
+      /* 0 */
       CHAR_9: "9",
+      /* 9 */
+      // Alphabet chars.
       CHAR_UPPERCASE_A: "A",
+      /* A */
       CHAR_LOWERCASE_A: "a",
+      /* a */
       CHAR_UPPERCASE_Z: "Z",
+      /* Z */
       CHAR_LOWERCASE_Z: "z",
+      /* z */
       CHAR_LEFT_PARENTHESES: "(",
+      /* ( */
       CHAR_RIGHT_PARENTHESES: ")",
+      /* ) */
       CHAR_ASTERISK: "*",
+      /* * */
+      // Non-alphabetic chars.
       CHAR_AMPERSAND: "&",
+      /* & */
       CHAR_AT: "@",
+      /* @ */
       CHAR_BACKSLASH: "\\",
+      /* \ */
       CHAR_BACKTICK: "`",
+      /* ` */
       CHAR_CARRIAGE_RETURN: "\r",
+      /* \r */
       CHAR_CIRCUMFLEX_ACCENT: "^",
+      /* ^ */
       CHAR_COLON: ":",
+      /* : */
       CHAR_COMMA: ",",
+      /* , */
       CHAR_DOLLAR: "$",
+      /* . */
       CHAR_DOT: ".",
+      /* . */
       CHAR_DOUBLE_QUOTE: '"',
+      /* " */
       CHAR_EQUAL: "=",
+      /* = */
       CHAR_EXCLAMATION_MARK: "!",
+      /* ! */
       CHAR_FORM_FEED: "\f",
+      /* \f */
       CHAR_FORWARD_SLASH: "/",
+      /* / */
       CHAR_HASH: "#",
+      /* # */
       CHAR_HYPHEN_MINUS: "-",
+      /* - */
       CHAR_LEFT_ANGLE_BRACKET: "<",
+      /* < */
       CHAR_LEFT_CURLY_BRACE: "{",
+      /* { */
       CHAR_LEFT_SQUARE_BRACKET: "[",
+      /* [ */
       CHAR_LINE_FEED: "\n",
+      /* \n */
       CHAR_NO_BREAK_SPACE: "\xA0",
+      /* \u00A0 */
       CHAR_PERCENT: "%",
+      /* % */
       CHAR_PLUS: "+",
+      /* + */
       CHAR_QUESTION_MARK: "?",
+      /* ? */
       CHAR_RIGHT_ANGLE_BRACKET: ">",
+      /* > */
       CHAR_RIGHT_CURLY_BRACE: "}",
+      /* } */
       CHAR_RIGHT_SQUARE_BRACKET: "]",
+      /* ] */
       CHAR_SEMICOLON: ";",
+      /* ; */
       CHAR_SINGLE_QUOTE: "'",
+      /* ' */
       CHAR_SPACE: " ",
+      /*   */
       CHAR_TAB: "	",
+      /* \t */
       CHAR_UNDERSCORE: "_",
+      /* _ */
       CHAR_VERTICAL_LINE: "|",
+      /* | */
       CHAR_ZERO_WIDTH_NOBREAK_SPACE: "\uFEFF"
+      /* \uFEFF */
     };
   }
 });
 
-// node_modules/.f/_/braces/3.0.2/braces/lib/parse.js
+// node_modules/braces/lib/parse.js
 var require_parse3 = __commonJS({
-  "node_modules/.f/_/braces/3.0.2/braces/lib/parse.js"(exports, module2) {
+  "node_modules/braces/lib/parse.js"(exports, module2) {
     "use strict";
     var stringify = require_stringify2();
     var {
       MAX_LENGTH,
       CHAR_BACKSLASH,
+      /* \ */
       CHAR_BACKTICK,
+      /* ` */
       CHAR_COMMA,
+      /* , */
       CHAR_DOT,
+      /* . */
       CHAR_LEFT_PARENTHESES,
+      /* ( */
       CHAR_RIGHT_PARENTHESES,
+      /* ) */
       CHAR_LEFT_CURLY_BRACE,
+      /* { */
       CHAR_RIGHT_CURLY_BRACE,
+      /* } */
       CHAR_LEFT_SQUARE_BRACKET,
+      /* [ */
       CHAR_RIGHT_SQUARE_BRACKET,
+      /* ] */
       CHAR_DOUBLE_QUOTE,
+      /* " */
       CHAR_SINGLE_QUOTE,
+      /* ' */
       CHAR_NO_BREAK_SPACE,
       CHAR_ZERO_WIDTH_NOBREAK_SPACE
     } = require_constants2();
@@ -13714,9 +14910,9 @@ var require_parse3 = __commonJS({
   }
 });
 
-// node_modules/.f/_/braces/3.0.2/braces/index.js
+// node_modules/braces/index.js
 var require_braces = __commonJS({
-  "node_modules/.f/_/braces/3.0.2/braces/index.js"(exports, module2) {
+  "node_modules/braces/index.js"(exports, module2) {
     "use strict";
     var stringify = require_stringify2();
     var compile = require_compile();
@@ -13777,9 +14973,9 @@ var require_braces = __commonJS({
   }
 });
 
-// node_modules/.f/_/binary-extensions/2.1.0/binary-extensions/binary-extensions.json
+// node_modules/binary-extensions/binary-extensions.json
 var require_binary_extensions = __commonJS({
-  "node_modules/.f/_/binary-extensions/2.1.0/binary-extensions/binary-extensions.json"(exports, module2) {
+  "node_modules/binary-extensions/binary-extensions.json"(exports, module2) {
     module2.exports = [
       "3dm",
       "3ds",
@@ -14039,16 +15235,16 @@ var require_binary_extensions = __commonJS({
   }
 });
 
-// node_modules/.f/_/binary-extensions/2.1.0/binary-extensions/index.js
+// node_modules/binary-extensions/index.js
 var require_binary_extensions2 = __commonJS({
-  "node_modules/.f/_/binary-extensions/2.1.0/binary-extensions/index.js"(exports, module2) {
+  "node_modules/binary-extensions/index.js"(exports, module2) {
     module2.exports = require_binary_extensions();
   }
 });
 
-// node_modules/.f/_/is-binary-path/2.1.0/is-binary-path/index.js
+// node_modules/is-binary-path/index.js
 var require_is_binary_path = __commonJS({
-  "node_modules/.f/_/is-binary-path/2.1.0/is-binary-path/index.js"(exports, module2) {
+  "node_modules/is-binary-path/index.js"(exports, module2) {
     "use strict";
     var path2 = require("path");
     var binaryExtensions = require_binary_extensions2();
@@ -14057,9 +15253,9 @@ var require_is_binary_path = __commonJS({
   }
 });
 
-// node_modules/.f/_/chokidar/3.4.3/chokidar/lib/constants.js
+// node_modules/chokidar/lib/constants.js
 var require_constants3 = __commonJS({
-  "node_modules/.f/_/chokidar/3.4.3/chokidar/lib/constants.js"(exports) {
+  "node_modules/chokidar/lib/constants.js"(exports) {
     "use strict";
     var { sep } = require("path");
     var { platform } = process;
@@ -14118,9 +15314,9 @@ var require_constants3 = __commonJS({
   }
 });
 
-// node_modules/.f/_/chokidar/3.4.3/chokidar/lib/nodefs-handler.js
+// node_modules/chokidar/lib/nodefs-handler.js
 var require_nodefs_handler = __commonJS({
-  "node_modules/.f/_/chokidar/3.4.3/chokidar/lib/nodefs-handler.js"(exports, module2) {
+  "node_modules/chokidar/lib/nodefs-handler.js"(exports, module2) {
     "use strict";
     var fs3 = require("fs");
     var sysPath = require("path");
@@ -14233,6 +15429,7 @@ var require_nodefs_handler = __commonJS({
           options,
           fsWatchBroadcast.bind(null, fullPath, KEY_LISTENERS),
           errHandler,
+          // no need to use broadcast here
           fsWatchBroadcast.bind(null, fullPath, KEY_RAW)
         );
         if (!watcher)
@@ -14317,10 +15514,19 @@ var require_nodefs_handler = __commonJS({
       };
     };
     var NodeFsHandler = class {
+      /**
+       * @param {import("../index").FSWatcher} fsW
+       */
       constructor(fsW) {
         this.fsw = fsW;
         this._boundHandleError = (error) => fsW._handleError(error);
       }
+      /**
+       * Watch file for changes with fs_watchFile or fs_watch.
+       * @param {String} path to file or dir
+       * @param {Function} listener on fs change
+       * @returns {Function} closer for the watcher instance
+       */
       _watchWithNodeFs(path2, listener) {
         const opts = this.fsw.options;
         const directory = sysPath.dirname(path2);
@@ -14347,6 +15553,13 @@ var require_nodefs_handler = __commonJS({
         }
         return closer;
       }
+      /**
+       * Watch a file and emit add event if warranted.
+       * @param {Path} file Path
+       * @param {fs.Stats} stats result of fs_stat
+       * @param {Boolean} initialAdd was the file added at watch instantiation?
+       * @returns {Function} closer for the watcher instance
+       */
       _handleFile(file, stats, initialAdd) {
         if (this.fsw.closed) {
           return;
@@ -14397,6 +15610,14 @@ var require_nodefs_handler = __commonJS({
         }
         return closer;
       }
+      /**
+       * Handle symlinks encountered while reading a dir.
+       * @param {Object} entry returned by readdirp
+       * @param {String} directory path of dir being read
+       * @param {String} path of this item
+       * @param {String} item basename of this item
+       * @returns {Promise<Boolean>} true if no more processing is needed for this entry.
+       */
       async _handleSymlink(entry, directory, path2, item) {
         if (this.fsw.closed) {
           return;
@@ -14469,7 +15690,10 @@ var require_nodefs_handler = __commonJS({
             const wasThrottled = throttler ? throttler.clear() : false;
             resolve2();
             previous.getChildren().filter((item) => {
-              return item !== directory && !current.has(item) && (!wh.hasGlob || wh.filterPath({
+              return item !== directory && !current.has(item) && // in case of intersecting globs;
+              // a path may have been filtered out of this readdir, but
+              // shouldn't be removed because it matches a different glob
+              (!wh.hasGlob || wh.filterPath({
                 fullPath: sysPath.resolve(directory, item)
               }));
             }).forEach((item) => {
@@ -14481,6 +15705,17 @@ var require_nodefs_handler = __commonJS({
           })
         );
       }
+      /**
+       * Read directory to add / remove files from `@watched` list and re-read it on change.
+       * @param {String} dir fs path
+       * @param {fs.Stats} stats
+       * @param {Boolean} initialAdd
+       * @param {Number} depth relative to user-supplied path
+       * @param {String} target child path targeted for watch
+       * @param {Object} wh Common watch helpers for this path
+       * @param {String} realpath
+       * @returns {Promise<Function>} closer for the watcher instance.
+       */
       async _handleDir(dir, stats, initialAdd, depth, target, wh, realpath) {
         const parentDir = this.fsw._getWatchedDir(sysPath.dirname(dir));
         const tracked = parentDir.has(sysPath.basename(dir));
@@ -14507,6 +15742,16 @@ var require_nodefs_handler = __commonJS({
         }
         return closer;
       }
+      /**
+       * Handle added file, directory, or glob pattern.
+       * Delegates call to _handleFile / _handleDir after checks.
+       * @param {String} path to file or ir
+       * @param {Boolean} initialAdd was the file added at watch instantiation?
+       * @param {Object} priorWh depth relative to user-supplied path
+       * @param {Number} depth Child path actually targeted for watch
+       * @param {String=} target Child path actually targeted for watch
+       * @returns {Promise}
+       */
       async _addToNodeFs(path2, initialAdd, priorWh, depth, target) {
         const ready = this.fsw._emitReady;
         if (this.fsw._isIgnored(path2) || this.fsw.closed) {
@@ -14571,9 +15816,9 @@ var require_nodefs_handler = __commonJS({
   }
 });
 
-// node_modules/.f/_/chokidar/3.4.3/chokidar/lib/fsevents-handler.js
+// node_modules/chokidar/lib/fsevents-handler.js
 var require_fsevents_handler = __commonJS({
-  "node_modules/.f/_/chokidar/3.4.3/chokidar/lib/fsevents-handler.js"(exports, module2) {
+  "node_modules/chokidar/lib/fsevents-handler.js"(exports, module2) {
     "use strict";
     var fs3 = require("fs");
     var sysPath = require("path");
@@ -14607,6 +15852,7 @@ var require_fsevents_handler = __commonJS({
       FSEVENT_MODIFIED,
       FSEVENT_DELETED,
       FSEVENT_MOVED,
+      // FSEVENT_CLONED,
       FSEVENT_UNKNOWN,
       FSEVENT_TYPE_FILE,
       FSEVENT_TYPE_DIRECTORY,
@@ -14715,6 +15961,9 @@ var require_fsevents_handler = __commonJS({
     };
     var sameTypes = (info2, stats) => info2.type === FSEVENT_TYPE_DIRECTORY && stats.isDirectory() || info2.type === FSEVENT_TYPE_SYMLINK && stats.isSymbolicLink() || info2.type === FSEVENT_TYPE_FILE && stats.isFile();
     var FsEventsHandler = class {
+      /**
+       * @param {import('../index').FSWatcher} fsw
+       */
       constructor(fsw) {
         this.fsw = fsw;
       }
@@ -14776,6 +16025,14 @@ var require_fsevents_handler = __commonJS({
             this._addToFsEvents(path2, false, true);
         }
       }
+      /**
+       * Handle symlinks encountered during directory scan
+       * @param {String} watchPath  - file/dir path to be watched with fsevents
+       * @param {String} realPath   - real path (in case of symlinks)
+       * @param {Function} transform  - path transformer
+       * @param {Function} globFilter - path filter in case a glob pattern was provided
+       * @returns {Function} closer for the watcher instance
+      */
       _watchWithFsEvents(watchPath, realPath, transform, globFilter) {
         if (this.fsw.closed)
           return;
@@ -14837,6 +16094,14 @@ var require_fsevents_handler = __commonJS({
         this.fsw._emitReady();
         return closer;
       }
+      /**
+       * Handle symlinks encountered during directory scan
+       * @param {String} linkPath path to symlink
+       * @param {String} fullPath absolute path to the symlink
+       * @param {Function} transform pre-existing path transformer
+       * @param {Number} curDepth level of subdirectories traversed to where symlink is
+       * @returns {Promise<void>}
+       */
       async _handleFsEventsSymlink(linkPath, fullPath, transform, curDepth) {
         if (this.fsw.closed || this.fsw._symlinkPaths.has(fullPath))
           return;
@@ -14865,6 +16130,11 @@ var require_fsevents_handler = __commonJS({
           }
         }
       }
+      /**
+       *
+       * @param {Path} newPath
+       * @param {fs.Stats} stats
+       */
       emitAdd(newPath, stats, processPath, opts, forceAdd) {
         const pp = processPath(newPath);
         const isDir = stats.isDirectory();
@@ -14890,6 +16160,14 @@ var require_fsevents_handler = __commonJS({
         );
         this.fsw._addPathCloser(path2, closer);
       }
+      /**
+       * Handle added path with fsevents
+       * @param {String} path file/dir path or glob pattern
+       * @param {Function|Boolean=} transform converts working path to what the user expects
+       * @param {Boolean=} forceAdd ensure add is emitted
+       * @param {Number=} priorDepth Level of subdirectories already traversed.
+       * @returns {Promise<void>}
+       */
       async _addToFsEvents(path2, transform, forceAdd, priorDepth) {
         if (this.fsw.closed) {
           return;
@@ -14959,9 +16237,9 @@ var require_fsevents_handler = __commonJS({
   }
 });
 
-// node_modules/.f/_/chokidar/3.4.3/chokidar/index.js
+// node_modules/chokidar/index.js
 var require_chokidar = __commonJS({
-  "node_modules/.f/_/chokidar/3.4.3/chokidar/index.js"(exports) {
+  "node_modules/chokidar/index.js"(exports) {
     "use strict";
     var { EventEmitter } = require("events");
     var fs3 = require("fs");
@@ -15059,6 +16337,10 @@ var require_chokidar = __commonJS({
     };
     var undef = (opts, key) => opts[key] === void 0;
     var DirEntry = class {
+      /**
+       * @param {Path} dir
+       * @param {Function} removeWatcher
+       */
       constructor(dir, removeWatcher) {
         this.path = dir;
         this._removeWatcher = removeWatcher;
@@ -15093,6 +16375,9 @@ var require_chokidar = __commonJS({
           return;
         return items.has(item);
       }
+      /**
+       * @returns {Array<String>}
+       */
       getChildren() {
         const { items } = this;
         if (!items)
@@ -15177,6 +16462,7 @@ var require_chokidar = __commonJS({
       }
     };
     var FSWatcher = class extends EventEmitter {
+      // Not indenting methods for history sake; for now.
       constructor(_opts) {
         super();
         const opts = {};
@@ -15264,6 +16550,14 @@ var require_chokidar = __commonJS({
         }
         Object.freeze(opts);
       }
+      // Public methods
+      /**
+       * Adds paths to be watched on an existing FSWatcher instance
+       * @param {Path|Array<Path>} paths_
+       * @param {String=} _origAdd private; for handling non-existent paths to be watched
+       * @param {Boolean=} _internal private; indicates a non-user add
+       * @returns {FSWatcher} for chaining
+       */
       add(paths_, _origAdd, _internal) {
         const { cwd, disableGlobbing } = this.options;
         this.closed = false;
@@ -15314,6 +16608,11 @@ var require_chokidar = __commonJS({
         }
         return this;
       }
+      /**
+       * Close watchers or start ignoring events from specified paths.
+       * @param {Path|Array<Path>} paths_ - string or array of strings, file/directory paths and/or globs
+       * @returns {FSWatcher} for chaining
+      */
       unwatch(paths_) {
         if (this.closed)
           return this;
@@ -15334,6 +16633,10 @@ var require_chokidar = __commonJS({
         });
         return this;
       }
+      /**
+       * Close watchers and remove all listeners from watched paths.
+       * @returns {Promise<void>}.
+      */
       close() {
         if (this.closed)
           return this._closePromise;
@@ -15356,6 +16659,10 @@ var require_chokidar = __commonJS({
         this._closePromise = closers.length ? Promise.all(closers).then(() => void 0) : Promise.resolve();
         return this._closePromise;
       }
+      /**
+       * Expose list of watched paths
+       * @returns {Object} for chaining
+      */
       getWatched() {
         const watchList = {};
         this._watched.forEach((entry, dir) => {
@@ -15369,6 +16676,18 @@ var require_chokidar = __commonJS({
         if (event !== EV_ERROR)
           this.emit(EV_ALL, ...args2);
       }
+      // Common helpers
+      // --------------
+      /**
+       * Normalize and emit events.
+       * Calling _emit DOES NOT MEAN emit() would be called!
+       * @param {EventName} event Type of event
+       * @param {Path} path File or directory path
+       * @param {*=} val1 arguments to be passed with event
+       * @param {*=} val2
+       * @param {*=} val3
+       * @returns the error if defined, otherwise the value of the FSWatcher instance's `closed` flag
+       */
       async _emit(event, path2, val1, val2, val3) {
         if (this.closed)
           return;
@@ -15387,7 +16706,7 @@ var require_chokidar = __commonJS({
         const awf = opts.awaitWriteFinish;
         let pw;
         if (awf && (pw = this._pendingWrites.get(path2))) {
-          pw.lastChange = new Date();
+          pw.lastChange = /* @__PURE__ */ new Date();
           return this;
         }
         if (opts.atomic) {
@@ -15444,6 +16763,11 @@ var require_chokidar = __commonJS({
         this.emitWithAll(event, args2);
         return this;
       }
+      /**
+       * Common handler for errors
+       * @param {Error} error
+       * @returns {Error|Boolean} The error if defined, otherwise the value of the FSWatcher instance's `closed` flag
+       */
       _handleError(error) {
         const code = error && error.code;
         if (error && code !== "ENOENT" && code !== "ENOTDIR" && (!this.options.ignorePermissionErrors || code !== "EPERM" && code !== "EACCES")) {
@@ -15451,6 +16775,13 @@ var require_chokidar = __commonJS({
         }
         return error || this.closed;
       }
+      /**
+       * Helper utility for throttling
+       * @param {ThrottleType} actionType type being throttled
+       * @param {Path} path being acted upon
+       * @param {Number} timeout duration of time to suppress duplicate actions
+       * @returns {Object|false} tracking object or false if action should be suppressed
+       */
       _throttle(actionType, path2, timeout) {
         if (!this._throttled.has(actionType)) {
           this._throttled.set(actionType, /* @__PURE__ */ new Map());
@@ -15479,13 +16810,21 @@ var require_chokidar = __commonJS({
       _incrReadyCount() {
         return this._readyCount++;
       }
+      /**
+       * Awaits write operation to finish.
+       * Polls a newly created file for size variations. When files size does not change for 'threshold' milliseconds calls callback.
+       * @param {Path} path being acted upon
+       * @param {Number} threshold Time in milliseconds a file size must be fixed before acknowledging write OP is finished
+       * @param {EventName} event
+       * @param {Function} awfEmit Callback to be called when ready for event to be emitted.
+       */
       _awaitWriteFinish(path2, threshold, event, awfEmit) {
         let timeoutHandler;
         let fullPath = path2;
         if (this.options.cwd && !sysPath.isAbsolute(path2)) {
           fullPath = sysPath.join(this.options.cwd, path2);
         }
-        const now = new Date();
+        const now = /* @__PURE__ */ new Date();
         const awaitWriteFinish = (prevStat) => {
           fs3.stat(fullPath, (err, curStat) => {
             if (err || !this._pendingWrites.has(path2)) {
@@ -15493,7 +16832,7 @@ var require_chokidar = __commonJS({
                 awfEmit(err);
               return;
             }
-            const now2 = Number(new Date());
+            const now2 = Number(/* @__PURE__ */ new Date());
             if (prevStat && curStat.size !== prevStat.size) {
               this._pendingWrites.get(path2).lastChange = now2;
             }
@@ -15529,6 +16868,12 @@ var require_chokidar = __commonJS({
       _getGlobIgnored() {
         return [...this._ignoredPaths.values()];
       }
+      /**
+       * Determines whether user has asked to ignore this path.
+       * @param {Path} path filepath or dir
+       * @param {fs.Stats=} stats result of fs.stat
+       * @returns {Boolean}
+       */
       _isIgnored(path2, stats) {
         if (this.options.atomic && DOT_RE.test(path2))
           return true;
@@ -15545,11 +16890,24 @@ var require_chokidar = __commonJS({
       _isntIgnored(path2, stat2) {
         return !this._isIgnored(path2, stat2);
       }
+      /**
+       * Provides a set of common helpers and properties relating to symlink and glob handling.
+       * @param {Path} path file, directory, or glob pattern being watched
+       * @param {Number=} depth at any depth > 0, this isn't a glob
+       * @returns {WatchHelper} object containing helpers for this path
+       */
       _getWatchHelpers(path2, depth) {
         const watchPath = depth || this.options.disableGlobbing || !isGlob(path2) ? path2 : globParent(path2);
         const follow = this.options.followSymlinks;
         return new WatchHelper(path2, watchPath, follow, this);
       }
+      // Directory helpers
+      // -----------------
+      /**
+       * Provides directory tracking objects
+       * @param {String} directory path of the directory
+       * @returns {DirEntry} the directory's tracking object
+       */
       _getWatchedDir(directory) {
         if (!this._boundRemove)
           this._boundRemove = this._remove.bind(this);
@@ -15558,6 +16916,14 @@ var require_chokidar = __commonJS({
           this._watched.set(dir, new DirEntry(dir, this._boundRemove));
         return this._watched.get(dir);
       }
+      // File helpers
+      // ------------
+      /**
+       * Check for read permissions.
+       * Based on this answer on SO: https://stackoverflow.com/a/11781404/1358405
+       * @param {fs.Stats} stats - object, result of fs_stat
+       * @returns {Boolean} indicates whether the file can be read
+      */
       _hasReadPermissions(stats) {
         if (this.options.ignorePermissionErrors)
           return true;
@@ -15566,6 +16932,14 @@ var require_chokidar = __commonJS({
         const it = Number.parseInt(st.toString(8)[0], 10);
         return Boolean(4 & it);
       }
+      /**
+       * Handles emitting unlink events for
+       * files and directories, and via recursion, for
+       * files and directories within directories that are unlinked
+       * @param {String} directory within which the following item is located
+       * @param {String} item      base path of item/directory
+       * @returns {void}
+      */
       _remove(directory, item, isDirectory) {
         const path2 = sysPath.join(directory, item);
         const fullPath = sysPath.resolve(path2);
@@ -15598,11 +16972,19 @@ var require_chokidar = __commonJS({
           this._closePath(path2);
         }
       }
+      /**
+       * Closes all watchers for a path
+       * @param {Path} path
+       */
       _closePath(path2) {
         this._closeFile(path2);
         const dir = sysPath.dirname(path2);
         this._getWatchedDir(dir).remove(sysPath.basename(path2));
       }
+      /**
+       * Closes only file-specific watchers
+       * @param {Path} path
+       */
       _closeFile(path2) {
         const closers = this._closers.get(path2);
         if (!closers)
@@ -15610,6 +16992,11 @@ var require_chokidar = __commonJS({
         closers.forEach((closer) => closer());
         this._closers.delete(path2);
       }
+      /**
+       *
+       * @param {Path} path
+       * @param {Function} closer
+       */
       _addPathCloser(path2, closer) {
         if (!closer)
           return;
@@ -15650,7 +17037,7 @@ var require_chokidar = __commonJS({
 
 // src/tsmono.ts
 var import_os = __toESM(require("os"));
-var import_argparse = __toESM(require_argparse2());
+var import_argparse = __toESM(require_argparse());
 var import_chalk2 = __toESM(require_source());
 
 // src/debug.ts
@@ -15729,7 +17116,9 @@ var import_json_file_plus = __toESM(require_json_file_plus());
 
 // src/patches.ts
 var patches = {
+  // ts-tream from npm didn't know how to import the transformer batcher thus using source
   "ts-stream": {
+    // srcdir: "src/lib"
     tsmono: {
       js_like_source: {
         links: {
@@ -15739,6 +17128,7 @@ var patches = {
     }
   },
   "react": { npm_also_types: true },
+  "underscore": { npm_also_types: true },
   "argparse": { npm_also_types: true },
   "react-dom": { npm_also_types: true },
   "react-router-dom": { npm_also_types: true },
@@ -15782,6 +17172,8 @@ var patches = {
           "packages/utils": "@prefresh/utils",
           "packages/vite": "@prefresh/vite",
           "packages/babel/src/index.mjs": "@prefresh/babel-plugin/index.js"
+          // 'packages/vite/src/index.js': '@prefresh/vite/index.js',
+          // 'packages/vite/index.d.ts': '@prefresh/vite/index.d.ts',
         },
         paths: {
           "@prefresh/babel-plugin": ["@prefresh/babel-plugin"],
@@ -15803,6 +17195,10 @@ var patches = {
     }
   },
   "vite": {
+    // srcdir: 'packages/vite/src/node',
+    // srcdir: "src/lib"
+    // use dependencies_from_package_jsons
+    // package_jsons: ['package.json', 'packages/vite/package.json', 'packages/playground/ssr-react/package.json'],
     allDevDependencies: true,
     tsmono: {
       js_like_source: {
@@ -15814,6 +17210,10 @@ var patches = {
           "vite/dist/client/*": ["vite-client/*"]
         },
         dependencies_from_package_jsons: ["packages/vite/package.json", "package.json"]
+        // paths: {
+        //     "@prefresh/babel-plugin":  ["@prefresh/babel-plugin"],
+        //     "@prefresh/babel-plugin/*":  ["@prefresh/babel-plugin/*"],
+        // }
       }
     }
   }
@@ -15959,6 +17359,7 @@ ${stderr}`);
   return stdout;
 };
 var DirectoryCache = class {
+  // sry for reimplementing it - need a *simple* fast solution
   constructor(path2) {
     this.path = path2;
   }
@@ -15981,7 +17382,7 @@ var DirectoryCache = class {
     return cached;
   }
   tc_() {
-    return new Date().getTime();
+    return (/* @__PURE__ */ new Date()).getTime();
   }
   path_(key) {
     return path.join(this.path, (0, import_btoa.default)(key));
@@ -16153,6 +17554,12 @@ var TSMONOJSONFile = class extends JSONFile {
       ...get_path(this.json, "tsmono", "directories", ["../"])
     ]);
   }
+  // dependencies(){
+  //   return {
+  //     'dependencies': get_path(this.json, 'dependencies', []),
+  //     'devDependencies': get_path(this.json, 'devDependencies', [])
+  //   }
+  // }
 };
 var map_package_dependencies_to_tsmono_dependencies = (versions) => {
   const r = [];
@@ -16444,19 +17851,22 @@ var Repository = class {
       ensure_path(x, "compilerOptions", "lib", [
         "es5",
         "es6",
+        // array.find
         "dom",
         "es2015.promise",
         "es2015.collection",
         "es2015.iterable",
         "es2019",
+        // [].flat()
         "dom",
         "dom.iterable"
+        // for (const x in el.children)
       ]);
       if ("paths" in x.compilerOptions) {
         if (!("baseUrl" in x.compilerOptions)) {
           x.compilerOptions.baseUrl = ".";
         } else {
-          throw "please drop baseUrl from your config. cause we have paths e.g. due to referenced dependencies it should be '.'";
+          throw `please drop baseUrl from your config in ${this.path}. cause we have paths e.g. due to referenced dependencies it should be '.'`;
         }
       }
       ensure_path(x, "compilerOptions", "paths", this.basename, ["src/*"]);
@@ -16585,62 +17995,62 @@ node -r ts-node/register-only -r tsconfig-paths/register ${v} "$@"`, "utf8");
   }
 };
 var parser = new import_argparse.ArgumentParser({
-  addHelp: true,
+  add_help: true,
   description: `tsmono (typescript monorepository), see github's README file`,
   version: "0.0.1"
 });
-var sp = parser.addSubparsers({
+var sp = parser.add_subparsers({
   title: "sub commands",
   dest: "main_action"
 });
-var init = sp.addParser("init", { addHelp: true });
-var add = sp.addParser("add", { addHelp: true });
-add.addArgument("args", { nargs: "*" });
-var care_about_remote_checkout = (x) => x.addArgument("--care-about-remote-checkout", { action: "storeTrue", help: "on remote site update the checked out repository and make sure they are clean" });
-var update = sp.addParser("update", { addHelp: true, description: "This also is default action" });
-update.addArgument("--symlink-node-modules-hack", { action: "storeTrue" });
-update.addArgument("--link-via-root-dirs", { action: "storeTrue", help: "add dependencies by populating root-dirs. See README " });
-update.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files. On Windows 10 cconsider activating dev mode to allow creating symlinks without special priviledges." });
-update.addArgument("--recurse", { action: "storeTrue" });
-update.addArgument("--force", { action: "storeTrue" });
-var zip = sp.addParser("zip", { addHelp: true, description: "This also is default action" });
-var print_config_path = sp.addParser("print-config-path", { addHelp: true, description: "print tsmon.json path location" });
-var write_config_path = sp.addParser("write-sample-config", { addHelp: true, description: "write sample configuration file" });
-write_config_path.addArgument("--force", { action: "storeTrue" });
-var echo_config_path = sp.addParser("echo-sample-config", { addHelp: true, description: "echo sample config for TSMONO_CONFIG_JSON env var" });
-var update_using_rootDirs = sp.addParser("update-using-rootDirs", { addHelp: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way" });
-update_using_rootDirs.addArgument("--recurse", { action: "storeTrue" });
-update_using_rootDirs.addArgument("--force", { action: "storeTrue" });
-var commit_all = sp.addParser("commit-all", { addHelp: true, description: "commit all changes of this repository and dependencies" });
-commit_all.addArgument("--force", { action: "storeTrue" });
-commit_all.addArgument("-message", {});
-var push = sp.addParser("push-with-dependencies", { addHelp: true, description: "upload to git repository" });
-push.addArgument("--shell-on-changes", { action: "storeTrue", help: "open shell so that you can commit changes" });
-push.addArgument("--git-push-remote-location-name", { help: "eg origin" });
+var init = sp.add_parser("init", { add_help: true });
+var add = sp.add_parser("add", { add_help: true });
+add.add_argument("args", { nargs: "*" });
+var care_about_remote_checkout = (x) => x.add_argument("--care-about-remote-checkout", { action: "store_true", help: "on remote site update the checked out repository and make sure they are clean" });
+var update = sp.add_parser("update", { add_help: true, description: "This also is default action" });
+update.add_argument("--symlink-node-modules-hack", { action: "store_true" });
+update.add_argument("--link-via-root-dirs", { action: "store_true", help: "add dependencies by populating root-dirs. See README " });
+update.add_argument("--link-to-links", { action: "store_true", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files. On Windows 10 cconsider activating dev mode to allow creating symlinks without special priviledges." });
+update.add_argument("--recurse", { action: "store_true" });
+update.add_argument("--force", { action: "store_true" });
+var zip = sp.add_parser("zip", { add_help: true, description: "This also is default action" });
+var print_config_path = sp.add_parser("print-config-path", { add_help: true, description: "print tsmon.json path location" });
+var write_config_path = sp.add_parser("write-sample-config", { add_help: true, description: "write sample configuration file" });
+write_config_path.add_argument("--force", { action: "store_true" });
+var echo_config_path = sp.add_parser("echo-sample-config", { add_help: true, description: "echo sample config for TSMONO_CONFIG_JSON env var" });
+var update_using_rootDirs = sp.add_parser("update-using-rootDirs", { add_help: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way" });
+update_using_rootDirs.add_argument("--recurse", { action: "store_true" });
+update_using_rootDirs.add_argument("--force", { action: "store_true" });
+var commit_all = sp.add_parser("commit-all", { add_help: true, description: "commit all changes of this repository and dependencies" });
+commit_all.add_argument("--force", { action: "store_true" });
+commit_all.add_argument("-message", {});
+var push = sp.add_parser("push-with-dependencies", { add_help: true, description: "upload to git repository" });
+push.add_argument("--shell-on-changes", { action: "store_true", help: "open shell so that you can commit changes" });
+push.add_argument("--git-push-remote-location-name", { help: "eg origin" });
 care_about_remote_checkout(push);
-push.addArgument("--config-json", { help: "See README.md" });
-push.addArgument("--run-remote-command", { help: "remote ssh location to run git pull in user@host:path:cmd" });
-var pull = sp.addParser("pull-with-dependencies", { addHelp: true, description: "pull current directory from remote location with dependencies" });
-pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono update" });
-pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details" });
+push.add_argument("--config-json", { help: "See README.md" });
+push.add_argument("--run-remote-command", { help: "remote ssh location to run git pull in user@host:path:cmd" });
+var pull = sp.add_parser("pull-with-dependencies", { add_help: true, description: "pull current directory from remote location with dependencies" });
+pull.add_argument("--update", { help: "if there is a tsmono.json also run tsmono update" });
+pull.add_argument("--link-to-links", { help: "when --update use --link-to-links see update command for details" });
 care_about_remote_checkout(pull);
-var clean = sp.addParser("is-clean", { addHelp: true, description: "check whether git repositories on local/ remote side are clean" });
-clean.addArgument("--no-local", { action: "storeTrue", help: "don't look at local directories" });
-clean.addArgument("--no-remote", { action: "storeTrue", help: "don't	 look at remote directories" });
-clean.addArgument("--shell", { action: "storeTrue", help: "if dirty start shell so that you can commit" });
-var list_dependencies = sp.addParser("list-local-dependencies", { addHelp: true, description: "list dependencies" });
-var from_json_files = sp.addParser("from-json-files", { addHelp: true, description: "try to create tsmono.json fom package.json and tsconfig.json file" });
-push.addArgument("--force", { action: "storeTrue", help: "overwrites existing tsconfig.json file" });
-var reinstall = sp.addParser("reinstall-with-dependencies", { addHelp: true, description: "removes node_modules and reinstalls to match current node version" });
-reinstall.addArgument("--link-to-links", { action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks" });
-var watch = sp.addParser("watch", { addHelp: true });
-var esbuild_server_client_dev = sp.addParser("esbuild-server-client-dev", { addHelp: true, description: "experimental" });
-esbuild_server_client_dev.addArgument("--server-ts-file", { help: "server.ts" });
-esbuild_server_client_dev.addArgument("--web-ts-file", { help: "web client .ts files" });
-var vite_server_and_api = sp.addParser("vite-server-and-api", { addHelp: true, description: "experimental" });
-vite_server_and_api.addArgument("--server-ts-file", { help: "server.ts" });
-vite_server_and_api.addArgument("--api-ts-file", { help: "server.ts like file providing API" });
-var args = parser.parseArgs();
+var clean = sp.add_parser("is-clean", { add_help: true, description: "check whether git repositories on local/ remote side are clean" });
+clean.add_argument("--no-local", { action: "store_true", help: "don't look at local directories" });
+clean.add_argument("--no-remote", { action: "store_true", help: "don't	 look at remote directories" });
+clean.add_argument("--shell", { action: "store_true", help: "if dirty start shell so that you can commit" });
+var list_dependencies = sp.add_parser("list-local-dependencies", { add_help: true, description: "list dependencies" });
+var from_json_files = sp.add_parser("from-json-files", { add_help: true, description: "try to create tsmono.json fom package.json and tsconfig.json file" });
+push.add_argument("--force", { action: "store_true", help: "overwrites existing tsconfig.json file" });
+var reinstall = sp.add_parser("reinstall-with-dependencies", { add_help: true, description: "removes node_modules and reinstalls to match current node version" });
+reinstall.add_argument("--link-to-links", { action: "store_true", help: "link ts dependencies to tsmono/links/* using symlinks" });
+var watch = sp.add_parser("watch", { add_help: true });
+var esbuild_server_client_dev = sp.add_parser("esbuild-server-client-dev", { add_help: true, description: "experimental" });
+esbuild_server_client_dev.add_argument("--server-ts-file", { help: "server.ts" });
+esbuild_server_client_dev.add_argument("--web-ts-file", { help: "web client .ts files" });
+var vite_server_and_api = sp.add_parser("vite-server-and-api", { add_help: true, description: "experimental" });
+vite_server_and_api.add_argument("--server-ts-file", { help: "server.ts" });
+vite_server_and_api.add_argument("--api-ts-file", { help: "server.ts like file providing API" });
+var args = parser.parse_args();
 var dot_git_ignore_hack = async () => {
   if (!fs2.pathExistsSync("tsmono.json"))
     return;
@@ -16655,7 +18065,9 @@ var dot_git_ignore_hack = async () => {
     "/package.json.installed",
     "/package.json.protect",
     "/package.json",
+    // derived by tsmono, but could be comitted
     "/tsconfig.json",
+    // derived by tsmono, contains local setup paths
     "/src/tsmono"
   ].filter((a) => !lines.find((x) => x.startsWith(a)));
   if (to_be_added.length > 0) {
@@ -16912,6 +18324,7 @@ var main = async () => {
           symlink_node_modules_hack: false,
           recurse: true,
           force: true
+          // , update_cmd: {executable: "npm", args: ["i"]}
         });
       }
     }
@@ -17059,6 +18472,7 @@ var main = async () => {
       symlink_node_modules_hack: false,
       recurse: true,
       force: true
+      // , update_cmd: {executable: "npm", args: ["i"]}
     });
   }
   const external_libarries = ["fsevents", "esbuild", "oracledb", "better-sqlite3", "sqlite3", "pg-native", "tedious", "mysql2"];
@@ -17082,6 +18496,7 @@ var main = async () => {
       chokidar.watch(".", {
         followSymlinks: true,
         ignored: /dist.*|.log/,
+        // ignored: /(^|[\/\\])\../,
         awaitWriteFinish: {
           stabilityThreshold: 500,
           pollInterval: 100
@@ -17142,56 +18557,74 @@ main().then(
     process.exit(1);
   }
 );
-/*!
- * fill-range <https://github.com/jonschlinkert/fill-range>
- *
- * Copyright (c) 2014-present, Jon Schlinkert.
- * Licensed under the MIT License.
- */
-/*!
- * is-extglob <https://github.com/jonschlinkert/is-extglob>
- *
- * Copyright (c) 2014-2016, Jon Schlinkert.
- * Licensed under the MIT License.
- */
-/*!
- * is-glob <https://github.com/jonschlinkert/is-glob>
- *
- * Copyright (c) 2014-2017, Jon Schlinkert.
- * Released under the MIT License.
- */
-/*!
- * is-number <https://github.com/jonschlinkert/is-number>
- *
- * Copyright (c) 2014-present, Jon Schlinkert.
- * Released under the MIT License.
- */
-/*!
- * node.extend
- * Copyright 2011, John Resig
- * Dual licensed under the MIT or GPL Version 2 licenses.
- * http://jquery.org/license
- *
- * @fileoverview
- * Port of jQuery.extend that actually works on node.js
- */
-/*!
- * normalize-path <https://github.com/jonschlinkert/normalize-path>
- *
- * Copyright (c) 2014-2018, Jon Schlinkert.
- * Released under the MIT License.
- */
-/*!
- * to-regex-range <https://github.com/micromatch/to-regex-range>
- *
- * Copyright (c) 2015-present, Jon Schlinkert.
- * Released under the MIT License.
- */
-/**!
- * is
- * the definitive JavaScript type testing library
- *
- * @copyright 2013-2014 Enrico Marino / Jordan Harband
- * @license MIT
- */
+/*! Bundled license information:
+
+is/index.js:
+  (**!
+   * is
+   * the definitive JavaScript type testing library
+   *
+   * @copyright 2013-2014 Enrico Marino / Jordan Harband
+   * @license MIT
+   *)
+
+node.extend/lib/extend.js:
+  (*!
+   * node.extend
+   * Copyright 2011, John Resig
+   * Dual licensed under the MIT or GPL Version 2 licenses.
+   * http://jquery.org/license
+   *
+   * @fileoverview
+   * Port of jQuery.extend that actually works on node.js
+   *)
+
+normalize-path/index.js:
+  (*!
+   * normalize-path <https://github.com/jonschlinkert/normalize-path>
+   *
+   * Copyright (c) 2014-2018, Jon Schlinkert.
+   * Released under the MIT License.
+   *)
+
+is-extglob/index.js:
+  (*!
+   * is-extglob <https://github.com/jonschlinkert/is-extglob>
+   *
+   * Copyright (c) 2014-2016, Jon Schlinkert.
+   * Licensed under the MIT License.
+   *)
+
+is-glob/index.js:
+  (*!
+   * is-glob <https://github.com/jonschlinkert/is-glob>
+   *
+   * Copyright (c) 2014-2017, Jon Schlinkert.
+   * Released under the MIT License.
+   *)
+
+is-number/index.js:
+  (*!
+   * is-number <https://github.com/jonschlinkert/is-number>
+   *
+   * Copyright (c) 2014-present, Jon Schlinkert.
+   * Released under the MIT License.
+   *)
+
+to-regex-range/index.js:
+  (*!
+   * to-regex-range <https://github.com/micromatch/to-regex-range>
+   *
+   * Copyright (c) 2015-present, Jon Schlinkert.
+   * Released under the MIT License.
+   *)
+
+fill-range/index.js:
+  (*!
+   * fill-range <https://github.com/jonschlinkert/fill-range>
+   *
+   * Copyright (c) 2014-present, Jon Schlinkert.
+   * Licensed under the MIT License.
+   *)
+*/
 //# sourceMappingURL=tsmono.js.map

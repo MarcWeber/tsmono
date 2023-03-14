@@ -790,7 +790,7 @@ class Repository {
               x.compilerOptions.baseUrl = "."
           } else {
               // Is this causing more problems than modules not being found
-              throw "please drop baseUrl from your config. cause we have paths e.g. due to referenced dependencies it should be '.'"
+              throw `please drop baseUrl from your config in ${this.path}. cause we have paths e.g. due to referenced dependencies it should be '.'`
           }
       }
 
@@ -955,49 +955,49 @@ class Repository {
 
 // COMMAND LINE ARGUMENTS
 const parser = new ArgumentParser({
-  addHelp: true,
+  add_help: true,
   description: `tsmono (typescript monorepository), see github's README file`,
   version: "0.0.1",
 });
-const sp = parser.addSubparsers({
+const sp = parser.add_subparsers({
   title: "sub commands",
   dest: "main_action",
 })
-const init   = sp.addParser("init", {addHelp: true})
-const add    = sp.addParser("add", {addHelp: true})
-add.addArgument("args", {nargs: "*"})
+const init   = sp.add_parser("init", {add_help: true})
+const add    = sp.add_parser("add", {add_help: true})
+add.add_argument("args", {nargs: "*"})
 
-const care_about_remote_checkout = (x: ArgumentParser) => x.addArgument("--care-about-remote-checkout", { action: "storeTrue", help: "on remote site update the checked out repository and make sure they are clean"})
+const care_about_remote_checkout = (x: ArgumentParser) => x.add_argument("--care-about-remote-checkout", { action: "store_true", help: "on remote site update the checked out repository and make sure they are clean"})
 
-const update = sp.addParser("update", {addHelp: true, description: "This also is default action"})
-update.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
-update.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
-update.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files. On Windows 10 cconsider activating dev mode to allow creating symlinks without special priviledges."})
-update.addArgument("--recurse", {action: "storeTrue"})
-update.addArgument("--force", {action: "storeTrue"})
+const update = sp.add_parser("update", {add_help: true, description: "This also is default action"})
+update.add_argument("--symlink-node-modules-hack", {action: "store_true"})
+update.add_argument("--link-via-root-dirs", {action: "store_true", help: "add dependencies by populating root-dirs. See README "})
+update.add_argument("--link-to-links", {action: "store_true", help: "link ts dependencies to tsmono/links/* using symlinks. Useful to use ctrl-p in vscode to find files. On Windows 10 cconsider activating dev mode to allow creating symlinks without special priviledges."})
+update.add_argument("--recurse", {action: "store_true"})
+update.add_argument("--force", {action: "store_true"})
 
-const zip = sp.addParser("zip", {addHelp: true, description: "This also is default action"})
+const zip = sp.add_parser("zip", {add_help: true, description: "This also is default action"})
 
-const print_config_path = sp.addParser("print-config-path", {addHelp: true, description: "print tsmon.json path location"})
+const print_config_path = sp.add_parser("print-config-path", {add_help: true, description: "print tsmon.json path location"})
 
-const write_config_path = sp.addParser("write-sample-config", {addHelp: true, description: "write sample configuration file"})
-write_config_path.addArgument("--force", {action: "storeTrue"})
-const echo_config_path = sp.addParser("echo-sample-config", {addHelp: true, description: "echo sample config for TSMONO_CONFIG_JSON env var"})
+const write_config_path = sp.add_parser("write-sample-config", {add_help: true, description: "write sample configuration file"})
+write_config_path.add_argument("--force", {action: "store_true"})
+const echo_config_path = sp.add_parser("echo-sample-config", {add_help: true, description: "echo sample config for TSMONO_CONFIG_JSON env var"})
 
-const update_using_rootDirs = sp.addParser("update-using-rootDirs", {addHelp: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way"})
-// update_using_rootDirs.addArgument("--symlink-node-modules-hack", {action: "storeTrue"})
-// update_using_rootDirs.addArgument("--link-via-root-dirs", {action: "storeTrue", help: "add dependencies by populating root-dirs. See README "})
-// update_using_rootDirs.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
-update_using_rootDirs.addArgument("--recurse", {action: "storeTrue"})
-update_using_rootDirs.addArgument("--force", {action: "storeTrue"})
+const update_using_rootDirs = sp.add_parser("update-using-rootDirs", {add_help: true, description: "Use rootDirs to link to dependencies essentially pulling all dependecnies, but also allowing to replace dependencies of dependencies this way"})
+// update_using_rootDirs.add_argument("--symlink-node-modules-hack", {action: "store_true"})
+// update_using_rootDirs.add_argument("--link-via-root-dirs", {action: "store_true", help: "add dependencies by populating root-dirs. See README "})
+// update_using_rootDirs.add_argument("--link-to-links", {action: "store_true", help: "link ts dependencies to tsmono/links/* using symlinks"})
+update_using_rootDirs.add_argument("--recurse", {action: "store_true"})
+update_using_rootDirs.add_argument("--force", {action: "store_true"})
 
-const commit_all  = sp.addParser("commit-all", {addHelp: true, description: "commit all changes of this repository and dependencies"})
-commit_all.addArgument("--force", {action: "storeTrue"})
-commit_all.addArgument("-message", {})
+const commit_all  = sp.add_parser("commit-all", {add_help: true, description: "commit all changes of this repository and dependencies"})
+commit_all.add_argument("--force", {action: "store_true"})
+commit_all.add_argument("-message", {})
 
-const push = sp.addParser("push-with-dependencies", {addHelp: true, description: "upload to git repository"})
-push.addArgument("--shell-on-changes", {action: "storeTrue", help: "open shell so that you can commit changes"})
-push.addArgument("--git-push-remote-location-name", { help: "eg origin"})
+const push = sp.add_parser("push-with-dependencies", {add_help: true, description: "upload to git repository"})
+push.add_argument("--shell-on-changes", {action: "store_true", help: "open shell so that you can commit changes"})
+push.add_argument("--git-push-remote-location-name", { help: "eg origin"})
 care_about_remote_checkout(push)
 
 type TsmonoConfig = {
@@ -1014,40 +1014,40 @@ interface RemoteLocation {
 }
 
 
-push.addArgument("--config-json", { help: "See README.md"})
+push.add_argument("--config-json", { help: "See README.md"})
 
-push.addArgument("--run-remote-command", {help: "remote ssh location to run git pull in user@host:path:cmd"})
+push.add_argument("--run-remote-command", {help: "remote ssh location to run git pull in user@host:path:cmd"})
 
-const pull = sp.addParser("pull-with-dependencies", {addHelp: true, description: "pull current directory from remote location with dependencies"})
-pull.addArgument("--update", { help: "if there is a tsmono.json also run tsmono update"})
-pull.addArgument("--link-to-links", { help: "when --update use --link-to-links see update command for details"})
+const pull = sp.add_parser("pull-with-dependencies", {add_help: true, description: "pull current directory from remote location with dependencies"})
+pull.add_argument("--update", { help: "if there is a tsmono.json also run tsmono update"})
+pull.add_argument("--link-to-links", { help: "when --update use --link-to-links see update command for details"})
 care_about_remote_checkout(pull)
 
-const clean = sp.addParser("is-clean", {addHelp: true, description: "check whether git repositories on local/ remote side are clean"})
-clean.addArgument("--no-local", { action: 'storeTrue', help: "don't look at local directories"})
-clean.addArgument("--no-remote", { action: 'storeTrue', help: "don't\t look at remote directories"})
-clean.addArgument("--shell", {action: "storeTrue", help: "if dirty start shell so that you can commit"})
+const clean = sp.add_parser("is-clean", {add_help: true, description: "check whether git repositories on local/ remote side are clean"})
+clean.add_argument("--no-local", { action: 'store_true', help: "don't look at local directories"})
+clean.add_argument("--no-remote", { action: 'store_true', help: "don't\t look at remote directories"})
+clean.add_argument("--shell", {action: "store_true", help: "if dirty start shell so that you can commit"})
 
-const list_dependencies = sp.addParser("list-local-dependencies", {addHelp: true, description: "list dependencies"})
+const list_dependencies = sp.add_parser("list-local-dependencies", {add_help: true, description: "list dependencies"})
 
-const from_json_files = sp.addParser("from-json-files", {addHelp: true, description: "try to create tsmono.json fom package.json and tsconfig.json file"})
-push.addArgument("--force", {action: "storeTrue", help: "overwrites existing tsconfig.json file"})
+const from_json_files = sp.add_parser("from-json-files", {add_help: true, description: "try to create tsmono.json fom package.json and tsconfig.json file"})
+push.add_argument("--force", {action: "store_true", help: "overwrites existing tsconfig.json file"})
 
-const reinstall = sp.addParser("reinstall-with-dependencies", {addHelp: true, description: "removes node_modules and reinstalls to match current node version"})
-reinstall.addArgument("--link-to-links", {action: "storeTrue", help: "link ts dependencies to tsmono/links/* using symlinks"})
+const reinstall = sp.add_parser("reinstall-with-dependencies", {add_help: true, description: "removes node_modules and reinstalls to match current node version"})
+reinstall.add_argument("--link-to-links", {action: "store_true", help: "link ts dependencies to tsmono/links/* using symlinks"})
 
-const watch  = sp.addParser("watch", {addHelp: true})
+const watch  = sp.add_parser("watch", {add_help: true})
 
 
-const esbuild_server_client_dev = sp.addParser("esbuild-server-client-dev", {addHelp: true, description: "experimental"})
-esbuild_server_client_dev.addArgument("--server-ts-file", { help: "server.ts"})
-esbuild_server_client_dev.addArgument("--web-ts-file", { help: "web client .ts files"})
+const esbuild_server_client_dev = sp.add_parser("esbuild-server-client-dev", {add_help: true, description: "experimental"})
+esbuild_server_client_dev.add_argument("--server-ts-file", { help: "server.ts"})
+esbuild_server_client_dev.add_argument("--web-ts-file", { help: "web client .ts files"})
 
-const vite_server_and_api = sp.addParser("vite-server-and-api", {addHelp: true, description: "experimental"})
-vite_server_and_api.addArgument("--server-ts-file", { help: "server.ts"})
-vite_server_and_api.addArgument("--api-ts-file",   { help: "server.ts like file providing API"})
+const vite_server_and_api = sp.add_parser("vite-server-and-api", {add_help: true, description: "experimental"})
+vite_server_and_api.add_argument("--server-ts-file", { help: "server.ts"})
+vite_server_and_api.add_argument("--api-ts-file",   { help: "server.ts like file providing API"})
 
-const args = parser.parseArgs();
+const args = parser.parse_args();
 
 const dot_git_ignore_hack = async () =>  {
   if (!fs.pathExistsSync("tsmono.json")) return;
@@ -1672,7 +1672,7 @@ const main = async () => {
         // recompileAndStartAPI()
     }
 
-  // default action is update - does not work due to argparse (TOOD, there is no reqired: false for addSubparsers)
+  // default action is update - does not work due to argparse (TOOD, there is no reqired: false for add_subparsers)
   // await update()
 }
 
