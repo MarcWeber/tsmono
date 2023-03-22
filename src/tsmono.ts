@@ -957,7 +957,7 @@ class Repository {
 const parser = new ArgumentParser({
   add_help: true,
   description: `tsmono (typescript monorepository), see github's README file`,
-  version: "0.0.1",
+    // version: "0.0.1",  add_argument(..., { action: 'version', version: 'N', ... }) 
 });
 const sp = parser.add_subparsers({
   title: "sub commands",

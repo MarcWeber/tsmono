@@ -17996,8 +17996,8 @@ node -r ts-node/register-only -r tsconfig-paths/register ${v} "$@"`, "utf8");
 };
 var parser = new import_argparse.ArgumentParser({
   add_help: true,
-  description: `tsmono (typescript monorepository), see github's README file`,
-  version: "0.0.1"
+  description: `tsmono (typescript monorepository), see github's README file`
+  // version: "0.0.1",  add_argument(..., { action: 'version', version: 'N', ... }) 
 });
 var sp = parser.add_subparsers({
   title: "sub commands",
