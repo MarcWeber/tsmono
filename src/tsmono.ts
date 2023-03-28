@@ -1341,7 +1341,7 @@ const main = async () => {
        try {
            return ( await sc(`
              cd ${rL["repositories-path-checked-out"]}/${reponame} && cat .tsmono-local-deps
-           `)).split("\n").filter((x) => /dep-basename: /.test(x) ).map((x) => x.slice('dep-basename: '.length) )
+           `)).split("\n").filter((x) => /dep-basename: /.test(x) ).map((x) => path.join('../', x.slice('dep-basename: '.length)) )
        } catch (e){
            console.log(chalk.red(`error getting dependencies assuming empty list`));
            console.log(e);
