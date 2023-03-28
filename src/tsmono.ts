@@ -1318,7 +1318,7 @@ const main = async () => {
     // test remote is git repository
     try {
       await sc(`
-      [ -f ${rL["repositories-path-checked-out"]}}/${reponame}/.git/config ]
+      [ -f ${rL["repositories-path-checked-out"]}/${reponame}/.git/config ]
       `, {stdout1: true})
     } catch (e) {
       info(`remote directory ${rL["repositories-path-checked-out"]}/${reponame}/.git/config does not exit, cannot determine dependencies`)

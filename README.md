@@ -81,6 +81,8 @@ PREFIXES
 ROADMAP / TODO:
 ===============
 
+  [ ] use u-simple-actions instead of argparse so that bash completion etc works
+
   [ ] rewrite from scratch allow multiple languages etc
       see ../ts-monorepository
 
