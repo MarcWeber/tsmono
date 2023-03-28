@@ -1020,6 +1020,7 @@ push.add_argument("--run-remote-command", {help: "remote ssh location to run git
 
 const pull = sp.add_parser("pull-with-dependencies", {add_help: true, description: "pull current directory from remote location with dependencies"})
 pull.add_argument("--update", { help: "if there is a tsmono.json also run tsmono update"})
+pull.add_argument("--parallel", { help: "run actions in parallel"})
 pull.add_argument("--link-to-links", { help: "when --update use --link-to-links see update command for details"})
 care_about_remote_checkout(pull)
 
@@ -1351,52 +1352,65 @@ const main = async () => {
 
     info("pulling " + JSON.stringify(items))
 
+    const actions = []
+
     for (const path_ of ([`../${reponame}`, ...items])) {
-      info(`pulling ${path_}`)
-      const p_ = path.join(cwd, path_)
-      const repo = basename(p_)
 
-      if ((rL.ignoreWhenPulling || []).includes(repo)) continue;
+        actions.push( async () => {
+          info(`updating ${path_}`)
+          const p_ = path.join(cwd, path_)
+          const repo = basename(p_)
 
-      if (!fs.existsSync(p_)) {
-        info(`creating ${p_}`)
-        fs.mkdirpSync(p_)
-      }
+          if ((rL.ignoreWhenPulling || []).includes(repo)) return
 
-        if (remote_exists)
-      await sc(`
-        exec 2>&1
-        set -x
-        bare=${rL["repositories-path-bare"]}/${repo}
-        repo=${rL["repositories-path-checked-out"]}/${repo}
-        [ -d $bare ] || {
-          mkdir -p $bare; ( cd $bare; git init --bare )
-          ( cd $repo;
-            git remote add origin ${path.relative(path.join(rL["repositories-path-checked-out"], repo), rL["repositories-path-bare"])}/${repo}
-            git push --set-upstream origin master
-          )
-        }
-        ${ args.care_about_remote_checkout ? `( cd $repo; git pull  )` : ""}
-        `)
+          if (!fs.existsSync(p_)) {
+            info(`creating ${p_}`)
+            fs.mkdirpSync(p_)
+          }
+
+            if (remote_exists)
+          await sc(`
+            exec 2>&1
+            set -x
+            bare=${rL["repositories-path-bare"]}/${repo}
+            repo=${rL["repositories-path-checked-out"]}/${repo}
+            [ -d $bare ] || {
+              mkdir -p $bare; ( cd $bare; git init --bare )
+              ( cd $repo;
+                git remote add origin ${path.relative(path.join(rL["repositories-path-checked-out"], repo), rL["repositories-path-bare"])}/${repo}
+                git push --set-upstream origin master
+              )
+            }
+            ${ args.care_about_remote_checkout ? `( cd $repo; git pull  )` : ""}
+            `)
 
 
-      if (!fs.existsSync(path.join(p_, ".git/config"))) {
-        await run("git", { args: ["clone", `${rL.server}:${rL["repositories-path-bare"]}/${repo}`, p_] })
-      }
-      info(`pulling ${p_} ..`)
-      await run("git", { args: ["pull"], cwd: p_ })
+          if (!fs.existsSync(path.join(p_, ".git/config"))) {
+            await run("git", { args: ["clone", `${rL.server}:${rL["repositories-path-bare"]}/${repo}`, p_] })
+          }
+          info(`pulling ${p_} ..`)
+          await run("git", { args: ["pull"], cwd: p_ })
 
-      if (args.update && fs.existsSync(path.join(p_, "tsmono.json"))) {
-          // run tsmono update
-          const p = new Repository(cfg, p_, {})
+          if (args.update && fs.existsSync(path.join(p_, "tsmono.json"))) {
+              // run tsmono update
+              const p = new Repository(cfg, p_, {})
 
-          await p.update(cfg, {
-            link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
-            // , update_cmd: {executable: "npm", args: ["i"]}
-          })
-      }
+              await p.update(cfg, {
+                link_to_links: args.link_to_links, install_npm_packages: true, symlink_node_modules_hack: false, recurse: true, force: true,
+                // , update_cmd: {executable: "npm", args: ["i"]}
+              })
+          }
+        })
     }
 
+        // parallel
+      if (args['parallel']){
+          await Promise.all(actions.map((a) => a()))
+      } else {
+          for (let a of actions ) {
+              await a()
+          }
+      }
   }
 
   if (args.main_action === "is-clean") {
