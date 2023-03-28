@@ -18032,7 +18032,7 @@ push.add_argument("--config-json", { help: "See README.md" });
 push.add_argument("--run-remote-command", { help: "remote ssh location to run git pull in user@host:path:cmd" });
 var pull = sp.add_parser("pull-with-dependencies", { add_help: true, description: "pull current directory from remote location with dependencies" });
 pull.add_argument("--update", { help: "if there is a tsmono.json also run tsmono update" });
-pull.add_argument("--parallel", { help: "run actions in parallel" });
+pull.add_argument("--parallel", { action: "store_true", help: "run actions in parallel" });
 pull.add_argument("--link-to-links", { help: "when --update use --link-to-links see update command for details" });
 care_about_remote_checkout(pull);
 var clean = sp.add_parser("is-clean", { add_help: true, description: "check whether git repositories on local/ remote side are clean" });
