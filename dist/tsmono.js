@@ -18195,6 +18195,13 @@ var main = async () => {
     await update2();
     await tslint_hack();
     await dot_git_ignore_hack();
+    silent = true;
+    const p2 = new Repository(cfg, process.cwd(), {});
+    const lines = [];
+    for (const r of p2.repositories()) {
+      lines.push(`dep-basename: ${path.basename(r.path)}`);
+    }
+    fs2.writeFileSync(".tsmono-local-deps", lines.join("\n"), "utf-8");
     return;
   }
   if (args.main_action === "update_using_rootDirs") {
@@ -18277,8 +18284,8 @@ var main = async () => {
         return [];
       try {
         return (await sc(`
-             cd ${rL["repositories-path-checked-out"]}/${reponame} && tsmono list-local-dependencies
-           `)).split("\n").filter((x) => /rel-path: /.test(x)).map((x) => x.slice(11));
+             cd ${rL["repositories-path-checked-out"]}/${reponame} && cat .tsmono-local-deps
+           `)).split("\n").filter((x) => /dep-basename: /.test(x)).map((x) => x.slice("dep-basename: ".length));
       } catch (e) {
         console.log(import_chalk2.default.red(`error getting dependencies assuming empty list`));
         console.log(e);
