@@ -18202,7 +18202,11 @@ var main = async () => {
     for (const r of p2.repositories()) {
       lines.push(`dep-basename: ${path.basename(r.path)}`);
     }
-    fs2.writeFileSync(".tsmono-local-deps", lines.join("\n"), "utf-8");
+    const local_deps_file = ".tsmono-local-deps";
+    if (!fs2.pathExistsSync(local_deps_file)) {
+      console.log(import_chalk2.default.red(`please commit ${local_deps_file}`));
+    }
+    fs2.writeFileSync(local_deps_file, lines.join("\n"), "utf-8");
     return;
   }
   if (args.main_action === "update_using_rootDirs") {
