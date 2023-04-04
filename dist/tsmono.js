@@ -18276,14 +18276,6 @@ var main = async () => {
     const rL = cfg["remote-location"];
     const sc = ssh_cmd(rL.server);
     let remote_exists = true;
-    try {
-      await sc(`
-      [ -f ${rL["repositories-path-checked-out"]}/${reponame}/.git/config ]
-      `, { stdout1: true });
-    } catch (e) {
-      info(`remote directory ${rL["repositories-path-checked-out"]}/${reponame}/.git/config does not exit, cannot determine dependencies`);
-      remote_exists = false;
-    }
     const items = await (async () => {
       if (!remote_exists)
         return [];
