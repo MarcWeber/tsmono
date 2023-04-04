@@ -1345,7 +1345,7 @@ const main = async () => {
        // // use remote list-local-dependencies
        try {
            const local_deps = ( await sc(`
-             cd ${rL["repositories-path-checked-out"]}/${reponame} && cat .tsmono-local-deps
+             cd ${rL["repositories-path-bare"]}/${reponame} && ( git show HEAD:.tsmono-local-deps )
            `)).split("\n").filter((x) => /dep-basename: /.test(x) ).map((x) => path.join('../', x.slice('dep-basename: '.length)) )
            console.log(`local deps: ${local_deps}`);
            return local_deps
