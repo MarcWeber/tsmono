@@ -1237,7 +1237,11 @@ const main = async () => {
     for (const r of p.repositories()) {
         lines.push(`dep-basename: ${path.basename(r.path)}`)
     }
-    fs.writeFileSync(".tsmono-local-deps", lines.join("\n"), 'utf-8')
+      const local_deps_file = ".tsmono-local-deps"
+      if (!fs.pathExistsSync(local_deps_file)){
+          console.log(chalk.red(`please commit ${local_deps_file}`));
+      }
+      fs.writeFileSync(, lines.join("\n"), 'utf-8')
     return
   }
   if (args.main_action === "update_using_rootDirs") {
