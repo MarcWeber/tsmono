@@ -1344,9 +1344,11 @@ const main = async () => {
 
        // // use remote list-local-dependencies
        try {
-           return ( await sc(`
+           const local_deps = ( await sc(`
              cd ${rL["repositories-path-checked-out"]}/${reponame} && cat .tsmono-local-deps
            `)).split("\n").filter((x) => /dep-basename: /.test(x) ).map((x) => path.join('../', x.slice('dep-basename: '.length)) )
+           console.log(`local deps: ${local_deps}`);
+           return local_deps
        } catch (e){
            console.log(chalk.red(`error getting dependencies assuming empty list`));
            console.log(e);
