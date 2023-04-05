@@ -97,7 +97,7 @@ ROADMAP / TODO:
       find a way to collect all of this shimming so that it can be used by
       webpack or other tools automatically.
 
-      Eg wirte shim.json or such merging all shimmings from all packages
+      Eg write from all packages
 
   [ ] completion for vscode & vim to find libraries nearby ?
 

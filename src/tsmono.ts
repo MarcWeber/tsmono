@@ -3,11 +3,13 @@ import { ArgumentParser } from "argparse";
 import {Links, Paths} from "./types";
 import Os from 'os'
 import chalk from "chalk";
+
 import debug_ from "./debug";
+const debug = debug_("tsmono")
+
 import * as fs from "fs-extra";
 import * as JSON5 from "json5";
 import * as path from "path";
-const debug = debug_("tsmono")
 import btoa from "btoa"
 import { spawn, SpawnOptions, ChildProcessWithoutNullStreams, ChildProcess } from "child_process";
 import {fetch} from "cross-fetch"
@@ -22,7 +24,7 @@ import jsonFile from "json-file-plus"
 import { patches, provided_by } from "./patches"
 import ln from "./library-notes"
 import {restartable_processes} from "./utils-restartable-processes"
-import { Repository, silent, t_cfg, readJsonFile, DependencyCollection, action_update, tslint_hack, run } from "./"
+import { Repository, silent, t_cfg, readJsonFile, DependencyCollection, action_update, tslint_hack, run, build_config } from "./"
 
 // COMMAND LINE ARGUMENTS
 const parser = new ArgumentParser({
@@ -150,45 +152,12 @@ const run_tasks = async (tasks: TaskDescription[]) => {
 }
 
 const main = async () => {
-  const hd = homedir()
-  const cache = new DirectoryCache(`${hd}/.tsmono/cache`)
 
-  const configDefaults = {
-    cache,
-    fetch_ttl_seconds : 60 * 24,
-    bin_sh: "/bin/sh",
-    npm_install_cmd: ["fyn"],
-    cacheDir: "~/.tsmono/cache",
-  }
-
-  const json_or_empty = (s: string|undefined) => {
-      if (s){
-          try {
-              return JSON.parse(s)
-          } catch (e){
-              throw `error parsing JSON ${s}`
-          }
-      } else return {}
-  }
-
-  const config_from_home_dir_path = path.join(hd, ".tsmmono.json")
-
-  const env_configs = ["", "1", "2", "3"].map((x) => json_or_empty( process.env[`TSMONO_CONFIG_JSON${x}`] ))
-  const env_config2 = json_or_empty( process.env.TSMONO_CONFIG_JSON2 )
-  const homedir_config = json_or_empty (fs.existsSync(config_from_home_dir_path) ? fs.readFileSync(config_from_home_dir_path, "utf8") : undefined)
-  const args_config = json_or_empty(args.config_json)
-
-  const config: ConfigData = Object.assign({ }, configDefaults, homedir_config, args_config, ...env_configs, env_config2 )
-  const cfg:    Config = { ...cfg_api( config ), ...config  }
+    const {cfg, more} = build_config(args.config_json)
+    const {config, config_from_home_dir_path} = more
 
   if (! ( cfg.directories == undefined ||  Array.isArray(cfg.directories) ))
     throw `directories must be an array! Check your configs`
-
-  console.log(`configDefaults is ${JSON.stringify(configDefaults, undefined, 2)}`)
-  console.log(`env_configs are ${JSON.stringify(env_configs, undefined, 2)}`)
-  console.log(`env_config2export is ${JSON.stringify(env_config2, undefined, 2)}`)
-  console.log(`homedir_config is ${JSON.stringify(homedir_config, undefined, 2)}`)
-  console.log(`args_config is ${JSON.stringify(args_config, undefined, 2)}`)
 
   const ssh_cmd = (server: string) =>  async (stdin: string, args?: {stdout1: true}): Promise<string> => {
       return run("ssh", {args: [server], stdin, ...args})

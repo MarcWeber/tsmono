@@ -1,11 +1,13 @@
-import {Links, Paths, RemoteLocation, Config, CP} from "./types";
+import { cfg_api, Links, Paths, RemoteLocation, Config, CP, DirectoryCache, ConfigData} from "./types";
 import * as fs from "fs-extra";
 import { JSONFile, parse_json_file, protect } from "./jsonfile";
 import Os from 'os'
 import chalk from "chalk";
-import debug_ from "./debug";
 import * as path from "path";
-export const debug = debug_("tsmono")
+
+import debug_ from "./debug";
+const debug = debug_("tsmono.index")
+
 import btoa from "btoa"
 import { spawn, SpawnOptions, ChildProcessWithoutNullStreams, ChildProcess } from "child_process";
 import {fetch} from "cross-fetch"
@@ -22,7 +24,7 @@ import ln from "./library-notes"
 import {restartable_processes} from "./utils-restartable-processes"
 
 export const readJsonFile = async (path: string): Promise<any> => {
-    console.log("reading", path);
+    debug("reading", path);
     const jf = await jsonFile(path)
     return jf.data
 }
@@ -867,6 +869,53 @@ const dot_git_ignore_hack = async (cfg: Config) =>  {
 
   if (to_be_added.length > 0) {
     fs.writeFileSync(f, [...lines, ...to_be_added].join("\n"), "utf8")
+  }
+}
+
+export const build_config = (o: {config_json?: string} = {}) => {
+  const hd = homedir()
+
+  const cache = new DirectoryCache(`${hd}/.tsmono/cache`)
+
+  const configDefaults = {
+    cache,
+    fetch_ttl_seconds : 60 * 24,
+    bin_sh: "/bin/sh",
+    npm_install_cmd: ["fyn"],
+    cacheDir: "~/.tsmono/cache",
+  }
+
+  const json_or_empty = (s: string|undefined) => {
+      if (s){
+          try {
+              return JSON.parse(s)
+          } catch (e){
+              throw `error parsing JSON ${s}`
+          }
+      } else return {}
+  }
+
+  const config_from_home_dir_path = path.join(hd, ".tsmmono.json")
+
+  const env_configs = ["", "1", "2", "3"].map((x) => json_or_empty( process.env[`TSMONO_CONFIG_JSON${x}`] ))
+  const env_config2 = json_or_empty( process.env.TSMONO_CONFIG_JSON2 )
+  const homedir_config = json_or_empty (fs.existsSync(config_from_home_dir_path) ? fs.readFileSync(config_from_home_dir_path, "utf8") : undefined)
+  const args_config = json_or_empty(o.config_json)
+
+  const config: ConfigData = Object.assign({ }, configDefaults, homedir_config, args_config, ...env_configs, env_config2 )
+
+  debug(`configDefaults is ${JSON.stringify(configDefaults, undefined, 2)}`)
+  debug(`env_configs are ${JSON.stringify(env_configs, undefined, 2)}`)
+  debug(`env_config2export is ${JSON.stringify(env_config2, undefined, 2)}`)
+  debug(`homedir_config is ${JSON.stringify(homedir_config, undefined, 2)}`)
+  debug(`args_config is ${JSON.stringify(args_config, undefined, 2)}`)
+
+  return {
+      cfg: { ...cfg_api( config ), ...config  } as Config,
+      more: {
+          config,
+          config_from_home_dir_path,
+      }
   }
 }
 
