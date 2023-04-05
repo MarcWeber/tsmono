@@ -1,6 +1,6 @@
 // copy from utils-debug
 // @ts-ignore
-export const debug: string[] = (process.env['DEBUG']||"").split(':')
+export const debug: string[] = (process.env['DEBUG']||"").split(':').filter((x) => x != "")
 const do_debug_help = debug.length > 0 && ! debug.includes('hide-help')
 export const debug_help = (msg:string) => { if (do_debug_help) console.log(msg) }
 

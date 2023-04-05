@@ -15848,7 +15848,7 @@ var import_os2 = __toESM(require("os"));
 var import_chalk3 = __toESM(require_source());
 
 // src/debug.ts
-var debug = (process.env["DEBUG"] || "").split(":");
+var debug = (process.env["DEBUG"] || "").split(":").filter((x) => x != "");
 var do_debug_help = debug.length > 0 && !debug.includes("hide-help");
 var debug_help = (msg) => {
   if (do_debug_help)
