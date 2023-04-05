@@ -921,10 +921,10 @@ export const build_config = (o: {config_json?: string} = {}) => {
 
 
 export type UpdateFlags = {
-    link_to_links: boolean,
-    symlink_node_modules_hack: boolean
-    recurse: boolean
-    force: boolean
+    link_to_links?: boolean,
+    symlink_node_modules_hack?: boolean
+    recurse?: boolean
+    force?: boolean
 }
 
 const update = async ({cfg, p}: CP, flags: UpdateFlags) => {
