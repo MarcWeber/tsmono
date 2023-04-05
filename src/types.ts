@@ -1,4 +1,5 @@
 import * as fs from "fs-extra";
+import {fetch} from "cross-fetch"
 import path from "path";
 import { JSONFile } from "./jsonfile";
 import { Repository } from ".";
