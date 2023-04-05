@@ -81,6 +81,9 @@ PREFIXES
 ROADMAP / TODO:
 ===============
 
+  [?] transform into library
+      partially done the update command can be used from ./index.ts now
+
   [ ] use u-simple-actions instead of argparse so that bash completion etc works
 
   [ ] rewrite from scratch allow multiple languages etc
