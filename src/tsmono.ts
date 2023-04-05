@@ -24,7 +24,7 @@ import jsonFile from "json-file-plus"
 import { patches, provided_by } from "./patches"
 import ln from "./library-notes"
 import {restartable_processes} from "./utils-restartable-processes"
-import { Repository, silent, t_cfg, readJsonFile, DependencyCollection, action_update, tslint_hack, run, build_config } from "./"
+import { Repository, silent, t_cfg, readJsonFile, DependencyCollection, tslint_hack, run, build_config, with_config } from "./"
 
 // COMMAND LINE ARGUMENTS
 const parser = new ArgumentParser({
@@ -41,6 +41,8 @@ const add    = sp.add_parser("add", {add_help: true})
 add.add_argument("args", {nargs: "*"})
 
 const care_about_remote_checkout = (x: ArgumentParser) => x.add_argument("--care-about-remote-checkout", { action: "store_true", help: "on remote site update the checked out repository and make sure they are clean"})
+
+const list_remotes = sp.add_parser("list-remotes", {add_help: true, description: "list remote repositories"})
 
 const update = sp.add_parser("update", {add_help: true, description: "This also is default action"})
 update.add_argument("--symlink-node-modules-hack", {action: "store_true"})
@@ -153,15 +155,15 @@ const run_tasks = async (tasks: TaskDescription[]) => {
 
 const main = async () => {
 
-    const {cfg, more} = build_config(args.config_json)
-    const {config, config_from_home_dir_path} = more
+    const built_config = build_config(args.config_json)
+    const {cfg, more} = built_config
+  const {config, config_from_home_dir_path} = more
 
   if (! ( cfg.directories == undefined ||  Array.isArray(cfg.directories) ))
     throw `directories must be an array! Check your configs`
 
-  const ssh_cmd = (server: string) =>  async (stdin: string, args?: {stdout1: true}): Promise<string> => {
-      return run("ssh", {args: [server], stdin, ...args})
-  }
+  const {ssh_cmd, sc, rL, action_update, action_list_remotes} = with_config(built_config)
+
 
   const p = new Repository(cfg, process.cwd(), {})
   const cp = {cfg, p}
@@ -197,10 +199,14 @@ const main = async () => {
 
   if (args.main_action === "update") {
       action_update({
-        cfg,
         cwd: process.cwd(),
         flags: args
       })
+  }
+  if (args.main_action === "list-remotes") {
+      for (let v of await action_list_remotes() ) {
+          console.log(v);
+      }
   }
   if (args.main_action === "update_using_rootDirs") {
     // await update_using_rootDirs();
@@ -282,8 +288,6 @@ const main = async () => {
     // TODO: think about relative directories ..
     const cwd = process.cwd()
     const reponame: string = path.basename(cwd)
-    const rL = cfg["remote-location"]
-    const sc = ssh_cmd(rL.server)
 
     let remote_exists = true;
 

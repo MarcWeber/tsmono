@@ -16253,8 +16253,6 @@ var del_if_exists = (path4) => {
 };
 var run = async (cmd, opts) => {
   const args2 = opts.args || [];
-  console.log("args", args2);
-  t_cfg.info("running", cmd, args2, "in", opts.cwd);
   let stdout = "";
   let stderr = "";
   await new Promise((a, b) => {
@@ -16263,7 +16261,7 @@ var run = async (cmd, opts) => {
     }));
     if (child.stdin) {
       if ("stdin" in opts && child.stdin) {
-        t_cfg.verbose("stdin is", opts.stdin);
+        debug2("stdin is", opts.stdin);
         child.stdin.setEncoding("utf8");
         child.stdin.write(opts.stdin);
       }
@@ -16910,23 +16908,43 @@ var build_config = (o = {}) => {
 var update = async ({ cfg, p }, flags) => {
   await p.update(cfg, { link_to_links: flags.link_to_links, install_npm_packages: true, symlink_node_modules_hack: flags.symlink_node_modules_hack, recurse: flags.recurse, force: flags.force });
 };
-var action_update = async (o) => {
-  const p = new Repository(o.cfg, o.cwd, {});
-  const cp = { cfg: o.cfg, p };
-  await update(cp, o.flags);
-  await tslint_hack(cp);
-  await dot_git_ignore_hack(o.cfg);
-  t_cfg.silent = true;
-  const lines = [];
-  for (const r of p.repositories()) {
-    lines.push(`dep-basename: ${path2.basename(r.path)}`);
-  }
-  const local_deps_file = ".tsmono-local-deps";
-  if (!fs4.pathExistsSync(local_deps_file)) {
-    console.log(import_chalk2.default.red(`please commit ${local_deps_file}`));
-  }
-  fs4.writeFileSync(local_deps_file, lines.join("\n"), "utf-8");
-  return;
+var with_config = (built_config) => {
+  const { cfg, more } = built_config;
+  const { config, config_from_home_dir_path } = more;
+  const rL = cfg["remote-location"];
+  const ssh_cmd = (server) => async (stdin, args2) => {
+    return run("ssh", { args: [server], stdin, ...args2 });
+  };
+  const sc = ssh_cmd(rL.server);
+  const action_update = async (o) => {
+    const p = new Repository(cfg, o.cwd, {});
+    const cp = { cfg, p };
+    await update(cp, o.flags);
+    await tslint_hack(cp);
+    await dot_git_ignore_hack(cfg);
+    t_cfg.silent = true;
+    const lines = [];
+    for (const r of p.repositories()) {
+      lines.push(`dep-basename: ${path2.basename(r.path)}`);
+    }
+    const local_deps_file = ".tsmono-local-deps";
+    if (!fs4.pathExistsSync(local_deps_file)) {
+      console.log(import_chalk2.default.red(`please commit ${local_deps_file}`));
+    }
+    fs4.writeFileSync(local_deps_file, lines.join("\n"), "utf-8");
+    return;
+  };
+  const action_list_remotes = async () => {
+    const out = await sc(` cd ${rL["repositories-path-bare"]} && ls -1 `);
+    return out.trim().split("\n");
+  };
+  return {
+    ssh_cmd,
+    action_update,
+    action_list_remotes,
+    rL,
+    sc
+  };
 };
 
 // src/tsmono.ts
@@ -16944,6 +16962,7 @@ var init = sp.add_parser("init", { add_help: true });
 var add = sp.add_parser("add", { add_help: true });
 add.add_argument("args", { nargs: "*" });
 var care_about_remote_checkout = (x) => x.add_argument("--care-about-remote-checkout", { action: "store_true", help: "on remote site update the checked out repository and make sure they are clean" });
+var list_remotes = sp.add_parser("list-remotes", { add_help: true, description: "list remote repositories" });
 var update2 = sp.add_parser("update", { add_help: true, description: "This also is default action" });
 update2.add_argument("--symlink-node-modules-hack", { action: "store_true" });
 update2.add_argument("--link-via-root-dirs", { action: "store_true", help: "add dependencies by populating root-dirs. See README " });
@@ -17011,13 +17030,12 @@ var run_tasks = async (tasks) => {
   }));
 };
 var main = async () => {
-  const { cfg, more } = build_config(args.config_json);
+  const built_config = build_config(args.config_json);
+  const { cfg, more } = built_config;
   const { config, config_from_home_dir_path } = more;
   if (!(cfg.directories == void 0 || Array.isArray(cfg.directories)))
     throw `directories must be an array! Check your configs`;
-  const ssh_cmd = (server) => async (stdin, args2) => {
-    return run("ssh", { args: [server], stdin, ...args2 });
-  };
+  const { ssh_cmd, sc, rL, action_update, action_list_remotes } = with_config(built_config);
   const p = new Repository(cfg, process.cwd(), {});
   const cp = { cfg, p };
   const ensure_is_git = async (r) => {
@@ -17048,10 +17066,14 @@ var main = async () => {
   }
   if (args.main_action === "update") {
     action_update({
-      cfg,
       cwd: process.cwd(),
       flags: args
     });
+  }
+  if (args.main_action === "list-remotes") {
+    for (let v of await action_list_remotes()) {
+      console.log(v);
+    }
   }
   if (args.main_action === "update_using_rootDirs") {
     await tslint_hack({ cfg, p });
@@ -17117,8 +17139,6 @@ var main = async () => {
   if (args.main_action === "pull-with-dependencies") {
     const cwd = process.cwd();
     const reponame = path3.basename(cwd);
-    const rL = cfg["remote-location"];
-    const sc = ssh_cmd(rL.server);
     let remote_exists = true;
     const items = await (async () => {
       if (!remote_exists)
@@ -17192,8 +17212,8 @@ var main = async () => {
   if (args.main_action === "is-clean") {
     t_cfg.info("using local dependencies as reference");
     const repositories = p.repositories({ includeThis: true });
-    const rL = cfg["remote-location"];
-    const sc = () => ssh_cmd(rL.server);
+    const rL2 = cfg["remote-location"];
+    const sc2 = () => ssh_cmd(rL2.server);
     const results = [];
     const check_local = (r) => async (o) => {
       const is_clean = async () => "" === await run("git", { args: ["diff"], cwd: r.path }) ? "clean" : "dirty";
@@ -17207,12 +17227,12 @@ var main = async () => {
       results.push(`${r.basename}: ${clean_before} -> ${await is_clean()}`);
     };
     const check_remote = (r) => async (o) => {
-      const is_clean = async () => "" === await sc()(`cd ${rL["repositories-path-bare"]}/${r.basename}; git diff`) ? "clean" : "dirty";
+      const is_clean = async () => "" === await sc2()(`cd ${rL2["repositories-path-bare"]}/${r.basename}; git diff`) ? "clean" : "dirty";
       const clean_before = await is_clean();
       if (clean_before === "dirty" && args.shell) {
         await o.with_user(async () => {
           t_cfg.info(`${r.path} is not clean, starting shell`);
-          await run("ssh", { args: [rL.server, `cd ${rL["repositories-path-checked-out"]}/${r.basename}; exec $SHELL -i`], stdout1: true });
+          await run("ssh", { args: [rL2.server, `cd ${rL2["repositories-path-checked-out"]}/${r.basename}; exec $SHELL -i`], stdout1: true });
         });
       }
       results.push(`remote ${r.basename}: ${clean_before} -> ${await is_clean()}`);
@@ -17229,7 +17249,7 @@ var main = async () => {
   }
   if (args.main_action === "push-with-dependencies") {
     const p2 = new Repository(cfg, process.cwd(), {});
-    const rL = cfg["remote-location"];
+    const rL2 = cfg["remote-location"];
     const basenames_to_pull = [];
     const seen = [];
     const ensure_repo_committed_and_clean = async (r) => {
@@ -17248,15 +17268,15 @@ var main = async () => {
     const ensure_remote_location_setup = async (r) => {
       t_cfg.info(r.path, "ensuring remote setup");
       const reponame = r.basename;
-      if ("" === await run(`git`, { expected_exitcodes: [0, 1], args: `config --get remote.${rL.gitRemoteLocationName}.url`.split(" "), cwd: r.path })) {
-        await run(`git`, { args: `remote add ${rL.gitRemoteLocationName} ${rL.server}:${rL["repositories-path-bare"]}/${reponame}`.split(" "), cwd: r.path });
-        await run(`ssh`, { args: [rL.server], cwd: r.path, stdin: `
-          bare=${rL["repositories-path-bare"]}/${reponame}
-          target=${rL["repositories-path-checked-out"]}/${reponame}
+      if ("" === await run(`git`, { expected_exitcodes: [0, 1], args: `config --get remote.${rL2.gitRemoteLocationName}.url`.split(" "), cwd: r.path })) {
+        await run(`git`, { args: `remote add ${rL2.gitRemoteLocationName} ${rL2.server}:${rL2["repositories-path-bare"]}/${reponame}`.split(" "), cwd: r.path });
+        await run(`ssh`, { args: [rL2.server], cwd: r.path, stdin: `
+          bare=${rL2["repositories-path-bare"]}/${reponame}
+          target=${rL2["repositories-path-checked-out"]}/${reponame}
           [ -d "$bare" ] || mkdir -p "$bare"; ( cd "$bare"; git init --bare; )
           ${args.care_about_remote_checkout ? `[ -d "$target" ] || ( git clone $bare $target; cd $target; git config pull.rebase true; )` : ""}
           ` });
-        await run(`git`, { args: `push --set-upstream ${rL.gitRemoteLocationName} master`.split(" "), cwd: r.path });
+        await run(`git`, { args: `push --set-upstream ${rL2.gitRemoteLocationName} master`.split(" "), cwd: r.path });
       }
     };
     const remote_update = async (r) => {
@@ -17264,10 +17284,10 @@ var main = async () => {
         return;
       const reponame = r.basename;
       await run(`ssh`, {
-        args: [rL.server],
+        args: [rL2.server],
         cwd: r.path,
         stdin: `
-          target=${rL["repositories-path-checked-out"]}/${reponame}
+          target=${rL2["repositories-path-checked-out"]}/${reponame}
           cd $target
           git pull
       `
@@ -17277,9 +17297,9 @@ var main = async () => {
       await ensure_is_git(r);
       await ensure_repo_committed_and_clean(r);
       await ensure_remote_location_setup(r);
-      if (rL.gitRemoteLocationName) {
+      if (rL2.gitRemoteLocationName) {
         t_cfg.info(`... pushing in ${r.path} ...`);
-        await run("git", { args: ["push", rL.gitRemoteLocationName], cwd: r.path });
+        await run("git", { args: ["push", rL2.gitRemoteLocationName], cwd: r.path });
       }
       await remote_update(r);
     };

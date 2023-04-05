@@ -74,8 +74,7 @@ export const run = async (cmd: string, opts: {
   expected_exitcodes?: number[],
 } & SpawnOptions) => {
   const args = opts.args || [];
-  console.log("args", args)
-  t_cfg.info("running", cmd, args, "in", opts.cwd);
+  // t_cfg.info("running", cmd, args, "in", opts.cwd);
   let stdout = ""
   let stderr = ""
     // duplicate code
@@ -86,7 +85,7 @@ export const run = async (cmd: string, opts: {
 
       if (child.stdin) {
         if ("stdin" in opts && child.stdin) {
-          t_cfg.verbose("stdin is", opts.stdin)
+          debug("stdin is", opts.stdin)
           // @ts-ignore
           child.stdin.setEncoding("utf8");
           child.stdin.write(opts.stdin)
@@ -918,7 +917,7 @@ export const build_config = (o: {config_json?: string} = {}) => {
       }
   }
 }
-
+export type BuiltConfig = ReturnType<typeof build_config>
 
 export type UpdateFlags = {
     link_to_links?: boolean,
@@ -931,30 +930,56 @@ const update = async ({cfg, p}: CP, flags: UpdateFlags) => {
     await p.update(cfg, {link_to_links: flags.link_to_links, install_npm_packages: true, symlink_node_modules_hack: flags.symlink_node_modules_hack, recurse: flags.recurse, force: flags.force})
 }
 
-export const action_update = async (o: {
-    cfg: Config
-    cwd: string
-    flags: UpdateFlags
-}) => {
+export const with_config = (built_config: BuiltConfig) => {
 
-    const p = new Repository(o.cfg, o.cwd, {})
+  const {cfg, more} = built_config
+  const {config, config_from_home_dir_path} = more
 
-    const cp = {cfg: o.cfg, p}
+  const rL = cfg["remote-location"]
 
-    await update(cp, o.flags);
-    await tslint_hack(cp);
-    await dot_git_ignore_hack(o.cfg)
+  const ssh_cmd = (server: string) =>  async (stdin: string, args?: {stdout1: true}): Promise<string> => {
+      return run("ssh", {args: [server], stdin, ...args})
+  }
+  const sc = ssh_cmd(rL.server)
 
-    t_cfg.silent = true;
-    const lines = []
-    for (const r of p.repositories()) {
-        lines.push(`dep-basename: ${path.basename(r.path)}`)
+    const action_update = async (o: {
+        cwd: string
+        flags: UpdateFlags
+    }) => {
+
+        const p = new Repository(cfg, o.cwd, {})
+
+        const cp = {cfg: cfg, p}
+
+        await update(cp, o.flags);
+        await tslint_hack(cp);
+        await dot_git_ignore_hack(cfg)
+
+        t_cfg.silent = true;
+        const lines = []
+        for (const r of p.repositories()) {
+            lines.push(`dep-basename: ${path.basename(r.path)}`)
+        }
+        const local_deps_file = ".tsmono-local-deps"
+        if (!fs.pathExistsSync(local_deps_file)){
+            console.log(chalk.red(`please commit ${local_deps_file}`));
+        }
+        fs.writeFileSync(local_deps_file, lines.join("\n"), 'utf-8')
+        return
+
     }
-    const local_deps_file = ".tsmono-local-deps"
-    if (!fs.pathExistsSync(local_deps_file)){
-        console.log(chalk.red(`please commit ${local_deps_file}`));
-    }
-    fs.writeFileSync(local_deps_file, lines.join("\n"), 'utf-8')
-    return
 
+    const action_list_remotes = async () => {
+        const out = await sc(` cd ${rL["repositories-path-bare"]} && ls -1 `)
+        return out.trim().split("\n")
+    }
+
+    return {
+        ssh_cmd,
+        action_update,
+        action_list_remotes,
+        rL,
+        sc
+    }
 }
+
