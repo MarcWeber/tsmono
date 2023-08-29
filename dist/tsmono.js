@@ -17290,6 +17290,7 @@ var patches = {
     }
   },
   "react": { npm_also_types: true },
+  "stream-to-promise": { npm_also_types: true },
   "underscore": { npm_also_types: true },
   "argparse": { npm_also_types: true },
   "react-dom": { npm_also_types: true },
@@ -18048,7 +18049,7 @@ var build_config = (o = {}) => {
     cache,
     fetch_ttl_seconds: 60 * 24,
     bin_sh: "/bin/sh",
-    npm_install_cmd: ["fyn"],
+    npm_install_cmd: ["yarn"],
     cacheDir: "~/.tsmono/cache"
   };
   const json_or_empty = (s) => {

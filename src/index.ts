@@ -880,7 +880,7 @@ export const build_config = (o: {config_json?: string} = {}) => {
     cache,
     fetch_ttl_seconds : 60 * 24,
     bin_sh: "/bin/sh",
-    npm_install_cmd: ["fyn"],
+    npm_install_cmd: ["yarn"],
     cacheDir: "~/.tsmono/cache",
   }
 
